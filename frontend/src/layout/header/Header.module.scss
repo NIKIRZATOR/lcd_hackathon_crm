@@ -1,0 +1,72 @@
+@use '../../styles/mixins' as *;
+
+.header {
+  height: 72px;
+  padding: 0 24px;
+
+  background: #ffffff;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  border-bottom: 1px solid #f0f0f0;
+
+  @include sm {
+    justify-content: end;
+  }
+}
+
+.logoLink {
+  display: flex;
+  gap: 6px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+
+  @include sm {
+    display: none;
+  }
+}
+
+.logoMain {
+  font-size: 26px;
+  font-weight: 700;
+  color: #252632;
+}
+
+.logoAccent {
+  font-size: 26px;
+  font-weight: 700;
+  color: #6941e8;
+}
+
+.notification {
+  font-size: 24px;
+}
+
+.divider {
+  height: 32px;
+  margin: 0;
+}
+
+.user {
+  cursor: pointer;
+}
+
+.avatar {
+  background-color: #6941e8;
+}
+
+.username {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+
+  @include xs {
+    display: none;
+  }
+}

@@ -1,0 +1,83 @@
+import { BellOutlined, LogoutOutlined, SettingOutlined, UserOutlined } from '@ant-design/icons';
+import type { MenuProps } from 'antd';
+import { Avatar, Badge, Button, Divider, Dropdown, Layout, Space, Typography } from 'antd';
+import { Link } from 'react-router-dom';
+import styles from './Header.module.scss';
+
+const { Header: HeaderAnt } = Layout;
+const { Text } = Typography;
+
+const userMenuItems: MenuProps['items'] = [
+  {
+    key: 'profile',
+    label: 'Профиль',
+    icon: <UserOutlined />,
+  },
+  {
+    key: 'settings',
+    label: 'Настройки',
+    icon: <SettingOutlined />,
+  },
+  {
+    type: 'divider',
+  },
+  {
+    key: 'logout',
+    label: 'Выйти',
+    icon: <LogoutOutlined />,
+    danger: true,
+  },
+];
+
+const Header = () => {
+  const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
+    if (key === 'profile') {
+      console.log('Профиль');
+    }
+
+    if (key === 'settings') {
+      console.log('Настройки');
+    }
+
+    if (key === 'logout') {
+      console.log('Выход');
+    }
+  };
+
+  return (
+    <HeaderAnt className={styles.header}>
+      <Link to="/dashboard" className={styles.logoLink}>
+        <Text className={styles.logoMain}>RTK</Text>
+        <Text className={styles.logoAccent}>EduFlow</Text>
+      </Link>
+      <Space size={16}>
+        <Badge dot offset={[-3, 3]}>
+          <Button
+            className={styles.notification}
+            type="text"
+            shape="circle"
+            icon={<BellOutlined />}
+          />
+        </Badge>
+        <Divider vertical className={styles.divider} />
+        <Dropdown
+          menu={{
+            items: userMenuItems,
+            onClick: handleUserMenuClick,
+          }}
+          trigger={['click']}
+          placement="bottomRight"
+        >
+          <Space size={10} className={styles.user}>
+            <Avatar size={40} className={styles.avatar}>
+              АА
+            </Avatar>
+            <Text className={styles.username}>Алексей Андреев</Text>
+          </Space>
+        </Dropdown>
+      </Space>
+    </HeaderAnt>
+  );
+};
+
+export default Header;
