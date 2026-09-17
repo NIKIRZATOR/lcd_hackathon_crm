@@ -1,8 +1,47 @@
 from fastapi import APIRouter
 
+from app.modules.analytics.router import router as analytics_router
+from app.modules.audit.router import router as audit_router
+from app.modules.auth.router import router as auth_router
+from app.modules.cohorts.router import router as cohorts_router
+from app.modules.contacts.router import router as contacts_router
+from app.modules.documents.router import router as documents_router
+from app.modules.integrations.router import router as integrations_router
+from app.modules.interactions.router import router as interactions_router
+from app.modules.licenses.router import router as licenses_router
+from app.modules.materials.router import router as materials_router
+from app.modules.notifications.router import router as notifications_router
+from app.modules.products.router import router as products_router
+from app.modules.programs.router import router as programs_router
+from app.modules.tasks.router import router as tasks_router
+from app.modules.teachers.router import router as teachers_router
+from app.modules.universities.router import router as universities_router
+from app.modules.users.router import router as users_router
+from app.modules.workflows.router import router as workflows_router
+
 api_router = APIRouter()
 
 
 @api_router.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok", "service": "backend"}
+
+
+api_router.include_router(analytics_router)
+api_router.include_router(audit_router)
+api_router.include_router(auth_router)
+api_router.include_router(cohorts_router)
+api_router.include_router(contacts_router)
+api_router.include_router(documents_router)
+api_router.include_router(integrations_router)
+api_router.include_router(interactions_router)
+api_router.include_router(licenses_router)
+api_router.include_router(materials_router)
+api_router.include_router(notifications_router)
+api_router.include_router(products_router)
+api_router.include_router(programs_router)
+api_router.include_router(tasks_router)
+api_router.include_router(teachers_router)
+api_router.include_router(universities_router)
+api_router.include_router(users_router)
+api_router.include_router(workflows_router)
