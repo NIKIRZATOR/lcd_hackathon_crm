@@ -1,26 +1,10 @@
-from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String
+from sqlalchemy import BigInteger, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base, ModelBase, TimestampCreateMixin, UUIDPrimaryKeyMixin
-
-
-class Contract(ModelBase):
-    __tablename__ = "contracts"
-
-    interaction_id: Mapped[UUID] = mapped_column(
-        PostgresUUID(as_uuid=True),
-        ForeignKey("university_interactions.id"),
-        nullable=False,
-    )
-    contract_number: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    status: Mapped[str] = mapped_column(String(64), nullable=False, default="DRAFT")
+from app.core.database import Base, TimestampCreateMixin, UUIDPrimaryKeyMixin
 
 
 class File(UUIDPrimaryKeyMixin, TimestampCreateMixin, Base):

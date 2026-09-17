@@ -36,3 +36,23 @@ Environment variables are documented in `.env.example`.
 
 - `GET /`
 - `GET /api/health`
+
+## Demo Data
+
+Run migrations before loading demo data:
+
+```bash
+docker compose run --rm backend alembic upgrade head
+```
+
+Seed dictionaries and their links:
+
+```bash
+docker compose run --rm backend python scripts/seed_demo_data.py
+```
+
+Clear all V1 data from the database:
+
+```bash
+docker compose run --rm backend python scripts/clear_demo_data.py
+```

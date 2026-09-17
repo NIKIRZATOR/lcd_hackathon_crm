@@ -181,19 +181,6 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['workflow_template_id'], ['workflow_templates.id'], name=op.f('fk_workflow_stages_workflow_template_id_workflow_templates')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_workflow_stages'))
     )
-    op.create_table('contracts',
-    sa.Column('interaction_id', sa.UUID(), nullable=False),
-    sa.Column('contract_number', sa.String(length=128), nullable=True),
-    sa.Column('signed_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('valid_from', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('valid_until', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('status', sa.String(length=64), nullable=False),
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['interaction_id'], ['university_interactions.id'], name=op.f('fk_contracts_interaction_id_university_interactions')),
-    sa.PrimaryKeyConstraint('id', name=op.f('pk_contracts'))
-    )
     op.create_table('interaction_contacts',
     sa.Column('interaction_id', sa.UUID(), nullable=False),
     sa.Column('contact_id', sa.UUID(), nullable=False),
@@ -245,23 +232,6 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['to_stage_id'], ['workflow_stages.id'], name=op.f('fk_workflow_transitions_to_stage_id_workflow_stages')),
     sa.ForeignKeyConstraint(['workflow_template_id'], ['workflow_templates.id'], name=op.f('fk_workflow_transitions_workflow_template_id_workflow_templates')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_workflow_transitions'))
-    )
-    op.create_table('licenses',
-    sa.Column('interaction_id', sa.UUID(), nullable=False),
-    sa.Column('product_id', sa.UUID(), nullable=False),
-    sa.Column('contract_id', sa.UUID(), nullable=True),
-    sa.Column('license_number', sa.String(length=128), nullable=True),
-    sa.Column('signed_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('valid_from', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('valid_until', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('transfer_status', sa.String(length=64), nullable=False),
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['contract_id'], ['contracts.id'], name=op.f('fk_licenses_contract_id_contracts')),
-    sa.ForeignKeyConstraint(['interaction_id'], ['university_interactions.id'], name=op.f('fk_licenses_interaction_id_university_interactions')),
-    sa.ForeignKeyConstraint(['product_id'], ['it_products.id'], name=op.f('fk_licenses_product_id_it_products')),
-    sa.PrimaryKeyConstraint('id', name=op.f('pk_licenses'))
     )
     op.create_table('workflow_stage_attachments',
     sa.Column('stage_instance_id', sa.UUID(), nullable=False),
@@ -318,11 +288,9 @@ def downgrade() -> None:
     op.drop_table('workflow_transition_history')
     op.drop_table('workflow_stage_comments')
     op.drop_table('workflow_stage_attachments')
-    op.drop_table('licenses')
     op.drop_table('workflow_transitions')
     op.drop_table('workflow_stage_instances')
     op.drop_table('interaction_contacts')
-    op.drop_table('contracts')
     op.drop_table('workflow_stages')
     op.drop_table('university_interactions')
     op.drop_table('program_products')
