@@ -1,0 +1,150 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.common.schemas.pagination import Page, PaginationParams
+from app.core.database import get_db_session
+from app.modules.products.schemas import (
+    ITProductCreate,
+    ITProductRead,
+    ITProductUpdate,
+    ProgramProductCreate,
+    ProgramProductRead,
+    ProgramProductUpdate,
+    VendorCreate,
+    VendorRead,
+    VendorUpdate,
+)
+from app.modules.products.service import ITProductService, ProgramProductService, VendorService
+
+router = APIRouter(tags=["products"])
+
+
+@router.get("/vendors", response_model=Page[VendorRead])
+def list_vendors(
+    search: str | None = None,
+    is_active: bool | None = None,
+    pagination: PaginationParams = Depends(),
+    db: Session = Depends(get_db_session),
+):
+    result = VendorService(db).list_vendors(
+        search=search,
+        is_active=is_active,
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort_by=pagination.sort_by,
+        sort_order=pagination.sort_order,
+    )
+    return Page(items=result.items, total=result.total, limit=pagination.limit, offset=pagination.offset)
+
+
+@router.get("/vendors/{vendor_id}", response_model=VendorRead)
+def get_vendor(vendor_id: UUID, db: Session = Depends(get_db_session)):
+    return VendorService(db).get_vendor(vendor_id)
+
+
+@router.post("/vendors", response_model=VendorRead, status_code=201)
+def create_vendor(payload: VendorCreate, db: Session = Depends(get_db_session)):
+    return VendorService(db).create_vendor(payload)
+
+
+@router.patch("/vendors/{vendor_id}", response_model=VendorRead)
+def update_vendor(vendor_id: UUID, payload: VendorUpdate, db: Session = Depends(get_db_session)):
+    return VendorService(db).update_vendor(vendor_id, payload)
+
+
+@router.patch("/vendors/{vendor_id}/deactivate", response_model=VendorRead)
+def deactivate_vendor(vendor_id: UUID, db: Session = Depends(get_db_session)):
+    return VendorService(db).deactivate_vendor(vendor_id)
+
+
+@router.get("/it-products", response_model=Page[ITProductRead])
+def list_products(
+    search: str | None = None,
+    vendor_id: UUID | None = None,
+    is_active: bool | None = None,
+    pagination: PaginationParams = Depends(),
+    db: Session = Depends(get_db_session),
+):
+    result = ITProductService(db).list_products(
+        search=search,
+        vendor_id=vendor_id,
+        is_active=is_active,
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort_by=pagination.sort_by,
+        sort_order=pagination.sort_order,
+    )
+    return Page(items=result.items, total=result.total, limit=pagination.limit, offset=pagination.offset)
+
+
+@router.get("/it-products/{product_id}", response_model=ITProductRead)
+def get_product(product_id: UUID, db: Session = Depends(get_db_session)):
+    return ITProductService(db).get_product(product_id)
+
+
+@router.post("/it-products", response_model=ITProductRead, status_code=201)
+def create_product(payload: ITProductCreate, db: Session = Depends(get_db_session)):
+    return ITProductService(db).create_product(payload)
+
+
+@router.patch("/it-products/{product_id}", response_model=ITProductRead)
+def update_product(
+    product_id: UUID,
+    payload: ITProductUpdate,
+    db: Session = Depends(get_db_session),
+):
+    return ITProductService(db).update_product(product_id, payload)
+
+
+@router.patch("/it-products/{product_id}/deactivate", response_model=ITProductRead)
+def deactivate_product(product_id: UUID, db: Session = Depends(get_db_session)):
+    return ITProductService(db).deactivate_product(product_id)
+
+
+@router.get("/program-products", response_model=Page[ProgramProductRead])
+def list_program_product_links(
+    program_id: UUID | None = None,
+    product_id: UUID | None = None,
+    is_required: bool | None = None,
+    pagination: PaginationParams = Depends(),
+    db: Session = Depends(get_db_session),
+):
+    result = ProgramProductService(db).list_links(
+        program_id=program_id,
+        product_id=product_id,
+        is_required=is_required,
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort_by=pagination.sort_by,
+        sort_order=pagination.sort_order,
+    )
+    return Page(items=result.items, total=result.total, limit=pagination.limit, offset=pagination.offset)
+
+
+@router.get("/program-products/{link_id}", response_model=ProgramProductRead)
+def get_program_product_link(link_id: UUID, db: Session = Depends(get_db_session)):
+    return ProgramProductService(db).get_link(link_id)
+
+
+@router.post("/program-products", response_model=ProgramProductRead, status_code=201)
+def create_program_product_link(
+    payload: ProgramProductCreate,
+    db: Session = Depends(get_db_session),
+):
+    return ProgramProductService(db).create_link(payload)
+
+
+@router.patch("/program-products/{link_id}", response_model=ProgramProductRead)
+def update_program_product_link(
+    link_id: UUID,
+    payload: ProgramProductUpdate,
+    db: Session = Depends(get_db_session),
+):
+    return ProgramProductService(db).update_link(link_id, payload)
+
+
+@router.delete("/program-products/{link_id}", status_code=204)
+def delete_program_product_link(link_id: UUID, db: Session = Depends(get_db_session)):
+    ProgramProductService(db).delete_link(link_id)
