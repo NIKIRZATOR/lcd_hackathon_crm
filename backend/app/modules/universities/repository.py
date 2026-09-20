@@ -1,5 +1,3 @@
-from sqlalchemy.orm import Session
-
 from app.common.repository import CRUDRepository
 from app.modules.universities.model import University
 
