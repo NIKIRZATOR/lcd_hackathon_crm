@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
+from app.common.errors import install_error_handlers
 from app.core.config import settings
 from app.core.logging import configure_logging
 
@@ -21,6 +22,7 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
+    install_error_handlers(application)
 
     @application.get("/")
     def root() -> dict[str, str]:
