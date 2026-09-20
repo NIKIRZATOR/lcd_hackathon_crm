@@ -32,14 +32,14 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
   const login = useCallback(async () => {
     await keycloak.login({
-      redirectUri: `${window.location.origin}/dashboard`,
+      redirectUri: window.location.origin,
     });
   }, []);
 
   const logout = useCallback(async () => {
     setUser(null);
     await keycloak.logout({
-      redirectUri: `${window.location.origin}/login`,
+      redirectUri: window.location.origin,
     });
   }, []);
 

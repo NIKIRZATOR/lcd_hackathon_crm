@@ -11,21 +11,24 @@ import RatingPage from '../pages/rating/RatingPage';
 import ReportsPage from '../pages/reports/ReportsPage';
 import TasksPage from '../pages/tasks/TasksPage';
 import UniversitiesPage from '../pages/universities/UniversitiesPage';
+import { allowedRoles } from './constants';
+import StartRoute from './StartRoute';
 
 const AppRoutes = () => {
   return (
     <Routes>
-      <Route index element={<LoginPage />} />
+      <Route path="/" element={<StartRoute />}>
+        <Route index element={<HomePage />} />
+      </Route>
       <Route path="/login" element={<LoginPage />} />
 
       <Route
         element={
-          <ProtectedRoute allowedRoles={['KAM', 'MANAGER', 'ADMIN']}>
+          <ProtectedRoute allowedRoles={allowedRoles}>
             <Layout />
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<HomePage />} />
         <Route path="/universities" element={<UniversitiesPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/programs" element={<ProgramsPage />} />
@@ -34,6 +37,7 @@ const AppRoutes = () => {
         <Route path="/rating" element={<RatingPage />} />
         <Route path="/reports" element={<ReportsPage />} />
       </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
