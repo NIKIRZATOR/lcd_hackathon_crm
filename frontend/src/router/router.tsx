@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
+import { ProtectedRoute } from '../auth';
 import Layout from '../layout';
 import AnalyticsPage from '../pages/analytics/AnalyticsPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
@@ -16,7 +17,13 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
 
-      <Route element={<Layout />}>
+      <Route
+        element={
+          <ProtectedRoute allowedRoles={['KAM', 'MANAGER', 'ADMIN']}>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<Navigate to="/dashboard" replace />} />
 
         <Route path="/dashboard" element={<DashboardPage />} />

@@ -8,7 +8,9 @@ import {
   TeamOutlined,
 } from '@ant-design/icons';
 import { Button, Divider, Form, Input, Typography } from 'antd';
+import { Navigate } from 'react-router-dom';
 
+import { useAuth } from '../../auth';
 import styles from './LoginPage.module.scss';
 
 const { Paragraph, Text, Title } = Typography;
@@ -32,13 +34,19 @@ const advantages = [
 ];
 
 const LoginPage = () => {
+  const { authenticated, initialized, login } = useAuth();
+
   const handleLogin = () => {
     console.log('RTK EduFlow login submit placeholder');
   };
 
   const handleKeycloakLogin = () => {
-    console.log('RTK EduFlow Keycloak login placeholder');
+    void login();
   };
+
+  if (initialized && authenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <main className={styles.page}>
@@ -122,6 +130,7 @@ const LoginPage = () => {
             block
             size="large"
             type="default"
+            loading={!initialized}
             onClick={handleKeycloakLogin}
             icon={<SafetyCertificateOutlined />}
             className={styles.keycloakButton}
