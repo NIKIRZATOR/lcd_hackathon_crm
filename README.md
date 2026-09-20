@@ -137,3 +137,10 @@ GET http://localhost:8000/api/auth/role-check
 ```bash
 docker compose down
 ```
+
+```bash
+docker compose down -v
+docker compose up -d --build
+docker compose run --rm backend alembic upgrade head
+docker compose run --rm backend python scripts/seed_demo_data.py
+```
