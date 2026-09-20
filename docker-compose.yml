@@ -6,10 +6,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-rtk_eduflow}
       POSTGRES_USER: ${POSTGRES_USER:-rtk_eduflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rtk_eduflow}
+      KEYCLOAK_DB: ${KEYCLOAK_DB:-keycloak}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-keycloak-db.sh:/docker-entrypoint-initdb.d/10-init-keycloak-db.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -27,10 +29,32 @@ services:
       API_PREFIX: /api
       DATABASE_URL: postgresql+psycopg://rtk_eduflow:rtk_eduflow@postgres:5432/rtk_eduflow
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk-eduflow}
+      KEYCLOAK_BACKEND_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-rtk-eduflow-backend}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-rtk-eduflow-backend}
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  keycloak-db-init:
+    image: postgres:16-alpine
+    container_name: rtk-eduflow-keycloak-db-init
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rtk_eduflow}
+      POSTGRES_USER: ${POSTGRES_USER:-rtk_eduflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rtk_eduflow}
+      KEYCLOAK_DB: ${KEYCLOAK_DB:-keycloak}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-rtk_eduflow}
+      POSTGRES_HOST: postgres
+    volumes:
+      - ./scripts/init-keycloak-db.sh:/scripts/init-keycloak-db.sh:ro
+    entrypoint: ["/bin/sh", "/scripts/init-keycloak-db.sh"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,6 +66,9 @@ services:
     environment:
       VITE_APP_NAME: ${APP_NAME:-edu_crm}
       VITE_API_URL: http://localhost:8000
+      VITE_KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
+      VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk-eduflow}
+      VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT_ID:-rtk-eduflow-frontend}
     ports:
       - "5173:5173"
     volumes:
@@ -49,6 +76,27 @@ services:
       - frontend_node_modules:/app/node_modules
     depends_on:
       - backend
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: rtk-eduflow-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}
+      KC_DB_USERNAME: ${POSTGRES_USER:-rtk_eduflow}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-rtk_eduflow}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/realm:/opt/keycloak/data/import:ro
+    depends_on:
+      keycloak-db-init:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

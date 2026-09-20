@@ -2,6 +2,7 @@ import { BellOutlined, LogoutOutlined, SettingOutlined, UserOutlined } from '@an
 import type { MenuProps } from 'antd';
 import { Avatar, Badge, Button, Divider, Dropdown, Layout, Space, Typography } from 'antd';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../auth';
 import styles from './Header.module.scss';
 
 const { Header: HeaderAnt } = Layout;
@@ -30,6 +31,8 @@ const userMenuItems: MenuProps['items'] = [
 ];
 
 const Header = () => {
+  const { logout, user } = useAuth();
+
   const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profile') {
       console.log('Профиль');
@@ -40,7 +43,7 @@ const Header = () => {
     }
 
     if (key === 'logout') {
-      console.log('Выход');
+      void logout();
     }
   };
 
@@ -70,9 +73,9 @@ const Header = () => {
         >
           <Space size={10} className={styles.user}>
             <Avatar size={40} className={styles.avatar}>
-              АА
+              {(user?.full_name ?? user?.username ?? 'RT').slice(0, 2).toUpperCase()}
             </Avatar>
-            <Text className={styles.username}>Алексей Андреев</Text>
+            <Text className={styles.username}>{user?.full_name ?? user?.username ?? 'Пользователь'}</Text>
           </Space>
         </Dropdown>
       </Space>

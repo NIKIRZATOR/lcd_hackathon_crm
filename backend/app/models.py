@@ -6,7 +6,7 @@ from app.modules.interactions.model import InteractionContact, UniversityInterac
 from app.modules.products.model import ITProduct, ProgramProduct, Vendor
 from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.universities.model import University
-from app.modules.users.model import User
+from app.modules.users.model import Role, User, user_roles
 from app.modules.workflows.model import (
     WorkflowStage,
     WorkflowStageAttachment,
@@ -24,10 +24,12 @@ __all__ = [
     "ITProgram",
     "InteractionContact",
     "ProgramProduct",
+    "Role",
     "University",
     "UniversityContact",
     "UniversityInteraction",
     "User",
+    "user_roles",
     "Vendor",
     "WorkflowStage",
     "WorkflowStageAttachment",

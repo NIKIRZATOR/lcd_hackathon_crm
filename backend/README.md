@@ -36,6 +36,10 @@ Environment variables are documented in `.env.example`.
 
 - `GET /`
 - `GET /api/health`
+- `GET /api/auth/me`
+- `GET /api/auth/role-check`
+
+Auth endpoints expect a Keycloak Bearer token from realm `rtk-eduflow`.
 
 ## Demo Data
 

@@ -7,13 +7,16 @@ import App from './App';
 import './styles/reset.scss';
 import './styles/mixins.scss';
 import { appTheme } from './styles/theme';
+import { AuthProvider } from './auth';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ConfigProvider theme={appTheme}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </AuthProvider>
     </ConfigProvider>
   </StrictMode>,
 );
