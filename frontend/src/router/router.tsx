@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '../auth';
 import Layout from '../layout';
 import AnalyticsPage from '../pages/analytics/AnalyticsPage';
-import DashboardPage from '../pages/dashboard/DashboardPage';
+import HomePage from '../pages/home/HomePage';
 import LoginPage from '../pages/login/LoginPage';
 import ProductsPage from '../pages/products/ProductsPage';
 import ProgramsPage from '../pages/programs/ProgramsPage';
@@ -15,6 +15,7 @@ import UniversitiesPage from '../pages/universities/UniversitiesPage';
 const AppRoutes = () => {
   return (
     <Routes>
+      <Route index element={<LoginPage />} />
       <Route path="/login" element={<LoginPage />} />
 
       <Route
@@ -24,9 +25,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
-
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/universities" element={<UniversitiesPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/programs" element={<ProgramsPage />} />
@@ -35,6 +34,7 @@ const AppRoutes = () => {
         <Route path="/rating" element={<RatingPage />} />
         <Route path="/reports" element={<ReportsPage />} />
       </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

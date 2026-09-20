@@ -3,24 +3,35 @@
 .header {
   height: 72px;
   padding: 0 24px;
-
-  background: #ffffff;
+  background: var(--ant-color-bg-container);
 
   display: flex;
   align-items: center;
   justify-content: space-between;
 
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
 
   @include sm {
-    justify-content: end;
+    padding: 0 16px;
   }
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menuButton {
+  font-size: 22px;
 }
 
 .logoLink {
   display: flex;
   gap: 6px;
+
   cursor: pointer;
+
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
@@ -34,13 +45,13 @@
 .logoMain {
   font-size: 26px;
   font-weight: 700;
-  color: #252632;
+  color: var(--ant-color-primary);
 }
 
 .logoAccent {
   font-size: 26px;
   font-weight: 700;
-  color: #6941e8;
+  color: var(--ant-orange);
 }
 
 .notification {
@@ -57,7 +68,7 @@
 }
 
 .avatar {
-  background-color: #6941e8;
+  background-color: var(--ant-color-primary);
 }
 
 .username {

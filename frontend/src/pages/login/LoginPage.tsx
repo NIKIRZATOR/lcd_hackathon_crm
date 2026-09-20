@@ -45,7 +45,7 @@ const LoginPage = () => {
   };
 
   if (initialized && authenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return (
@@ -102,11 +102,7 @@ const LoginPage = () => {
               name="password"
               rules={[{ required: true, message: 'Введите пароль' }]}
             >
-              <Input.Password
-                size="large"
-                prefix={<LockOutlined />}
-                placeholder="Введите пароль"
-              />
+              <Input.Password size="large" prefix={<LockOutlined />} placeholder="Введите пароль" />
             </Form.Item>
 
             <Button

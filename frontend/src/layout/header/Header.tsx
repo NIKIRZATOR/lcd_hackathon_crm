@@ -1,4 +1,10 @@
-import { BellOutlined, LogoutOutlined, SettingOutlined, UserOutlined } from '@ant-design/icons';
+import {
+  BellOutlined,
+  LogoutOutlined,
+  MenuOutlined,
+  SettingOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { Avatar, Badge, Button, Divider, Dropdown, Layout, Space, Typography } from 'antd';
 import { Link } from 'react-router-dom';
@@ -7,6 +13,11 @@ import styles from './Header.module.scss';
 
 const { Header: HeaderAnt } = Layout;
 const { Text } = Typography;
+
+type HeaderProps = {
+  showMenuButton?: boolean;
+  onMenuClick?: () => void;
+};
 
 const userMenuItems: MenuProps['items'] = [
   {
@@ -30,7 +41,7 @@ const userMenuItems: MenuProps['items'] = [
   },
 ];
 
-const Header = () => {
+const Header = ({ showMenuButton, onMenuClick }: HeaderProps) => {
   const { logout, user } = useAuth();
 
   const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
@@ -49,10 +60,23 @@ const Header = () => {
 
   return (
     <HeaderAnt className={styles.header}>
-      <Link to="/dashboard" className={styles.logoLink}>
-        <Text className={styles.logoMain}>RTK</Text>
-        <Text className={styles.logoAccent}>EduFlow</Text>
-      </Link>
+      <div className={styles.left}>
+        {showMenuButton && (
+          <Button
+            type="text"
+            shape="circle"
+            icon={<MenuOutlined />}
+            onClick={onMenuClick}
+            className={styles.menuButton}
+          />
+        )}
+
+        <Link to="/" className={styles.logoLink}>
+          <Text className={styles.logoMain}>RTK</Text>
+          <Text className={styles.logoAccent}>EduFlow</Text>
+        </Link>
+      </div>
+
       <Space size={16}>
         <Badge dot offset={[-3, 3]}>
           <Button
@@ -62,7 +86,9 @@ const Header = () => {
             icon={<BellOutlined />}
           />
         </Badge>
+
         <Divider vertical className={styles.divider} />
+
         <Dropdown
           menu={{
             items: userMenuItems,
@@ -75,7 +101,9 @@ const Header = () => {
             <Avatar size={40} className={styles.avatar}>
               {(user?.full_name ?? user?.username ?? 'RT').slice(0, 2).toUpperCase()}
             </Avatar>
-            <Text className={styles.username}>{user?.full_name ?? user?.username ?? 'Пользователь'}</Text>
+            <Text className={styles.username}>
+              {user?.full_name ?? user?.username ?? 'Пользователь'}
+            </Text>
           </Space>
         </Dropdown>
       </Space>

@@ -1,8 +1,14 @@
 import type { ThemeConfig } from 'antd';
 
 export const appTheme: ThemeConfig = {
+  cssVar: { prefix: 'ant' },
+
   token: {
-    colorPrimary: '#6941E8',
+    colorPrimary: '#7700FF',
+    colorPrimaryHover: '#9466FF',
+
+    purple: '#9466FF',
+    orange: '#FF4F12',
 
     colorText: '#252632',
     colorTextSecondary: '#8C8FA3',
@@ -14,18 +20,17 @@ export const appTheme: ThemeConfig = {
     colorBorder: '#E7E9F1',
     colorBorderSecondary: '#EFF0F5',
 
+    colorSuccess: '#22C55E',
+    colorWarning: '#F59E0B',
+    colorError: '#EF4444',
+
     borderRadius: 6,
     borderRadiusLG: 8,
 
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-
     fontSize: 14,
 
     controlHeight: 36,
-
-    colorSuccess: '#22C55E',
-    colorWarning: '#F59E0B',
-    colorError: '#EF4444',
   },
 
   components: {
@@ -41,7 +46,7 @@ export const appTheme: ThemeConfig = {
 
       lightSiderBg: '#F8F8FC',
       lightTriggerBg: '#F8F8FC',
-      lightTriggerColor: '#6941E8',
+      lightTriggerColor: '#7700FF',
 
       triggerHeight: 48,
     },
@@ -50,11 +55,12 @@ export const appTheme: ThemeConfig = {
       itemBg: 'transparent',
 
       itemColor: '#9295A8',
-      itemHoverColor: '#6941E8',
-      itemHoverBg: '#F1EDFF',
 
-      itemSelectedColor: '#6941E8',
-      itemSelectedBg: '#E9E3FF',
+      itemHoverColor: '#7700FF',
+      itemHoverBg: '#F5F0FF',
+
+      itemSelectedColor: '#7700FF',
+      itemSelectedBg: '#EFE5FF',
 
       itemBorderRadius: 6,
       itemHeight: 40,
@@ -68,40 +74,62 @@ export const appTheme: ThemeConfig = {
     Card: {
       colorBgContainer: '#FFFFFF',
       borderRadiusLG: 8,
-      boxShadowTertiary: '0 2px 8px rgba(35, 32, 58, 0.05)',
+      boxShadowTertiary: '0 2px 8px rgba(37, 38, 50, 0.05)',
     },
 
     Button: {
       borderRadius: 6,
+
       primaryShadow: 'none',
       defaultShadow: 'none',
+
+      defaultHoverColor: '#7700FF',
+      defaultHoverBorderColor: '#9466FF',
+
+      textTextColor: '#7700FF',
+      textTextHoverColor: '#9466FF',
+      textTextActiveColor: '#7700FF',
     },
 
     Input: {
-      activeBorderColor: '#6941E8',
-      hoverBorderColor: '#8061EA',
-      activeShadow: '0 0 0 2px rgba(105, 65, 232, 0.08)',
+      activeBorderColor: '#7700FF',
+      hoverBorderColor: '#9466FF',
+
+      activeShadow: '0 0 0 2px rgba(119, 0, 255, 0.08)',
     },
 
     Select: {
-      activeBorderColor: '#6941E8',
-      hoverBorderColor: '#8061EA',
+      activeBorderColor: '#7700FF',
+      hoverBorderColor: '#9466FF',
 
-      optionSelectedBg: '#EEE9FF',
-      optionSelectedColor: '#6941E8',
+      optionSelectedBg: '#F5F0FF',
+      optionSelectedColor: '#7700FF',
     },
 
     Table: {
-      headerBg: '#F8F8FC',
+      headerBg: 'transparent',
       headerColor: '#777A8C',
+
+      headerSortActiveBg: '#FAF7FF',
+      headerSortHoverBg: '#FAF7FF',
+      fixedHeaderSortActiveBg: '#FAF7FF',
+
+      bodySortBg: '#FAF7FF',
+
       borderColor: '#ECEEF4',
-      rowHoverBg: '#FAF9FF',
+
+      rowHoverBg: '#FAF7FF',
+      rowExpandedBg: 'transparent',
+
+      expandIconBg: 'transparent',
     },
 
     Tabs: {
-      inkBarColor: '#6941E8',
-      itemSelectedColor: '#6941E8',
-      itemHoverColor: '#8061EA',
+      inkBarColor: '#7700FF',
+
+      itemSelectedColor: '#7700FF',
+      itemHoverColor: '#9466FF',
+      itemActiveColor: '#7700FF',
     },
   },
 };

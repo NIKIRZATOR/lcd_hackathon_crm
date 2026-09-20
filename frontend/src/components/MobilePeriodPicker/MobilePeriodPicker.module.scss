@@ -1,0 +1,87 @@
+.period {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  width: 100%;
+  min-width: 0;
+
+  &__input {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+
+    background: var(--ant-color-bg-container);
+    border: 1px solid var(--ant-color-border);
+    border-radius: var(--ant-border-radius);
+
+    &:focus-within {
+      border-color: var(--ant-color-primary);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--ant-color-primary) 10%, transparent);
+    }
+  }
+
+  &__date {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  &__arrow {
+    flex-shrink: 0;
+    color: var(--ant-color-text-secondary);
+  }
+
+  &__presets {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: auto;
+
+    width: 100%;
+  }
+
+  &__preset {
+    width: 100%;
+  }
+
+  &__preset_active {
+    color: var(--ant-color-primary);
+    background: color-mix(in srgb, var(--ant-color-primary) 10%, white);
+    border-color: color-mix(in srgb, var(--ant-color-primary) 35%, white);
+
+    &:hover {
+      color: var(--ant-color-primary);
+      background: color-mix(in srgb, var(--ant-color-primary) 15%, white);
+      border-color: var(--ant-color-primary);
+    }
+  }
+
+  &__popup {
+    width: 300px;
+
+    :global(.ant-picker-panel-container),
+    :global(.ant-picker-panel),
+    :global(.ant-picker-date-panel),
+    :global(.ant-picker-month-panel),
+    :global(.ant-picker-year-panel),
+    :global(.ant-picker-decade-panel),
+    :global(.ant-picker-content) {
+      width: 100%;
+      min-width: 0;
+    }
+
+    :global(.ant-picker-body) {
+      box-sizing: border-box;
+      padding-inline: 8px;
+    }
+
+    :global(.ant-picker-content) {
+      table-layout: fixed;
+    }
+  }
+}
