@@ -1,0 +1,62 @@
+.kpi {
+  &__card {
+    flex: 1 0 220px;
+    min-width: 220px;
+
+    background: var(--ant-color-bg-container);
+    border-color: var(--ant-color-border-secondary);
+  }
+
+  &__label {
+    margin-bottom: 12px;
+
+    color: var(--ant-color-text);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  &__content {
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+  }
+
+  &__value {
+    flex-shrink: 0;
+
+    color: var(--ant-color-text);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  &__comparison {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__trend--positive,
+  &__trend--negative {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  &__trend--positive {
+    color: var(--ant-color-success);
+  }
+
+  &__trend--negative {
+    color: var(--ant-color-error);
+  }
+
+  &__comparisonText {
+    color: var(--ant-color-text-secondary);
+    font-size: 10px;
+  }
+}

@@ -1,14 +1,21 @@
+$breakpoint-tablet: 992px;
 $breakpoint-mobile-sm: 768px;
 $breakpoint-mobile-xs: 576px;
 
-@mixin xs {
-  @media (max-width: #{$breakpoint-mobile-xs - 1px}) {
+@mixin md {
+  @media (max-width: #{$breakpoint-tablet - 1px}) {
     @content;
   }
 }
 
 @mixin sm {
   @media (max-width: #{$breakpoint-mobile-sm - 1px}) {
+    @content;
+  }
+}
+
+@mixin xs {
+  @media (max-width: #{$breakpoint-mobile-xs - 1px}) {
     @content;
   }
 }

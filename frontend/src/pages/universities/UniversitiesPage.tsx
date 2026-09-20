@@ -1,10 +1,13 @@
+import PageLayout from '../../components/pageLayout/PageLayout';
+
 const UniversitiesPage = () => {
   return (
-    <p>
+    <PageLayout>
       Список Вузов - с переходом на карточку конкретного вуза: <br></br> University 360 Единая
       карточка: контакты, взаимодействия, программы, продукты, преподаватели, потоки, документы,
       задачи, история.
-    </p>
+      <br></br>
+    </PageLayout>
   );
 };
 

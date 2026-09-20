@@ -1,0 +1,152 @@
+@use '../../styles/mixins' as mixins;
+
+.form {
+  display: flex;
+  flex-direction: column;
+
+  width: 100%;
+  padding: 16px;
+
+  background: var(--ant-color-bg-container);
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+
+  &__filters {
+    display: grid;
+    grid-template-columns:
+      300px
+      repeat(var(--filters-columns-count), minmax(0, 1fr));
+    gap: 12px;
+
+    width: 100%;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 12px;
+    align-self: flex-end;
+  }
+}
+
+.filters {
+  &__item {
+    min-width: 0;
+    margin-bottom: 0;
+  }
+}
+
+.mobileFilters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+  min-width: 0;
+
+  &__button {
+    flex-shrink: 0;
+
+    color: var(--ant-color-primary);
+    border-color: var(--ant-color-primary);
+  }
+
+  &__selected {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 4px;
+
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  &__tag {
+    flex-shrink: 0;
+
+    max-width: 120px;
+    margin-inline-end: 0;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.mobileModal {
+  max-width: calc(100vw - 24px);
+
+  :global(.ant-modal-content) {
+    padding: 20px 16px 16px;
+    border-radius: 20px;
+  }
+
+  :global(.ant-modal-header) {
+    margin-bottom: 20px;
+  }
+
+  :global(.ant-modal-title) {
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  &__filters {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    :global(.ant-form-item) {
+      width: 100%;
+      margin-bottom: 0;
+    }
+
+    :global(.ant-select) {
+      width: 100%;
+    }
+  }
+
+  &__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+
+    margin-top: 16px;
+    padding-top: 12px;
+
+    border-top: 1px solid var(--ant-color-border-secondary);
+
+    button {
+      width: 100%;
+    }
+  }
+}
+
+@include mixins.md {
+  .form {
+    gap: 20px;
+
+    &__filters {
+      grid-template-columns: 300px repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
+  }
+
+  .filters {
+    &__item_primary {
+      grid-row: span 2;
+    }
+
+    &__item:nth-child(4),
+    &__item:nth-child(5) {
+      align-self: end;
+    }
+  }
+}
+
+@include mixins.sm {
+  .form {
+    padding: 0;
+
+    background: transparent;
+    border: 0;
+  }
+}
