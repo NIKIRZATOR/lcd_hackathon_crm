@@ -32,6 +32,7 @@ services:
       KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk-eduflow}
+      KEYCLOAK_FRONTEND_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT_ID:-rtk-eduflow-frontend}
       KEYCLOAK_BACKEND_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-rtk-eduflow-backend}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-rtk-eduflow-backend}
     ports:

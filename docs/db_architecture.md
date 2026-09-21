@@ -188,6 +188,7 @@ Runtime-логика:
 | --- | --- | --- | --- | --- |
 | `GET` | `/auth/me` | Authenticated | Bearer token | Текущего пользователя |
 | `GET` | `/auth/role-check` | `KAM`, `MANAGER`, `ADMIN` | Bearer token | Информацию о доступе |
+| `POST` | `/auth/token` | Public | Swagger OAuth2 username/password form | Keycloak bearer token |
 
 Пример ответа `/auth/me`:
 
@@ -202,6 +203,18 @@ Runtime-логика:
   "roles": ["KAM"]
 }
 ```
+
+`POST /auth/token` используется Swagger UI для ручной проверки API. В Swagger нужно нажать `Authorize`, ввести demo `username` и `password`, а `client_id` и `client_secret` оставить пустыми. Backend сам использует public client `rtk-eduflow-frontend` и Keycloak password grant.
+
+Demo users:
+
+| Username | Password | Role |
+| --- | --- | --- |
+| `kam1` | `kam1` | `KAM` |
+| `kam2` | `kam2` | `KAM` |
+| `manager1` | `manager1` | `MANAGER` |
+| `admin1` | `admin1` | `ADMIN` |
+| `viewer1` | `viewer1` | no CRM role |
 
 ### Universities
 
