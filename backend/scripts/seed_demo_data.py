@@ -13,8 +13,10 @@ from app.modules.contacts.model import UniversityContact
 from app.modules.products.model import ITProduct, ProgramProduct, Vendor
 from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.universities.model import University
-from app.modules.users.model import User
+from app.modules.interactions.model import UniversityInteraction
+from app.modules.users.model import ManagerMembership, Role, User
 from app.modules.workflows.model import WorkflowStage, WorkflowTemplate, WorkflowTransition
+from app.modules.workflows.service import WorkflowRuntimeService
 
 
 UNIVERSITIES = [
@@ -124,12 +126,80 @@ PROGRAM_PRODUCTS = [
     ("QA Automation", "Deploy Manager", False),
 ]
 
+ROLES = {
+    "KAM": "University account manager",
+    "MANAGER": "Manager lead",
+    "ADMIN": "Platform administrator",
+}
+
 USERS = [
     {
-        "full_name": "Alexey Andreev",
-        "email": "ivan.ivanovich@rtk.demo",
-        "role": "MANAGER",
-    }
+        "username": "kam1",
+        "full_name": "KAM One",
+        "email": "kam1@example.local",
+        "roles": ["KAM"],
+    },
+    {
+        "username": "kam2",
+        "full_name": "KAM Two",
+        "email": "kam2@example.local",
+        "roles": ["KAM"],
+    },
+    {
+        "username": "manager1",
+        "full_name": "Manager One",
+        "email": "manager1@example.local",
+        "roles": ["MANAGER"],
+    },
+    {
+        "username": "admin1",
+        "full_name": "Admin One",
+        "email": "admin1@example.local",
+        "roles": ["ADMIN"],
+    },
+]
+
+MANAGER_MEMBERSHIPS = [
+    ("manager1", "kam1"),
+]
+
+INTERACTIONS = [
+    {
+        "university": "MSU",
+        "program": "DevOps Basic",
+        "product": "Cloud Lab",
+        "manager": "kam1",
+        "status": "ACTIVE",
+        "contract_number": "RTK-DEMO-001",
+        "license_signed": True,
+        "transfer_status": "TRANSFERRED",
+        "university_responsibles": "Ivan Sokolov",
+        "comment": "Visible to kam1 and manager1.",
+    },
+    {
+        "university": "ITMO",
+        "program": "Applied Machine Learning",
+        "product": "ML Studio",
+        "manager": "kam1",
+        "status": "ACTIVE",
+        "contract_number": "RTK-DEMO-002",
+        "license_signed": False,
+        "transfer_status": "IN_PROGRESS",
+        "university_responsibles": "Anna Petrova",
+        "comment": "Second interaction in manager1 scope.",
+    },
+    {
+        "university": "NSU",
+        "program": "QA Automation",
+        "product": "Test Automation Kit",
+        "manager": "kam2",
+        "status": "ACTIVE",
+        "contract_number": "RTK-DEMO-003",
+        "license_signed": False,
+        "transfer_status": "NOT_STARTED",
+        "university_responsibles": "Dmitry Kuznetsov",
+        "comment": "Visible to kam2 and admin1, not manager1.",
+    },
 ]
 
 WORKFLOW_TEMPLATE = {
@@ -300,20 +370,46 @@ def seed_program_products(
             )
 
 
-def seed_users(db: Session) -> dict[str, User]:
+def seed_roles(db: Session) -> dict[str, Role]:
+    result = {}
+    for name, description in ROLES.items():
+        role = get_by_field(db, Role, "name", name)
+        if role is None:
+            role = Role(name=name, description=description)
+            db.add(role)
+            db.flush()
+        result[name] = role
+    return result
+
+
+def seed_users(db: Session, roles: dict[str, Role]) -> dict[str, User]:
     result = {}
     for data in USERS:
-        user = get_by_field(db, User, "email", data["email"])
+        user = get_by_field(db, User, "username", data["username"])
+        local_roles = [roles[name] for name in data["roles"]]
         if user is None:
-            user = User(**data, is_active=True)
+            user = User(
+                username=data["username"],
+                full_name=data["full_name"],
+                email=data["email"],
+                role=local_roles[0].name,
+                is_active=True,
+                roles=local_roles,
+            )
             db.add(user)
             db.flush()
-        result[data["email"]] = user
+        else:
+            user.full_name = data["full_name"]
+            user.email = data["email"]
+            user.role = local_roles[0].name
+            user.is_active = True
+            user.roles = local_roles
+        result[data["username"]] = user
     return result
 
 
 def seed_workflow(db: Session, users: dict[str, User]) -> WorkflowTemplate:
-    creator = users["ivan.ivanovich@rtk.demo"]
+    creator = users["admin1"]
     template = get_by_field(db, WorkflowTemplate, "name", WORKFLOW_TEMPLATE["name"])
     if template is None:
         template = WorkflowTemplate(**WORKFLOW_TEMPLATE, created_by=creator.id, is_active=True)
@@ -369,6 +465,68 @@ def seed_workflow(db: Session, users: dict[str, User]) -> WorkflowTemplate:
     return template
 
 
+def seed_manager_memberships(db: Session, users: dict[str, User]) -> None:
+    for manager_username, kam_username in MANAGER_MEMBERSHIPS:
+        manager = users[manager_username]
+        kam = users[kam_username]
+        membership = db.scalar(
+            select(ManagerMembership).where(
+                ManagerMembership.manager_user_id == manager.id,
+                ManagerMembership.kam_user_id == kam.id,
+            )
+        )
+        if membership is None:
+            db.add(ManagerMembership(manager_user_id=manager.id, kam_user_id=kam.id, is_active=True))
+        else:
+            membership.is_active = True
+
+
+def seed_interactions(
+    db: Session,
+    universities: dict[str, University],
+    programs: dict[str, ITProgram],
+    products: dict[str, ITProduct],
+    users: dict[str, User],
+    workflow_template: WorkflowTemplate,
+) -> None:
+    runtime = WorkflowRuntimeService(db)
+    for data in INTERACTIONS:
+        university = universities[data["university"]]
+        program = programs[data["program"]]
+        product = products[data["product"]]
+        manager = users[data["manager"]]
+        interaction = db.scalar(
+            select(UniversityInteraction).where(
+                UniversityInteraction.university_id == university.id,
+                UniversityInteraction.program_id == program.id,
+                UniversityInteraction.product_id == product.id,
+            )
+        )
+        values = {
+            "manager_user_id": manager.id,
+            "workflow_template_id": workflow_template.id,
+            "status": data["status"],
+            "contract_number": data["contract_number"],
+            "license_signed": data["license_signed"],
+            "transfer_status": data["transfer_status"],
+            "university_responsibles": data["university_responsibles"],
+            "comment": data["comment"],
+        }
+        if interaction is None:
+            interaction = UniversityInteraction(
+                university_id=university.id,
+                program_id=program.id,
+                product_id=product.id,
+                **values,
+            )
+            db.add(interaction)
+            db.flush()
+            runtime.initialize_interaction_workflow(interaction)
+        else:
+            for field, value in values.items():
+                setattr(interaction, field, value)
+
+
 def main() -> None:
     db = SessionLocal()
     try:
@@ -379,8 +537,11 @@ def main() -> None:
         vendors = seed_vendors(db)
         products = seed_products(db, vendors)
         seed_program_products(db, programs, products)
-        users = seed_users(db)
-        seed_workflow(db, users)
+        roles = seed_roles(db)
+        users = seed_users(db, roles)
+        workflow_template = seed_workflow(db, users)
+        seed_manager_memberships(db, users)
+        seed_interactions(db, universities, programs, products, users, workflow_template)
         db.commit()
     finally:
         db.close()

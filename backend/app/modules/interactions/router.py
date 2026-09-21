@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.common.schemas.pagination import Page, PaginationParams
@@ -10,12 +10,14 @@ from app.modules.auth.access import (
     ensure_can_create_interaction,
     ensure_can_delete_interaction,
     ensure_can_read_interaction,
+    ensure_can_assign_interaction,
     ensure_can_update_interaction,
     resolve_interaction_manager_filter,
 )
 from app.modules.auth.dependencies import require_roles
 from app.modules.interactions.schemas import (
     UniversityInteractionCreate,
+    UniversityInteractionAssign,
     UniversityInteractionRead,
     UniversityInteractionUpdate,
 )
@@ -85,8 +87,26 @@ def update_interaction(
 ):
     service = UniversityInteractionService(db)
     interaction = service.get_interaction(interaction_id)
+    if "manager_user_id" in payload.model_fields_set:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use assignment endpoint to change interaction manager",
+        )
     ensure_can_update_interaction(db, current_user, interaction, payload)
     return service.update_interaction(interaction_id, payload, changed_by_user_id=current_user.id)
+
+
+@router.post("/{interaction_id}/assign", response_model=UniversityInteractionRead)
+def assign_interaction(
+    interaction_id: UUID,
+    payload: UniversityInteractionAssign,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles("MANAGER", "ADMIN")),
+):
+    service = UniversityInteractionService(db)
+    interaction = service.get_interaction(interaction_id)
+    ensure_can_assign_interaction(db, current_user, interaction, payload.manager_user_id)
+    return service.assign_interaction(interaction_id, payload, changed_by_user_id=current_user.id)
 
 
 @router.delete("/{interaction_id}", status_code=204)

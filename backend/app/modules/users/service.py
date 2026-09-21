@@ -29,6 +29,8 @@ class UserService:
 
         user = self.repository.get_by_keycloak_user_id(keycloak_user_id)
         if user is None:
+            user = self.repository.get_by_username(username)
+        if user is None:
             user = User(
                 keycloak_user_id=keycloak_user_id,
                 username=username,
@@ -40,6 +42,7 @@ class UserService:
             )
             self.repository.add_user(user)
         else:
+            user.keycloak_user_id = keycloak_user_id
             user.username = username
             user.full_name = full_name or user.full_name or username
             user.email = email

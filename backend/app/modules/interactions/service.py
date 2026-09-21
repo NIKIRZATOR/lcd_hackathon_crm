@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.common.repository import ListResult
 from app.modules.interactions.model import InteractionContact, UniversityInteraction
 from app.modules.interactions.repository import UniversityInteractionRepository
-from app.modules.interactions.schemas import UniversityInteractionCreate, UniversityInteractionUpdate
+from app.modules.interactions.schemas import UniversityInteractionAssign, UniversityInteractionCreate, UniversityInteractionUpdate
 from app.modules.products.model import ITProduct
 from app.modules.programs.model import ITProgram
 from app.modules.universities.model import University
@@ -118,6 +118,44 @@ class UniversityInteractionService:
                 )
             )
 
+        self.db.commit()
+        self.db.refresh(interaction)
+        return interaction
+
+    def assign_interaction(
+        self,
+        interaction_id: UUID,
+        payload: UniversityInteractionAssign,
+        *,
+        changed_by_user_id: UUID,
+    ) -> UniversityInteraction:
+        interaction = self.get_interaction(interaction_id)
+        old_manager_user_id = interaction.manager_user_id
+
+        if payload.manager_user_id is not None and self.db.get(User, payload.manager_user_id) is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Manager user not found")
+
+        if payload.manager_user_id == old_manager_user_id:
+            return interaction
+
+        interaction.manager_user_id = payload.manager_user_id
+        self.db.add(
+            ResponsibleAssignmentHistory(
+                interaction_id=interaction.id,
+                old_manager_user_id=old_manager_user_id,
+                new_manager_user_id=payload.manager_user_id,
+                changed_by_user_id=changed_by_user_id,
+                reason=payload.reason,
+            )
+        )
+        self.db.execute(
+            update(WorkflowStageInstance)
+            .where(
+                WorkflowStageInstance.interaction_id == interaction.id,
+                WorkflowStageInstance.status.in_(["NOT_STARTED", "IN_PROGRESS", "WAITING", "BLOCKED"]),
+            )
+            .values(responsible_user_id=payload.manager_user_id)
+        )
         self.db.commit()
         self.db.refresh(interaction)
         return interaction

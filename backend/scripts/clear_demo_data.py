@@ -14,7 +14,7 @@ from app.modules.interactions.model import InteractionContact, UniversityInterac
 from app.modules.products.model import ITProduct, ProgramProduct, Vendor
 from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.universities.model import University
-from app.modules.users.model import User
+from app.modules.users.model import DataAccessScope, ManagerMembership, ResponsibleAssignmentHistory, User, user_roles
 from app.modules.workflows.model import (
     WorkflowStageAttachment,
     WorkflowStageComment,
@@ -32,6 +32,9 @@ def main() -> None:
         db.execute(delete(WorkflowStageAttachment))
         db.execute(delete(WorkflowStageComment))
         db.execute(delete(WorkflowTransitionHistory))
+        db.execute(delete(ResponsibleAssignmentHistory))
+        db.execute(delete(DataAccessScope))
+        db.execute(delete(ManagerMembership))
         db.execute(delete(InteractionContact))
         db.execute(update(UniversityInteraction).values(current_stage_instance_id=None))
         db.execute(delete(WorkflowStageInstance))
@@ -47,6 +50,7 @@ def main() -> None:
         db.execute(delete(ITProgram))
         db.execute(delete(ITDirection))
         db.execute(delete(University))
+        db.execute(delete(user_roles))
         db.execute(delete(User))
 
         db.commit()

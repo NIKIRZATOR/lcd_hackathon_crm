@@ -14,6 +14,10 @@ class UserRepository:
         statement = select(User).where(User.keycloak_user_id == keycloak_user_id)
         return self.db.scalar(statement)
 
+    def get_by_username(self, username: str) -> User | None:
+        statement = select(User).where(User.username == username)
+        return self.db.scalar(statement)
+
     def get_role_by_name(self, name: str) -> Role | None:
         statement = select(Role).where(Role.name == name)
         return self.db.scalar(statement)

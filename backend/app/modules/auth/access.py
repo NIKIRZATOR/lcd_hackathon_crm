@@ -14,7 +14,18 @@ CRM_ROLES = ("KAM", "MANAGER", "ADMIN")
 CATALOG_WRITE_ROLES = ("MANAGER", "ADMIN")
 ADMIN_ROLES = ("ADMIN",)
 
-KAM_ALLOWED_INTERACTION_UPDATE_FIELDS = {"status", "started_at", "completed_at", "comment"}
+KAM_ALLOWED_INTERACTION_UPDATE_FIELDS = {
+    "status",
+    "contract_number",
+    "license_signed",
+    "license_signed_at",
+    "license_valid_until",
+    "transfer_status",
+    "university_responsibles",
+    "started_at",
+    "completed_at",
+    "comment",
+}
 
 
 def get_user_roles(user: User) -> set[str]:
@@ -93,9 +104,11 @@ def ensure_can_read_interaction(db: Session, current_user: User, interaction: Un
     raise forbidden("Cannot access this interaction")
 
 
-def ensure_can_create_interaction(db: Session, current_user: User, manager_user_id: UUID) -> None:
+def ensure_can_create_interaction(db: Session, current_user: User, manager_user_id: UUID | None) -> None:
     if is_admin(current_user):
         return
+    if manager_user_id is None:
+        raise forbidden("Cannot create unassigned interaction")
     if has_any_role(current_user, "MANAGER") and manager_user_id in get_subordinate_kam_ids(db, current_user.id):
         return
     if has_any_role(current_user, "KAM") and manager_user_id == current_user.id:
@@ -130,6 +143,24 @@ def ensure_can_update_interaction(
 def ensure_can_delete_interaction(current_user: User) -> None:
     if not is_admin(current_user):
         raise forbidden("Only ADMIN can delete interactions")
+
+
+def ensure_can_assign_interaction(
+    db: Session,
+    current_user: User,
+    interaction: UniversityInteraction,
+    new_manager_user_id: UUID | None,
+) -> None:
+    if is_admin(current_user):
+        return
+    if not has_any_role(current_user, "MANAGER"):
+        raise forbidden("Only MANAGER or ADMIN can assign interactions")
+
+    kam_ids = get_subordinate_kam_ids(db, current_user.id)
+    if interaction.manager_user_id not in kam_ids:
+        raise forbidden("Cannot assign interaction outside manager scope")
+    if new_manager_user_id is not None and new_manager_user_id not in kam_ids:
+        raise forbidden("Cannot assign interaction to manager outside scope")
 
 
 def ensure_can_read_university(db: Session, current_user: User, university_id: UUID) -> None:
