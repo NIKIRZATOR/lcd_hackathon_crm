@@ -64,7 +64,7 @@ docker compose run --rm backend python scripts/seed_demo_data.py
 - 5 продуктов
 - 8 связей `program_products`
 - 1 demo manager
-- 1 default workflow template со стадиями и переходами
+- 1 default workflow template `RTK EduFlow Base Workflow` с 14 стадиями и переходами
 
 ## 4. Проверить CRUD справочников
 
@@ -238,12 +238,12 @@ SKIPPED
 
 `requires_comment`:
 
-- в demo workflow этап `Exchange documents` требует комментарий;
+- в workflow `RTK EduFlow Base Workflow` этап `Обмен документами для подписания` требует комментарий;
 - переход с него без `comment` должен вернуть ошибку.
 
 Optional stage:
 
-- этап `Correct documents` optional;
+- этап `Корректировка документов перед подписанием` optional;
 - его можно пропустить через:
 
 ```json

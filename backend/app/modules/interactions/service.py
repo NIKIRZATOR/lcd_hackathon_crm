@@ -13,7 +13,7 @@ from app.modules.products.model import ITProduct
 from app.modules.programs.model import ITProgram
 from app.modules.universities.model import University
 from app.modules.users.model import ResponsibleAssignmentHistory, User
-from app.modules.workflows.model import WorkflowTemplate
+from app.modules.workflows.model import WorkflowTemplate, WorkflowVersion
 from app.modules.workflows.model import (
     WorkflowStageAttachment,
     WorkflowStageComment,
@@ -81,9 +81,22 @@ class UniversityInteractionService:
         self._validate_related_entities(payload)
         runtime = WorkflowRuntimeService(self.db)
         runtime.validate_template_has_stages(payload.workflow_template_id)
+        workflow_version_id = payload.workflow_version_id
+        if workflow_version_id is None:
+            workflow_version_id = self.db.scalar(
+                select(WorkflowVersion.id)
+                .where(
+                    WorkflowVersion.workflow_template_id == payload.workflow_template_id,
+                    WorkflowVersion.status == "PUBLISHED",
+                )
+                .order_by(WorkflowVersion.version.desc())
+            )
+        if workflow_version_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow template has no published version")
 
         interaction = UniversityInteraction(
-            **payload.model_dump(exclude={"started_at"}),
+            **payload.model_dump(exclude={"started_at", "workflow_version_id"}),
+            workflow_version_id=workflow_version_id,
             started_at=payload.started_at or datetime.now(timezone.utc),
         )
 
@@ -116,6 +129,15 @@ class UniversityInteractionService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot change workflow template after workflow initialization",
+            )
+        if (
+            payload.workflow_version_id is not None
+            and payload.workflow_version_id != interaction.workflow_version_id
+            and interaction.current_stage_instance_id is not None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot change workflow version after workflow initialization",
             )
 
         for field, value in payload.model_dump(exclude_unset=True).items():
@@ -217,9 +239,20 @@ class UniversityInteractionService:
             ("product_id", ITProduct, "IT product not found"),
             ("manager_user_id", User, "Manager user not found"),
             ("workflow_template_id", WorkflowTemplate, "Workflow template not found"),
+            ("workflow_version_id", WorkflowVersion, "Workflow version not found"),
         ]
 
         for field, model, message in checks:
             value = getattr(payload, field, None)
             if value is not None and self.db.get(model, value) is None:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+
+        workflow_template_id = getattr(payload, "workflow_template_id", None)
+        workflow_version_id = getattr(payload, "workflow_version_id", None)
+        if workflow_template_id is not None and workflow_version_id is not None:
+            version = self.db.get(WorkflowVersion, workflow_version_id)
+            if version is not None and version.workflow_template_id != workflow_template_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Workflow version belongs to another template",
+                )

@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 StageStatus = Literal["NOT_STARTED", "IN_PROGRESS", "WAITING", "BLOCKED", "COMPLETED", "SKIPPED"]
+WorkflowVersionStatus = Literal["DRAFT", "PUBLISHED", "ARCHIVED"]
 
 
 class WorkflowTemplateBase(BaseModel):
@@ -37,8 +38,24 @@ class WorkflowTemplateRead(WorkflowTemplateBase):
     updated_at: datetime
 
 
+class WorkflowVersionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    workflow_template_id: UUID
+    version: int
+    status: WorkflowVersionStatus
+    supersedes_version_id: UUID | None = None
+    created_by: UUID | None = None
+    published_at: datetime | None = None
+    archived_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class WorkflowStageBase(BaseModel):
     workflow_template_id: UUID
+    workflow_version_id: UUID | None = None
     name: str
     description: str | None = None
     order_index: int
@@ -57,6 +74,7 @@ class WorkflowStageCreate(WorkflowStageBase):
 
 class WorkflowStageUpdate(BaseModel):
     workflow_template_id: UUID | None = None
+    workflow_version_id: UUID | None = None
     name: str | None = None
     description: str | None = None
     order_index: int | None = None
@@ -79,6 +97,7 @@ class WorkflowStageRead(WorkflowStageBase):
 
 class WorkflowTransitionBase(BaseModel):
     workflow_template_id: UUID
+    workflow_version_id: UUID | None = None
     from_stage_id: UUID
     to_stage_id: UUID
     name: str | None = None
@@ -92,6 +111,7 @@ class WorkflowTransitionCreate(WorkflowTransitionBase):
 
 class WorkflowTransitionUpdate(BaseModel):
     workflow_template_id: UUID | None = None
+    workflow_version_id: UUID | None = None
     from_stage_id: UUID | None = None
     to_stage_id: UUID | None = None
     name: str | None = None

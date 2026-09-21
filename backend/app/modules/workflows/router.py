@@ -27,12 +27,14 @@ from app.modules.workflows.schemas import (
     WorkflowTransitionRead,
     WorkflowTransitionResult,
     WorkflowTransitionUpdate,
+    WorkflowVersionRead,
 )
 from app.modules.workflows.service import (
     WorkflowRuntimeService,
     WorkflowStageService,
     WorkflowTemplateService,
     WorkflowTransitionService,
+    WorkflowVersionService,
 )
 
 router = APIRouter(
@@ -96,15 +98,40 @@ def update_template(
     return WorkflowTemplateService(db).update_template(template_id, payload)
 
 
+@router.get("/templates/{template_id}/versions", response_model=list[WorkflowVersionRead])
+def list_template_versions(template_id: UUID, db: Session = Depends(get_db_session)):
+    return WorkflowVersionService(db).list_versions(template_id)
+
+
+@router.post("/templates/{template_id}/versions/draft", response_model=WorkflowVersionRead, status_code=201)
+def create_template_draft(
+    template_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return WorkflowVersionService(db).create_draft(template_id, created_by=current_user.id)
+
+
+@router.post("/versions/{version_id}/publish", response_model=WorkflowVersionRead)
+def publish_workflow_version(
+    version_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return WorkflowVersionService(db).publish_version(version_id)
+
+
 @router.get("/stages", response_model=Page[WorkflowStageRead])
 def list_stages(
     workflow_template_id: UUID | None = None,
+    workflow_version_id: UUID | None = None,
     is_active: bool | None = None,
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db_session),
 ):
     result = WorkflowStageService(db).list_stages(
         workflow_template_id=workflow_template_id,
+        workflow_version_id=workflow_version_id,
         is_active=is_active,
         limit=pagination.limit,
         offset=pagination.offset,
@@ -141,6 +168,7 @@ def update_stage(
 @router.get("/transitions", response_model=Page[WorkflowTransitionRead])
 def list_transitions(
     workflow_template_id: UUID | None = None,
+    workflow_version_id: UUID | None = None,
     from_stage_id: UUID | None = None,
     to_stage_id: UUID | None = None,
     is_default: bool | None = None,
@@ -149,6 +177,7 @@ def list_transitions(
 ):
     result = WorkflowTransitionService(db).list_transitions(
         workflow_template_id=workflow_template_id,
+        workflow_version_id=workflow_version_id,
         from_stage_id=from_stage_id,
         to_stage_id=to_stage_id,
         is_default=is_default,

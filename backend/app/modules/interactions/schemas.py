@@ -10,6 +10,10 @@ class UniversityInteractionBase(BaseModel):
     product_id: UUID = Field(description="IT product identifier.")
     manager_user_id: UUID | None = Field(default=None, description="Current responsible KAM user identifier.")
     workflow_template_id: UUID = Field(description="Workflow template used to initialize runtime stages.")
+    workflow_version_id: UUID | None = Field(
+        default=None,
+        description="Concrete workflow version used by runtime. If omitted, backend selects current published version.",
+    )
     status: str = Field(default="ACTIVE", description="Interaction business status.")
     contract_number: str | None = Field(default=None, description="Contract number from customer/source data.")
     license_signed: bool = Field(default=False, description="Whether the license has been signed.")
@@ -52,6 +56,7 @@ class UniversityInteractionUpdate(BaseModel):
     product_id: UUID | None = None
     manager_user_id: UUID | None = None
     workflow_template_id: UUID | None = None
+    workflow_version_id: UUID | None = None
     current_stage_instance_id: UUID | None = None
     status: str | None = None
     contract_number: str | None = None

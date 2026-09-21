@@ -10,6 +10,7 @@ from app.modules.workflows.model import (
     WorkflowTemplate,
     WorkflowTransition,
     WorkflowTransitionHistory,
+    WorkflowVersion,
 )
 
 
@@ -17,6 +18,31 @@ class WorkflowTemplateRepository(CRUDRepository[WorkflowTemplate]):
     model = WorkflowTemplate
     sortable_fields = {"name", "version", "is_active", "is_default", "created_at", "updated_at"}
     default_sort = "name"
+
+
+class WorkflowVersionRepository(CRUDRepository[WorkflowVersion]):
+    model = WorkflowVersion
+    sortable_fields = {"version", "status", "published_at", "created_at", "updated_at"}
+    default_sort = "version"
+
+    def list_by_template(self, template_id: UUID) -> list[WorkflowVersion]:
+        statement = (
+            select(WorkflowVersion)
+            .where(WorkflowVersion.workflow_template_id == template_id)
+            .order_by(WorkflowVersion.version)
+        )
+        return list(self.db.scalars(statement).all())
+
+    def get_current_published(self, template_id: UUID) -> WorkflowVersion | None:
+        statement = (
+            select(WorkflowVersion)
+            .where(
+                WorkflowVersion.workflow_template_id == template_id,
+                WorkflowVersion.status == "PUBLISHED",
+            )
+            .order_by(WorkflowVersion.version.desc())
+        )
+        return self.db.scalar(statement)
 
 
 class WorkflowStageRepository(CRUDRepository[WorkflowStage]):
@@ -32,6 +58,14 @@ class WorkflowStageRepository(CRUDRepository[WorkflowStage]):
         )
         return list(self.db.scalars(statement).all())
 
+    def list_active_by_version(self, version_id: UUID) -> list[WorkflowStage]:
+        statement = (
+            select(WorkflowStage)
+            .where(WorkflowStage.workflow_version_id == version_id, WorkflowStage.is_active.is_(True))
+            .order_by(WorkflowStage.order_index)
+        )
+        return list(self.db.scalars(statement).all())
+
 
 class WorkflowTransitionRepository(CRUDRepository[WorkflowTransition]):
     model = WorkflowTransition
@@ -43,6 +77,7 @@ class WorkflowTransitionRepository(CRUDRepository[WorkflowTransition]):
         *,
         transition_id: UUID,
         template_id: UUID,
+        version_id: UUID | None = None,
         from_stage_id: UUID,
     ) -> WorkflowTransition | None:
         statement = select(WorkflowTransition).where(
@@ -50,6 +85,8 @@ class WorkflowTransitionRepository(CRUDRepository[WorkflowTransition]):
             WorkflowTransition.workflow_template_id == template_id,
             WorkflowTransition.from_stage_id == from_stage_id,
         )
+        if version_id is not None:
+            statement = statement.where(WorkflowTransition.workflow_version_id == version_id)
         return self.db.scalar(statement)
 
 

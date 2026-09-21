@@ -16,6 +16,7 @@ from app.modules.workflows.model import (
     WorkflowTemplate,
     WorkflowTransition,
     WorkflowTransitionHistory,
+    WorkflowVersion,
 )
 
 __all__ = [
@@ -43,4 +44,5 @@ __all__ = [
     "WorkflowTemplate",
     "WorkflowTransition",
     "WorkflowTransitionHistory",
+    "WorkflowVersion",
 ]
