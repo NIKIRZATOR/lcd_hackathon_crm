@@ -2,7 +2,7 @@
 
 Дата обновления: 2026-09-21
 
-Документ описывает текущую backend-схему RTK EduFlow CRM после закрытия backend-части этапа 1.
+Документ описывает текущую backend-схему RTK EduFlow CRM с учётом промежуточных изменений Stage 2 Workflow Engine.
 
 ## Структура
 
@@ -20,12 +20,532 @@
 - `9c0f4f2a6d1b_add_access_scope_tables.py`
 - `b2d7a89e4c31_extend_interactions_for_contracts.py`
 - `c3f8a4d2b7e1_add_audit_events.py`
+- `d7c1b2a9e8f0_add_workflow_versions.py`
+
+## UML Reference: Поля И Связи Таблиц
+
+Этот раздел можно использовать как источник для ER/UML-диаграмм. Если не указано иначе, таблица на `ModelBase` имеет общие поля:
+
+- `id: UUID` - primary key.
+- `created_at: timestamptz`.
+- `updated_at: timestamptz`.
+
+### `alembic_version`
+
+Fields:
+
+- `version_num` - текущая применённая Alembic revision.
+
+Relations:
+
+- Нет business-связей.
+
+### `roles`
+
+Fields:
+
+- `id`
+- `name: varchar(64), unique`
+- `description: varchar(255), nullable`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `roles.id` <- `user_roles.role_id`
+
+### `users`
+
+Fields:
+
+- `id`
+- `keycloak_user_id: uuid, unique, nullable`
+- `username: varchar(255), unique, nullable`
+- `full_name: varchar(255)`
+- `email: varchar(255), nullable`
+- `role: varchar(64)`
+- `is_active: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `users.id` <- `user_roles.user_id`
+- `users.id` <- `manager_memberships.manager_user_id`
+- `users.id` <- `manager_memberships.kam_user_id`
+- `users.id` <- `responsible_assignment_history.old_manager_user_id`
+- `users.id` <- `responsible_assignment_history.new_manager_user_id`
+- `users.id` <- `responsible_assignment_history.changed_by_user_id`
+- `users.id` <- `data_access_scopes.subject_user_id`
+- `users.id` <- `data_access_scopes.granted_by_user_id`
+- `users.id` <- `university_interactions.manager_user_id`
+- `users.id` <- `workflow_templates.created_by`
+- `users.id` <- `workflow_versions.created_by`
+- `users.id` <- `workflow_stage_instances.responsible_user_id`
+- `users.id` <- `workflow_transition_history.performed_by`
+- `users.id` <- `workflow_stage_comments.author_user_id`
+- `users.id` <- `workflow_stage_attachments.uploaded_by`
+- `users.id` <- `files.uploaded_by`
+- `users.id` <- `audit_events.actor_user_id`
+
+### `user_roles`
+
+Fields:
+
+- `user_id: uuid, PK, FK -> users.id`
+- `role_id: uuid, PK, FK -> roles.id`
+
+Relations:
+
+- Many-to-many между `users` и `roles`.
+
+### `manager_memberships`
+
+Fields:
+
+- `id`
+- `manager_user_id: uuid, FK -> users.id`
+- `kam_user_id: uuid, FK -> users.id`
+- `valid_from: timestamptz, nullable`
+- `valid_to: timestamptz, nullable`
+- `is_active: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- Unique: `(manager_user_id, kam_user_id)`
+- Index: `(manager_user_id, is_active)`
+- Index: `(kam_user_id, is_active)`
+
+### `data_access_scopes`
+
+Fields:
+
+- `id`
+- `subject_user_id: uuid, FK -> users.id`
+- `university_id: uuid, FK -> universities.id, nullable`
+- `interaction_id: uuid, FK -> university_interactions.id, nullable`
+- `access_level: varchar(64)`
+- `granted_by_user_id: uuid, FK -> users.id, nullable`
+- `valid_from: timestamptz, nullable`
+- `valid_to: timestamptz, nullable`
+- `is_active: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- Index: `(subject_user_id, is_active)`
+- Index: `university_id`
+- Index: `interaction_id`
+
+### `universities`
+
+Fields:
+
+- `id`
+- `name: varchar(255)`
+- `short_name: varchar(255), nullable`
+- `region: varchar(255), nullable`
+- `city: varchar(255), nullable`
+- `address: text, nullable`
+- `website: varchar(512), nullable`
+- `is_active: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `universities.id` <- `university_contacts.university_id`
+- `universities.id` <- `university_interactions.university_id`
+- `universities.id` <- `data_access_scopes.university_id`
+
+### `university_contacts`
+
+Fields:
+
+- `id`
+- `university_id: uuid, FK -> universities.id`
+- `full_name: varchar(255)`
+- `position: varchar(255), nullable`
+- `email: varchar(255), nullable`
+- `phone: varchar(64), nullable`
+- `department: varchar(255), nullable`
+- `is_primary: boolean`
+- `is_active: boolean`
+- `comment: text, nullable`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `university_contacts.id` <- `interaction_contacts.contact_id`
+
+### `it_directions`
+
+Fields:
+
+- `id`
+- `name: varchar(255)`
+- `code: varchar(64), nullable`
+- `description: text, nullable`
+- `is_active: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `it_directions.id` <- `it_programs.direction_id`
+
+### `it_programs`
+
+Fields:
+
+- `id`
+- `direction_id: uuid, FK -> it_directions.id`
+- `name: varchar(255)`
+- `description: text, nullable`
+- `version: varchar(64), nullable`
+- `is_active: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `it_programs.id` <- `program_products.program_id`
+- `it_programs.id` <- `university_interactions.program_id`
+
+### `vendors`
+
+Fields:
+
+- `id`
+- `name: varchar(255)`
+- `description: text, nullable`
+- `is_active: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `vendors.id` <- `it_products.vendor_id`
+
+### `it_products`
+
+Fields:
+
+- `id`
+- `vendor_id: uuid, FK -> vendors.id, nullable`
+- `name: varchar(255)`
+- `description: text, nullable`
+- `documentation_url: varchar(512), nullable`
+- `is_active: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `it_products.id` <- `program_products.product_id`
+- `it_products.id` <- `university_interactions.product_id`
+
+### `program_products`
+
+Fields:
+
+- `id`
+- `program_id: uuid, FK -> it_programs.id`
+- `product_id: uuid, FK -> it_products.id`
+- `is_required: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- Unique: `(program_id, product_id)`
+
+### `university_interactions`
+
+Fields:
+
+- `id`
+- `university_id: uuid, FK -> universities.id`
+- `program_id: uuid, FK -> it_programs.id`
+- `product_id: uuid, FK -> it_products.id`
+- `manager_user_id: uuid, FK -> users.id, nullable`
+- `workflow_template_id: uuid, FK -> workflow_templates.id, nullable`
+- `workflow_version_id: uuid, FK -> workflow_versions.id, nullable`
+- `current_stage_instance_id: uuid, FK -> workflow_stage_instances.id, nullable`
+- `status: varchar(64)`
+- `contract_number: varchar(255), nullable`
+- `license_signed: boolean`
+- `license_signed_at: timestamptz, nullable`
+- `license_valid_until: timestamptz, nullable`
+- `transfer_status: varchar(64), nullable`
+- `university_responsibles: text, nullable`
+- `started_at: timestamptz, nullable`
+- `completed_at: timestamptz, nullable`
+- `comment: text, nullable`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `university_interactions.id` <- `interaction_contacts.interaction_id`
+- `university_interactions.id` <- `responsible_assignment_history.interaction_id`
+- `university_interactions.id` <- `data_access_scopes.interaction_id`
+- `university_interactions.id` <- `workflow_stage_instances.interaction_id`
+- `university_interactions.id` <- `workflow_transition_history.interaction_id`
+- Index: `workflow_version_id`
+
+### `interaction_contacts`
+
+Fields:
+
+- `id`
+- `interaction_id: uuid, FK -> university_interactions.id`
+- `contact_id: uuid, FK -> university_contacts.id`
+- `role: varchar(255), nullable`
+- `is_primary: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- Unique: `(interaction_id, contact_id)`
+
+### `responsible_assignment_history`
+
+Fields:
+
+- `id`
+- `interaction_id: uuid, FK -> university_interactions.id`
+- `old_manager_user_id: uuid, FK -> users.id, nullable`
+- `new_manager_user_id: uuid, FK -> users.id, nullable`
+- `changed_by_user_id: uuid, FK -> users.id`
+- `reason: text, nullable`
+- `changed_at: timestamptz`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- Index: `(interaction_id, changed_at)`
+
+### `workflow_templates`
+
+Fields:
+
+- `id`
+- `name: varchar(255)`
+- `description: text, nullable`
+- `version: varchar(64), nullable`
+- `is_active: boolean`
+- `is_default: boolean`
+- `created_by: uuid, FK -> users.id, nullable`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `workflow_templates.id` <- `workflow_versions.workflow_template_id`
+- `workflow_templates.id` <- `workflow_stages.workflow_template_id`
+- `workflow_templates.id` <- `workflow_transitions.workflow_template_id`
+- `workflow_templates.id` <- `university_interactions.workflow_template_id`
+
+### `workflow_versions`
+
+Fields:
+
+- `id`
+- `workflow_template_id: uuid, FK -> workflow_templates.id`
+- `version: integer`
+- `status: varchar(32)` - `DRAFT`, `PUBLISHED`, `ARCHIVED`
+- `supersedes_version_id: uuid, FK -> workflow_versions.id, nullable`
+- `created_by: uuid, FK -> users.id, nullable`
+- `published_at: timestamptz, nullable`
+- `archived_at: timestamptz, nullable`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `workflow_versions.id` <- `workflow_stages.workflow_version_id`
+- `workflow_versions.id` <- `workflow_transitions.workflow_version_id`
+- `workflow_versions.id` <- `university_interactions.workflow_version_id`
+- Unique: `(workflow_template_id, version)`
+- Index: `(workflow_template_id, status)`
+
+### `workflow_stages`
+
+Fields:
+
+- `id`
+- `workflow_template_id: uuid, FK -> workflow_templates.id`
+- `workflow_version_id: uuid, FK -> workflow_versions.id`
+- `name: varchar(255)`
+- `description: text, nullable`
+- `order_index: integer`
+- `is_initial: boolean`
+- `is_final: boolean`
+- `is_optional: boolean`
+- `default_duration_days: integer, nullable`
+- `requires_comment: boolean`
+- `requires_attachment: boolean`
+- `is_active: boolean`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `workflow_stages.id` <- `workflow_transitions.from_stage_id`
+- `workflow_stages.id` <- `workflow_transitions.to_stage_id`
+- `workflow_stages.id` <- `workflow_stage_instances.workflow_stage_id`
+- Index: `(workflow_version_id, order_index)`
+
+### `workflow_transitions`
+
+Fields:
+
+- `id`
+- `workflow_template_id: uuid, FK -> workflow_templates.id`
+- `workflow_version_id: uuid, FK -> workflow_versions.id`
+- `from_stage_id: uuid, FK -> workflow_stages.id`
+- `to_stage_id: uuid, FK -> workflow_stages.id`
+- `name: varchar(255), nullable`
+- `is_default: boolean`
+- `condition_code: varchar(255), nullable`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `workflow_transitions.id` <- `workflow_transition_history.transition_id`
+- Index: `(workflow_version_id, from_stage_id)`
+
+### `workflow_stage_instances`
+
+Fields:
+
+- `id`
+- `interaction_id: uuid, FK -> university_interactions.id`
+- `workflow_stage_id: uuid, FK -> workflow_stages.id`
+- `responsible_user_id: uuid, FK -> users.id, nullable`
+- `status: varchar(64)`
+- `started_at: timestamptz, nullable`
+- `due_at: timestamptz, nullable`
+- `completed_at: timestamptz, nullable`
+- `skipped_at: timestamptz, nullable`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- `workflow_stage_instances.id` <- `university_interactions.current_stage_instance_id`
+- `workflow_stage_instances.id` <- `workflow_transition_history.from_stage_instance_id`
+- `workflow_stage_instances.id` <- `workflow_transition_history.to_stage_instance_id`
+- `workflow_stage_instances.id` <- `workflow_stage_comments.stage_instance_id`
+- `workflow_stage_instances.id` <- `workflow_stage_attachments.stage_instance_id`
+
+### `workflow_transition_history`
+
+Fields:
+
+- `id`
+- `interaction_id: uuid, FK -> university_interactions.id`
+- `from_stage_instance_id: uuid, FK -> workflow_stage_instances.id, nullable`
+- `to_stage_instance_id: uuid, FK -> workflow_stage_instances.id, nullable`
+- `transition_id: uuid, FK -> workflow_transitions.id, nullable`
+- `performed_by: uuid, FK -> users.id`
+- `comment: text, nullable`
+- `performed_at: timestamptz, nullable`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- История связывает interaction, исходный runtime stage, целевой runtime stage и definition transition.
+
+### `workflow_stage_comments`
+
+Fields:
+
+- `id`
+- `stage_instance_id: uuid, FK -> workflow_stage_instances.id`
+- `author_user_id: uuid, FK -> users.id`
+- `text: text`
+- `deleted_at: timestamptz, nullable`
+- `created_at`
+- `updated_at`
+
+Relations:
+
+- Комментарии принадлежат runtime stage instance.
+
+### `workflow_stage_attachments`
+
+Fields:
+
+- `id`
+- `stage_instance_id: uuid, FK -> workflow_stage_instances.id`
+- `file_id: uuid, FK -> files.id`
+- `uploaded_by: uuid, FK -> users.id`
+- `description: text, nullable`
+- `created_at`
+
+Relations:
+
+- Связывает runtime stage instance и file metadata.
+
+### `files`
+
+Fields:
+
+- `id`
+- `original_name: varchar(255)`
+- `storage_name: varchar(255)`
+- `storage_path: varchar(1024)`
+- `mime_type: varchar(255), nullable`
+- `extension: varchar(32), nullable`
+- `size_bytes: bigint, nullable`
+- `checksum: varchar(255), nullable`
+- `uploaded_by: uuid, FK -> users.id, nullable`
+- `created_at`
+
+Relations:
+
+- `files.id` <- `workflow_stage_attachments.file_id`
+
+### `audit_events`
+
+Fields:
+
+- `id`
+- `actor_user_id: uuid, FK -> users.id, nullable`
+- `action: varchar(128)`
+- `entity_type: varchar(128)`
+- `entity_id: uuid, nullable`
+- `result: varchar(32)`
+- `reason: text, nullable`
+- `error_code: varchar(128), nullable`
+- `metadata: jsonb, nullable`
+- `request_id: varchar(128), nullable`
+- `created_at`
+
+Relations:
+
+- `actor_user_id -> users.id`
+- `entity_id` polymorphic: business entity UUID, interpreted together with `entity_type`.
+- Index: `created_at`
+- Index: `(actor_user_id, created_at)`
+- Index: `(entity_type, entity_id)`
+- Index: `action`
 
 ### Служебные Таблицы
 
 | Таблица | Назначение | Пример |
 | --- | --- | --- |
-| `alembic_version` | Текущая версия миграций Alembic. | `version_num=c3f8a4d2b7e1` |
+| `alembic_version` | Текущая версия миграций Alembic. | `version_num=d7c1b2a9e8f0` |
 
 ### Пользователи, Роли И Доступ
 
@@ -110,9 +630,10 @@ manager_memberships:
 
 | Таблица | Назначение | Основные связи | Пример заполнения |
 | --- | --- | --- | --- |
-| `workflow_templates` | Шаблоны workflow. | Используется в interactions и stages. | `name=Default onboarding`, `is_default=true` |
-| `workflow_stages` | Этапы внутри шаблона. | `workflow_template_id -> workflow_templates.id`. | `name=License signing`, `order_index=1` |
-| `workflow_transitions` | Разрешенные переходы между этапами. | `from_stage_id`, `to_stage_id -> workflow_stages.id`. | `from=License signing`, `to=Materials transfer` |
+| `workflow_templates` | Логические шаблоны workflow. | Используется в versions и interactions. | `name=RTK EduFlow Base Workflow`, `is_default=true` |
+| `workflow_versions` | Версии workflow template. | `workflow_template_id -> workflow_templates.id`, `supersedes_version_id -> workflow_versions.id`. | `version=1`, `status=PUBLISHED` |
+| `workflow_stages` | Этапы внутри конкретной версии workflow. | `workflow_template_id -> workflow_templates.id`, `workflow_version_id -> workflow_versions.id`. | `name=Подписание документов`, `order_index=6` |
+| `workflow_transitions` | Разрешенные переходы между этапами внутри версии. | `workflow_version_id -> workflow_versions.id`, `from_stage_id`, `to_stage_id -> workflow_stages.id`. | `from=stage 4`, `to=stage 5` |
 | `workflow_stage_instances` | Runtime-экземпляры этапов для interaction. | `interaction_id -> university_interactions.id`, `workflow_stage_id -> workflow_stages.id`. | `status=IN_PROGRESS`, `responsible_user_id=kam1` |
 | `workflow_transition_history` | История переходов workflow. | `interaction_id`, stage instances, transition, `performed_by -> users.id`. | `performed_by=kam1`, `comment=done` |
 | `workflow_stage_comments` | Комментарии к runtime-этапам. | `stage_instance_id -> workflow_stage_instances.id`, `author_user_id -> users.id`. | `comment=Waiting for university confirmation` |
@@ -122,7 +643,9 @@ Runtime-логика:
 
 ```text
 При создании interaction backend берет workflow_template_id,
-создает workflow_stage_instances для активных stages,
+выбирает текущую PUBLISHED workflow_version,
+сохраняет workflow_version_id в interaction,
+создает workflow_stage_instances для активных stages этой version,
 назначает responsible_user_id = interaction.manager_user_id
 и ставит начальный stage в IN_PROGRESS.
 ```
@@ -364,11 +887,14 @@ Demo users:
 | `GET` | `/workflows/templates/{template_id}` | `KAM`, `MANAGER`, `ADMIN` | path id | `WorkflowTemplateRead` |
 | `POST` | `/workflows/templates` | `ADMIN` | `WorkflowTemplateCreate` | `WorkflowTemplateRead` |
 | `PATCH` | `/workflows/templates/{template_id}` | `ADMIN` | `WorkflowTemplateUpdate` | `WorkflowTemplateRead` |
-| `GET` | `/workflows/stages` | `KAM`, `MANAGER`, `ADMIN` | `workflow_template_id`, `is_active`, pagination/sort | `Page[WorkflowStageRead]` |
+| `GET` | `/workflows/templates/{template_id}/versions` | `KAM`, `MANAGER`, `ADMIN` | path id | `list[WorkflowVersionRead]` |
+| `POST` | `/workflows/templates/{template_id}/versions/draft` | `ADMIN` | path id | `WorkflowVersionRead` |
+| `POST` | `/workflows/versions/{version_id}/publish` | `ADMIN` | path id | `WorkflowVersionRead` |
+| `GET` | `/workflows/stages` | `KAM`, `MANAGER`, `ADMIN` | `workflow_template_id`, `workflow_version_id`, `is_active`, pagination/sort | `Page[WorkflowStageRead]` |
 | `GET` | `/workflows/stages/{stage_id}` | `KAM`, `MANAGER`, `ADMIN` | path id | `WorkflowStageRead` |
 | `POST` | `/workflows/stages` | `ADMIN` | `WorkflowStageCreate` | `WorkflowStageRead` |
 | `PATCH` | `/workflows/stages/{stage_id}` | `ADMIN` | `WorkflowStageUpdate` | `WorkflowStageRead` |
-| `GET` | `/workflows/transitions` | `KAM`, `MANAGER`, `ADMIN` | `workflow_template_id`, `from_stage_id`, `to_stage_id`, `is_default`, pagination/sort | `Page[WorkflowTransitionRead]` |
+| `GET` | `/workflows/transitions` | `KAM`, `MANAGER`, `ADMIN` | `workflow_template_id`, `workflow_version_id`, `from_stage_id`, `to_stage_id`, `is_default`, pagination/sort | `Page[WorkflowTransitionRead]` |
 | `GET` | `/workflows/transitions/{transition_id}` | `KAM`, `MANAGER`, `ADMIN` | path id | `WorkflowTransitionRead` |
 | `POST` | `/workflows/transitions` | `ADMIN` | `WorkflowTransitionCreate` | `WorkflowTransitionRead` |
 | `PATCH` | `/workflows/transitions/{transition_id}` | `ADMIN` | `WorkflowTransitionUpdate` | `WorkflowTransitionRead` |
@@ -392,7 +918,8 @@ Scope rules:
 
 - runtime endpoints проверяют доступ к interaction;
 - non-admin roles должны передавать `interaction_id` при списочных runtime-запросах;
-- workflow template/stage/transition editing доступен только `ADMIN`.
+- workflow template/stage/transition editing доступен только `ADMIN`;
+- published workflow version immutable: structural edits разрешены только в draft version.
 
 ### Audit
 
@@ -448,7 +975,7 @@ GET /api/audit/events?result=SUCCESS
 
 | Этап | Плановые изменения |
 | --- | --- |
-| 2 | Workflow versioning/governance: versions, change requests, approvals, stage mappings, migration jobs. |
+| 2 | Частично реализовано: `workflow_versions`, draft/publish lifecycle, runtime binding. Впереди: governance, change requests, approvals, stage mappings, migration jobs. |
 | 3 | Object storage: расширение `files` полями `provider`, `bucket`, `object_key`, `checksum`, `scan_status`. |
 | 4 | Imports: `import_jobs`, mappings, row errors, import artifacts. |
 | 5 | Reports: `report_jobs`, `report_artifacts`, `report_templates`. |
