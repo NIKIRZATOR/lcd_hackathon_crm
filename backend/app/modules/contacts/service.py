@@ -39,7 +39,7 @@ class UniversityContactService:
     def list_contacts_for_manager(
         self,
         *,
-        manager_user_id: UUID,
+        manager_user_id: UUID | set[UUID],
         search: str | None,
         university_id: UUID | None,
         is_active: bool | None,

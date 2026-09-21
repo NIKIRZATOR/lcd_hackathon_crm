@@ -39,7 +39,7 @@ class UniversityService:
     def list_universities_for_manager(
         self,
         *,
-        manager_user_id: UUID,
+        manager_user_id: UUID | set[UUID],
         search: str | None,
         is_active: bool | None,
         region: str | None,

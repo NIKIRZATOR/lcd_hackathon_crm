@@ -8,8 +8,8 @@ from app.core.database import get_db_session
 from app.modules.auth.access import (
     CATALOG_WRITE_ROLES,
     CRM_ROLES,
-    can_access_all_interactions,
     ensure_can_read_contact,
+    resolve_visible_manager_ids,
 )
 from app.modules.auth.dependencies import require_roles
 from app.modules.contacts.schemas import (
@@ -38,7 +38,8 @@ def list_contacts(
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
     service = UniversityContactService(db)
-    if can_access_all_interactions(current_user):
+    visible_manager_ids = resolve_visible_manager_ids(db, current_user)
+    if visible_manager_ids is None:
         result = service.list_contacts(
             search=search,
             university_id=university_id,
@@ -51,7 +52,7 @@ def list_contacts(
         )
     else:
         result = service.list_contacts_for_manager(
-            manager_user_id=current_user.id,
+            manager_user_id=visible_manager_ids,
             search=search,
             university_id=university_id,
             is_active=is_active,

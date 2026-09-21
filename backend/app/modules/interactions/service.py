@@ -12,7 +12,7 @@ from app.modules.interactions.schemas import UniversityInteractionCreate, Univer
 from app.modules.products.model import ITProduct
 from app.modules.programs.model import ITProgram
 from app.modules.universities.model import University
-from app.modules.users.model import User
+from app.modules.users.model import ResponsibleAssignmentHistory, User
 from app.modules.workflows.model import WorkflowTemplate
 from app.modules.workflows.model import (
     WorkflowStageAttachment,
@@ -34,21 +34,19 @@ class UniversityInteractionService:
         university_id: UUID | None,
         program_id: UUID | None,
         product_id: UUID | None,
-        manager_user_id: UUID | None,
+        manager_user_id: UUID | set[UUID] | None,
         status_value: str | None,
         limit: int,
         offset: int,
         sort_by: str | None,
         sort_order: str,
     ) -> ListResult[UniversityInteraction]:
-        return self.repository.list(
-            filters={
-                "university_id": university_id,
-                "program_id": program_id,
-                "product_id": product_id,
-                "manager_user_id": manager_user_id,
-                "status": status_value,
-            },
+        return self.repository.list_with_manager_scope(
+            university_id=university_id,
+            program_id=program_id,
+            product_id=product_id,
+            manager_user_id=manager_user_id,
+            status_value=status_value,
             limit=limit,
             offset=offset,
             sort_by=sort_by,
@@ -82,8 +80,15 @@ class UniversityInteractionService:
         self.db.refresh(interaction)
         return interaction
 
-    def update_interaction(self, interaction_id: UUID, payload: UniversityInteractionUpdate) -> UniversityInteraction:
+    def update_interaction(
+        self,
+        interaction_id: UUID,
+        payload: UniversityInteractionUpdate,
+        *,
+        changed_by_user_id: UUID | None = None,
+    ) -> UniversityInteraction:
         interaction = self.get_interaction(interaction_id)
+        old_manager_user_id = interaction.manager_user_id
         self._validate_related_entities(payload)
         if (
             payload.workflow_template_id is not None
@@ -97,6 +102,21 @@ class UniversityInteractionService:
 
         for field, value in payload.model_dump(exclude_unset=True).items():
             setattr(interaction, field, value)
+
+        if payload.manager_user_id is not None and payload.manager_user_id != old_manager_user_id:
+            if changed_by_user_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Assignment change performer is required",
+                )
+            self.db.add(
+                ResponsibleAssignmentHistory(
+                    interaction_id=interaction.id,
+                    old_manager_user_id=old_manager_user_id,
+                    new_manager_user_id=payload.manager_user_id,
+                    changed_by_user_id=changed_by_user_id,
+                )
+            )
 
         self.db.commit()
         self.db.refresh(interaction)

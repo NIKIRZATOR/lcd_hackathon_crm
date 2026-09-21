@@ -8,8 +8,8 @@ from app.core.database import get_db_session
 from app.modules.auth.access import (
     CATALOG_WRITE_ROLES,
     CRM_ROLES,
-    can_access_all_interactions,
     ensure_can_read_university,
+    resolve_visible_manager_ids,
 )
 from app.modules.auth.dependencies import require_roles
 from app.modules.universities.schemas import UniversityCreate, UniversityRead, UniversityUpdate
@@ -34,7 +34,8 @@ def list_universities(
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
     service = UniversityService(db)
-    if can_access_all_interactions(current_user):
+    visible_manager_ids = resolve_visible_manager_ids(db, current_user)
+    if visible_manager_ids is None:
         result = service.list_universities(
             search=search,
             is_active=is_active,
@@ -47,7 +48,7 @@ def list_universities(
         )
     else:
         result = service.list_universities_for_manager(
-            manager_user_id=current_user.id,
+            manager_user_id=visible_manager_ids,
             search=search,
             is_active=is_active,
             region=region,

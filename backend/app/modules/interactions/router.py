@@ -37,6 +37,7 @@ def list_interactions(
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
     scoped_manager_user_id = resolve_interaction_manager_filter(
+        db=db,
         current_user=current_user,
         requested_manager_user_id=manager_user_id,
     )
@@ -61,7 +62,7 @@ def get_interaction(
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
     interaction = UniversityInteractionService(db).get_interaction(interaction_id)
-    ensure_can_read_interaction(current_user, interaction)
+    ensure_can_read_interaction(db, current_user, interaction)
     return interaction
 
 
@@ -71,7 +72,7 @@ def create_interaction(
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
-    ensure_can_create_interaction(current_user, payload.manager_user_id)
+    ensure_can_create_interaction(db, current_user, payload.manager_user_id)
     return UniversityInteractionService(db).create_interaction(payload)
 
 
@@ -84,8 +85,8 @@ def update_interaction(
 ):
     service = UniversityInteractionService(db)
     interaction = service.get_interaction(interaction_id)
-    ensure_can_update_interaction(current_user, interaction, payload)
-    return service.update_interaction(interaction_id, payload)
+    ensure_can_update_interaction(db, current_user, interaction, payload)
+    return service.update_interaction(interaction_id, payload, changed_by_user_id=current_user.id)
 
 
 @router.delete("/{interaction_id}", status_code=204)

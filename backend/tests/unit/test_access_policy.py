@@ -44,14 +44,48 @@ def make_interaction(manager_user_id) -> UniversityInteraction:
 def test_kam_interaction_filter_is_forced_to_self() -> None:
     user = make_user("KAM")
 
-    assert resolve_interaction_manager_filter(current_user=user, requested_manager_user_id=None) == user.id
+    assert resolve_interaction_manager_filter(db=None, current_user=user, requested_manager_user_id=None) == user.id
 
 
 def test_kam_cannot_filter_interactions_by_another_manager() -> None:
     user = make_user("KAM")
 
     with pytest.raises(HTTPException) as error:
-        resolve_interaction_manager_filter(current_user=user, requested_manager_user_id=uuid4())
+        resolve_interaction_manager_filter(db=None, current_user=user, requested_manager_user_id=uuid4())
+
+    assert error.value.status_code == 403
+
+
+def test_manager_interaction_filter_is_limited_to_subordinates(monkeypatch: pytest.MonkeyPatch) -> None:
+    manager = make_user("MANAGER")
+    kam_id = uuid4()
+    monkeypatch.setattr("app.modules.auth.access.get_subordinate_kam_ids", lambda db, manager_user_id: {kam_id})
+
+    assert resolve_interaction_manager_filter(
+        db=None,
+        current_user=manager,
+        requested_manager_user_id=None,
+    ) == {kam_id}
+    assert (
+        resolve_interaction_manager_filter(
+            db=None,
+            current_user=manager,
+            requested_manager_user_id=kam_id,
+        )
+        == kam_id
+    )
+
+
+def test_manager_cannot_filter_by_non_subordinate(monkeypatch: pytest.MonkeyPatch) -> None:
+    manager = make_user("MANAGER")
+    monkeypatch.setattr("app.modules.auth.access.get_subordinate_kam_ids", lambda db, manager_user_id: {uuid4()})
+
+    with pytest.raises(HTTPException) as error:
+        resolve_interaction_manager_filter(
+            db=None,
+            current_user=manager,
+            requested_manager_user_id=uuid4(),
+        )
 
     assert error.value.status_code == 403
 
@@ -62,6 +96,7 @@ def test_admin_interaction_filter_is_not_forced() -> None:
 
     assert (
         resolve_interaction_manager_filter(
+            db=None,
             current_user=user,
             requested_manager_user_id=requested_manager_id,
         )
@@ -73,7 +108,7 @@ def test_kam_can_read_own_interaction() -> None:
     user = make_user("KAM")
     interaction = make_interaction(user.id)
 
-    ensure_can_read_interaction(user, interaction)
+    ensure_can_read_interaction(None, user, interaction)
 
 
 def test_kam_cannot_update_restricted_interaction_fields() -> None:
@@ -82,7 +117,7 @@ def test_kam_cannot_update_restricted_interaction_fields() -> None:
     payload = UniversityInteractionUpdate(manager_user_id=uuid4())
 
     with pytest.raises(HTTPException) as error:
-        ensure_can_update_interaction(user, interaction, payload)
+        ensure_can_update_interaction(None, user, interaction, payload)
 
     assert error.value.status_code == 403
 

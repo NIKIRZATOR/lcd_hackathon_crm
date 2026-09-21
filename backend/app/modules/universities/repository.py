@@ -15,7 +15,7 @@ class UniversityRepository(CRUDRepository[University]):
     def list_for_manager(
         self,
         *,
-        manager_user_id: UUID,
+        manager_user_id: UUID | set[UUID],
         filters: dict[str, object | None],
         search: str | None,
         limit: int,
@@ -37,14 +37,18 @@ class UniversityRepository(CRUDRepository[University]):
     def _build_scoped_statement(
         self,
         *,
-        manager_user_id: UUID,
+        manager_user_id: UUID | set[UUID],
         filters: dict[str, object | None],
         search: str | None,
     ) -> Select[tuple[University]]:
+        manager_ids = manager_user_id if isinstance(manager_user_id, set) else {manager_user_id}
+        if not manager_ids:
+            return select(University).where(False)
+
         statement = select(University).where(
             exists().where(
                 UniversityInteraction.university_id == University.id,
-                UniversityInteraction.manager_user_id == manager_user_id,
+                UniversityInteraction.manager_user_id.in_(manager_ids),
             )
         )
 

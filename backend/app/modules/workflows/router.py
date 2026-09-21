@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.common.schemas.pagination import Page, PaginationParams
 from app.core.database import get_db_session
-from app.modules.auth.access import ADMIN_ROLES, CRM_ROLES, can_access_all_interactions, ensure_can_read_interaction, forbidden
+from app.modules.auth.access import ADMIN_ROLES, CRM_ROLES, ensure_can_read_interaction, forbidden, is_admin
 from app.modules.auth.dependencies import require_roles
 from app.modules.interactions.model import UniversityInteraction
 from app.modules.users.model import User
@@ -46,7 +46,7 @@ def _ensure_can_access_interaction(db: Session, current_user: User, interaction_
         from fastapi import HTTPException, status
 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University interaction not found")
-    ensure_can_read_interaction(current_user, interaction)
+    ensure_can_read_interaction(db, current_user, interaction)
     return interaction
 
 
@@ -190,7 +190,7 @@ def list_stage_instances(
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
-    if interaction_id is None and not can_access_all_interactions(current_user):
+    if interaction_id is None and not is_admin(current_user):
         raise forbidden("interaction_id is required for this role")
     if interaction_id is not None:
         _ensure_can_access_interaction(db, current_user, interaction_id)
@@ -235,7 +235,7 @@ def list_transition_history(
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
-    if interaction_id is None and not can_access_all_interactions(current_user):
+    if interaction_id is None and not is_admin(current_user):
         raise forbidden("interaction_id is required for this role")
     if interaction_id is not None:
         _ensure_can_access_interaction(db, current_user, interaction_id)
