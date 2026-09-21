@@ -98,6 +98,23 @@
       }
     },
     {
+      "username": "kam2",
+      "enabled": true,
+      "email": "kam2@example.local",
+      "firstName": "KAM",
+      "lastName": "Two",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "kam2",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "rtk-eduflow-backend": ["KAM"]
+      }
+    },
+    {
       "username": "manager1",
       "enabled": true,
       "email": "manager1@example.local",

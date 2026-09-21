@@ -1,6 +1,7 @@
 """Import all SQLAlchemy models so Alembic autogenerate can see metadata."""
 
 from app.modules.contacts.model import UniversityContact
+from app.modules.audit.model import AuditEvent
 from app.modules.documents.model import File
 from app.modules.interactions.model import InteractionContact, UniversityInteraction
 from app.modules.products.model import ITProduct, ProgramProduct, Vendor
@@ -19,6 +20,7 @@ from app.modules.workflows.model import (
 
 __all__ = [
     "File",
+    "AuditEvent",
     "ITDirection",
     "ITProduct",
     "ITProgram",

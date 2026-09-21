@@ -1,10 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.common.errors import get_request_id
 from app.common.schemas.pagination import Page, PaginationParams
 from app.core.database import get_db_session
+from app.modules.audit.service import AuditService
 from app.modules.auth.access import (
     CRM_ROLES,
     ensure_can_create_interaction,
@@ -16,8 +18,9 @@ from app.modules.auth.access import (
 )
 from app.modules.auth.dependencies import require_roles
 from app.modules.interactions.schemas import (
-    UniversityInteractionCreate,
+    ResponsibleAssignmentHistoryRead,
     UniversityInteractionAssign,
+    UniversityInteractionCreate,
     UniversityInteractionRead,
     UniversityInteractionUpdate,
 )
@@ -146,6 +149,30 @@ def get_interaction(
     return interaction
 
 
+@router.get(
+    "/{interaction_id}/assignment-history",
+    response_model=Page[ResponsibleAssignmentHistoryRead],
+    summary="List responsible assignment history",
+    description="Returns assignment changes for an interaction if it is inside the current user's data scope.",
+    responses=COMMON_ERROR_RESPONSES,
+)
+def list_assignment_history(
+    interaction_id: UUID,
+    pagination: PaginationParams = Depends(),
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    service = UniversityInteractionService(db)
+    interaction = service.get_interaction(interaction_id)
+    ensure_can_read_interaction(db, current_user, interaction)
+    result = service.list_assignment_history(
+        interaction_id=interaction_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return Page(items=result.items, total=result.total, limit=pagination.limit, offset=pagination.offset)
+
+
 @router.post(
     "",
     response_model=UniversityInteractionRead,
@@ -175,11 +202,26 @@ def get_interaction(
 )
 def create_interaction(
     payload: UniversityInteractionCreate,
+    request: Request,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
     ensure_can_create_interaction(db, current_user, payload.manager_user_id)
-    return UniversityInteractionService(db).create_interaction(payload)
+    interaction = UniversityInteractionService(db).create_interaction(payload)
+    AuditService(db).log_event(
+        actor_user_id=current_user.id,
+        action="interaction.create",
+        entity_type="interaction",
+        entity_id=interaction.id,
+        metadata={
+            "university_id": str(interaction.university_id),
+            "program_id": str(interaction.program_id),
+            "product_id": str(interaction.product_id),
+            "manager_user_id": str(interaction.manager_user_id) if interaction.manager_user_id else None,
+        },
+        request_id=get_request_id(request),
+    )
+    return interaction
 
 
 @router.patch(
@@ -215,6 +257,7 @@ def create_interaction(
 def update_interaction(
     interaction_id: UUID,
     payload: UniversityInteractionUpdate,
+    request: Request,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
@@ -226,7 +269,16 @@ def update_interaction(
             detail="Use assignment endpoint to change interaction manager",
         )
     ensure_can_update_interaction(db, current_user, interaction, payload)
-    return service.update_interaction(interaction_id, payload, changed_by_user_id=current_user.id)
+    interaction = service.update_interaction(interaction_id, payload, changed_by_user_id=current_user.id)
+    AuditService(db).log_event(
+        actor_user_id=current_user.id,
+        action="interaction.update",
+        entity_type="interaction",
+        entity_id=interaction.id,
+        metadata={"fields": sorted(payload.model_fields_set)},
+        request_id=get_request_id(request),
+    )
+    return interaction
 
 
 @router.post(
@@ -262,13 +314,28 @@ def update_interaction(
 def assign_interaction(
     interaction_id: UUID,
     payload: UniversityInteractionAssign,
+    request: Request,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles("MANAGER", "ADMIN")),
 ):
     service = UniversityInteractionService(db)
     interaction = service.get_interaction(interaction_id)
+    old_manager_user_id = interaction.manager_user_id
     ensure_can_assign_interaction(db, current_user, interaction, payload.manager_user_id)
-    return service.assign_interaction(interaction_id, payload, changed_by_user_id=current_user.id)
+    interaction = service.assign_interaction(interaction_id, payload, changed_by_user_id=current_user.id)
+    AuditService(db).log_event(
+        actor_user_id=current_user.id,
+        action="interaction.assign",
+        entity_type="interaction",
+        entity_id=interaction.id,
+        reason=payload.reason,
+        metadata={
+            "old_manager_user_id": str(old_manager_user_id) if old_manager_user_id else None,
+            "new_manager_user_id": str(payload.manager_user_id) if payload.manager_user_id else None,
+        },
+        request_id=get_request_id(request),
+    )
+    return interaction
 
 
 @router.delete(
@@ -288,8 +355,16 @@ def assign_interaction(
 )
 def delete_interaction(
     interaction_id: UUID,
+    request: Request,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
     ensure_can_delete_interaction(current_user)
     UniversityInteractionService(db).delete_interaction(interaction_id)
+    AuditService(db).log_event(
+        actor_user_id=current_user.id,
+        action="interaction.delete",
+        entity_type="interaction",
+        entity_id=interaction_id,
+        request_id=get_request_id(request),
+    )

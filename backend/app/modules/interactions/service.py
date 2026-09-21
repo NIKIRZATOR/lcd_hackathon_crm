@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, desc, func, select, update
 from sqlalchemy.orm import Session
 
 from app.common.repository import ListResult
@@ -58,6 +58,24 @@ class UniversityInteractionService:
         if interaction is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University interaction not found")
         return interaction
+
+    def list_assignment_history(
+        self,
+        *,
+        interaction_id: UUID,
+        limit: int,
+        offset: int,
+    ) -> ListResult[ResponsibleAssignmentHistory]:
+        statement = select(ResponsibleAssignmentHistory).where(
+            ResponsibleAssignmentHistory.interaction_id == interaction_id
+        )
+        total = self.db.scalar(select(func.count()).select_from(statement.subquery())) or 0
+        items = list(
+            self.db.scalars(
+                statement.order_by(desc(ResponsibleAssignmentHistory.changed_at)).limit(limit).offset(offset)
+            ).all()
+        )
+        return ListResult(items=items, total=total)
 
     def create_interaction(self, payload: UniversityInteractionCreate) -> UniversityInteraction:
         self._validate_related_entities(payload)

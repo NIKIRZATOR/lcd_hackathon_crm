@@ -95,3 +95,17 @@ class UniversityInteractionRead(UniversityInteractionBase):
     current_stage_instance_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class ResponsibleAssignmentHistoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    interaction_id: UUID
+    old_manager_user_id: UUID | None
+    new_manager_user_id: UUID | None
+    changed_by_user_id: UUID
+    reason: str | None
+    changed_at: datetime
+    created_at: datetime
+    updated_at: datetime

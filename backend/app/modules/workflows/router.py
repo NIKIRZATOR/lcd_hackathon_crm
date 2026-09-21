@@ -1,10 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
+from app.common.errors import get_request_id
 from app.common.schemas.pagination import Page, PaginationParams
 from app.core.database import get_db_session
+from app.modules.audit.service import AuditService
 from app.modules.auth.access import ADMIN_ROLES, CRM_ROLES, ensure_can_read_interaction, forbidden, is_admin
 from app.modules.auth.dependencies import require_roles
 from app.modules.interactions.model import UniversityInteraction
@@ -253,9 +255,26 @@ def list_transition_history(
 def execute_transition(
     interaction_id: UUID,
     payload: WorkflowTransitionExecute,
+    request: Request,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
     _ensure_can_access_interaction(db, current_user, interaction_id)
     scoped_payload = payload.model_copy(update={"performed_by": current_user.id})
-    return WorkflowRuntimeService(db).execute_transition(interaction_id, scoped_payload)
+    result = WorkflowRuntimeService(db).execute_transition(interaction_id, scoped_payload)
+    AuditService(db).log_event(
+        actor_user_id=current_user.id,
+        action="workflow.transition",
+        entity_type="interaction",
+        entity_id=interaction_id,
+        reason=payload.comment,
+        metadata={
+            "transition_id": str(payload.transition_id),
+            "from_stage_instance_id": str(result.from_stage_instance_id),
+            "to_stage_instance_id": str(result.to_stage_instance_id),
+            "transition_history_id": str(result.transition_history_id),
+            "skip_current": payload.skip_current,
+        },
+        request_id=get_request_id(request),
+    )
+    return result
