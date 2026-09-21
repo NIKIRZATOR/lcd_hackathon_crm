@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.common.schemas.pagination import Page, PaginationParams
 from app.core.database import get_db_session
+from app.modules.auth.access import CATALOG_WRITE_ROLES, CRM_ROLES
+from app.modules.auth.dependencies import require_roles
 from app.modules.products.schemas import (
     ITProductCreate,
     ITProductRead,
@@ -17,8 +19,9 @@ from app.modules.products.schemas import (
     VendorUpdate,
 )
 from app.modules.products.service import ITProductService, ProgramProductService, VendorService
+from app.modules.users.model import User
 
-router = APIRouter(tags=["products"])
+router = APIRouter(tags=["products"], dependencies=[Depends(require_roles(*CRM_ROLES))])
 
 
 @router.get("/vendors", response_model=Page[VendorRead])
@@ -45,17 +48,30 @@ def get_vendor(vendor_id: UUID, db: Session = Depends(get_db_session)):
 
 
 @router.post("/vendors", response_model=VendorRead, status_code=201)
-def create_vendor(payload: VendorCreate, db: Session = Depends(get_db_session)):
+def create_vendor(
+    payload: VendorCreate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
+):
     return VendorService(db).create_vendor(payload)
 
 
 @router.patch("/vendors/{vendor_id}", response_model=VendorRead)
-def update_vendor(vendor_id: UUID, payload: VendorUpdate, db: Session = Depends(get_db_session)):
+def update_vendor(
+    vendor_id: UUID,
+    payload: VendorUpdate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
+):
     return VendorService(db).update_vendor(vendor_id, payload)
 
 
 @router.patch("/vendors/{vendor_id}/deactivate", response_model=VendorRead)
-def deactivate_vendor(vendor_id: UUID, db: Session = Depends(get_db_session)):
+def deactivate_vendor(
+    vendor_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
+):
     return VendorService(db).deactivate_vendor(vendor_id)
 
 
@@ -85,7 +101,11 @@ def get_product(product_id: UUID, db: Session = Depends(get_db_session)):
 
 
 @router.post("/it-products", response_model=ITProductRead, status_code=201)
-def create_product(payload: ITProductCreate, db: Session = Depends(get_db_session)):
+def create_product(
+    payload: ITProductCreate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
+):
     return ITProductService(db).create_product(payload)
 
 
@@ -94,12 +114,17 @@ def update_product(
     product_id: UUID,
     payload: ITProductUpdate,
     db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
 ):
     return ITProductService(db).update_product(product_id, payload)
 
 
 @router.patch("/it-products/{product_id}/deactivate", response_model=ITProductRead)
-def deactivate_product(product_id: UUID, db: Session = Depends(get_db_session)):
+def deactivate_product(
+    product_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
+):
     return ITProductService(db).deactivate_product(product_id)
 
 
@@ -132,6 +157,7 @@ def get_program_product_link(link_id: UUID, db: Session = Depends(get_db_session
 def create_program_product_link(
     payload: ProgramProductCreate,
     db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
 ):
     return ProgramProductService(db).create_link(payload)
 
@@ -141,10 +167,15 @@ def update_program_product_link(
     link_id: UUID,
     payload: ProgramProductUpdate,
     db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
 ):
     return ProgramProductService(db).update_link(link_id, payload)
 
 
 @router.delete("/program-products/{link_id}", status_code=204)
-def delete_program_product_link(link_id: UUID, db: Session = Depends(get_db_session)):
+def delete_program_product_link(
+    link_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
+):
     ProgramProductService(db).delete_link(link_id)

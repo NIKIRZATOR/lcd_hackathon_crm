@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.common.schemas.pagination import Page, PaginationParams
 from app.core.database import get_db_session
+from app.modules.auth.access import CATALOG_WRITE_ROLES, CRM_ROLES
+from app.modules.auth.dependencies import require_roles
 from app.modules.programs.schemas import (
     ITDirectionCreate,
     ITDirectionRead,
@@ -14,8 +16,9 @@ from app.modules.programs.schemas import (
     ITProgramUpdate,
 )
 from app.modules.programs.service import ITDirectionService, ITProgramService
+from app.modules.users.model import User
 
-router = APIRouter(tags=["programs"])
+router = APIRouter(tags=["programs"], dependencies=[Depends(require_roles(*CRM_ROLES))])
 
 
 @router.get("/it-directions", response_model=Page[ITDirectionRead])
@@ -42,7 +45,11 @@ def get_direction(direction_id: UUID, db: Session = Depends(get_db_session)):
 
 
 @router.post("/it-directions", response_model=ITDirectionRead, status_code=201)
-def create_direction(payload: ITDirectionCreate, db: Session = Depends(get_db_session)):
+def create_direction(
+    payload: ITDirectionCreate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
+):
     return ITDirectionService(db).create_direction(payload)
 
 
@@ -51,12 +58,17 @@ def update_direction(
     direction_id: UUID,
     payload: ITDirectionUpdate,
     db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
 ):
     return ITDirectionService(db).update_direction(direction_id, payload)
 
 
 @router.patch("/it-directions/{direction_id}/deactivate", response_model=ITDirectionRead)
-def deactivate_direction(direction_id: UUID, db: Session = Depends(get_db_session)):
+def deactivate_direction(
+    direction_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
+):
     return ITDirectionService(db).deactivate_direction(direction_id)
 
 
@@ -86,7 +98,11 @@ def get_program(program_id: UUID, db: Session = Depends(get_db_session)):
 
 
 @router.post("/it-programs", response_model=ITProgramRead, status_code=201)
-def create_program(payload: ITProgramCreate, db: Session = Depends(get_db_session)):
+def create_program(
+    payload: ITProgramCreate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
+):
     return ITProgramService(db).create_program(payload)
 
 
@@ -95,10 +111,15 @@ def update_program(
     program_id: UUID,
     payload: ITProgramUpdate,
     db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
 ):
     return ITProgramService(db).update_program(program_id, payload)
 
 
 @router.patch("/it-programs/{program_id}/deactivate", response_model=ITProgramRead)
-def deactivate_program(program_id: UUID, db: Session = Depends(get_db_session)):
+def deactivate_program(
+    program_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
+):
     return ITProgramService(db).deactivate_program(program_id)

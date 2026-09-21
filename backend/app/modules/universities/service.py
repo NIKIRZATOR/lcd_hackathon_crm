@@ -36,6 +36,29 @@ class UniversityService:
             sort_order=sort_order,
         )
 
+    def list_universities_for_manager(
+        self,
+        *,
+        manager_user_id: UUID,
+        search: str | None,
+        is_active: bool | None,
+        region: str | None,
+        city: str | None,
+        limit: int,
+        offset: int,
+        sort_by: str | None,
+        sort_order: str,
+    ) -> ListResult[University]:
+        return self.repository.list_for_manager(
+            manager_user_id=manager_user_id,
+            filters={"is_active": is_active, "region": region, "city": city},
+            search=search,
+            limit=limit,
+            offset=offset,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+
     def get_university(self, university_id: UUID) -> University:
         university = self.repository.get(university_id)
         if university is None:
