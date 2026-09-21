@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     keycloak_url: str = "http://localhost:8080"
     keycloak_internal_url: str | None = None
     keycloak_realm: str = "rtk-eduflow"
+    keycloak_frontend_client_id: str = "rtk-eduflow-frontend"
     keycloak_backend_client_id: str = "rtk-eduflow-backend"
     keycloak_audience: str = "rtk-eduflow-backend"
 
@@ -40,6 +41,10 @@ class Settings(BaseSettings):
     @property
     def keycloak_openid_configuration_url(self) -> str:
         return f"{self.keycloak_base_url}/realms/{self.keycloak_realm}/.well-known/openid-configuration"
+
+    @property
+    def keycloak_token_url(self) -> str:
+        return f"{self.keycloak_base_url}/realms/{self.keycloak_realm}/protocol/openid-connect/token"
 
 
 @lru_cache

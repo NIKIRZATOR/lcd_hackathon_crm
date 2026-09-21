@@ -36,6 +36,29 @@ class UniversityContactService:
             sort_order=sort_order,
         )
 
+    def list_contacts_for_manager(
+        self,
+        *,
+        manager_user_id: UUID | set[UUID],
+        search: str | None,
+        university_id: UUID | None,
+        is_active: bool | None,
+        is_primary: bool | None,
+        limit: int,
+        offset: int,
+        sort_by: str | None,
+        sort_order: str,
+    ) -> ListResult[UniversityContact]:
+        return self.repository.list_for_manager(
+            manager_user_id=manager_user_id,
+            filters={"university_id": university_id, "is_active": is_active, "is_primary": is_primary},
+            search=search,
+            limit=limit,
+            offset=offset,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+
     def get_contact(self, contact_id: UUID) -> UniversityContact:
         contact = self.repository.get(contact_id)
         if contact is None:

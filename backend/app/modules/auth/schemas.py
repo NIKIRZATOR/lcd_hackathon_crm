@@ -12,3 +12,12 @@ class CurrentUserRead(BaseModel):
     roles: list[str]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TokenRead(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int | None = None
+    refresh_expires_in: int | None = None
+    refresh_token: str | None = None
+    scope: str | None = None

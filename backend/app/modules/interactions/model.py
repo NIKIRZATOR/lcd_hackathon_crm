@@ -26,10 +26,10 @@ class UniversityInteraction(ModelBase):
         ForeignKey("it_products.id"),
         nullable=False,
     )
-    manager_user_id: Mapped[UUID] = mapped_column(
+    manager_user_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("users.id"),
-        nullable=False,
+        nullable=True,
     )
     workflow_template_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
@@ -46,6 +46,12 @@ class UniversityInteraction(ModelBase):
         nullable=True,
     )
     status: Mapped[str] = mapped_column(String(64), nullable=False, default="DRAFT")
+    contract_number: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    license_signed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    license_signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    license_valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    transfer_status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    university_responsibles: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
