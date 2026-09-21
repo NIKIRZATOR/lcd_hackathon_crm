@@ -1,16 +1,21 @@
-.root {
+.interactionFunnel {
   padding: 20px;
 
   background: var(--ant-color-bg-container);
   border: 1px solid var(--ant-color-border-secondary);
   border-radius: var(--ant-border-radius-lg);
-}
 
-.title {
-  margin: 0 0 20px;
+  &__header {
+    margin: 0 0 20px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
 
-  font-size: 20px;
-  font-weight: 600;
+  &__title {
+    font-size: 20px;
+    font-weight: 600;
+  }
 }
 
 .chart {

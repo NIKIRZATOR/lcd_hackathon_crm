@@ -1,4 +1,5 @@
-import type { EChartsCoreOption } from 'echarts/core';
+import { forwardRef, useImperativeHandle, useRef } from 'react';
+import type { EChartsCoreOption, EChartsType } from 'echarts/core';
 
 import ReactEChartsCore from 'echarts-for-react/esm/core';
 
@@ -9,12 +10,26 @@ type EChartProps = {
   className?: string;
 };
 
-const EChart = ({ option, className }: EChartProps) => {
+export type EChartRef = {
+  getInstance: () => EChartsType | null;
+};
+
+const EChart = forwardRef<EChartRef, EChartProps>(({ option, className }, ref) => {
+  const chartRef = useRef<ReactEChartsCore>(null);
+
+  useImperativeHandle(ref, () => ({
+    getInstance: () => chartRef.current?.getEchartsInstance() ?? null,
+  }));
+
   return (
     <ReactEChartsCore
+      ref={chartRef}
       echarts={echarts}
       option={option}
-      opts={{ renderer: 'svg' }}
+      opts={{
+        renderer: 'svg',
+        locale: 'RU',
+      }}
       className={className}
       style={{
         width: '100%',
@@ -22,6 +37,8 @@ const EChart = ({ option, className }: EChartProps) => {
       }}
     />
   );
-};
+});
+
+EChart.displayName = 'EChart';
 
 export default EChart;
