@@ -261,13 +261,13 @@ def update_interaction(
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
-    service = UniversityInteractionService(db)
-    interaction = service.get_interaction(interaction_id)
     if "manager_user_id" in payload.model_fields_set:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Use assignment endpoint to change interaction manager",
         )
+    service = UniversityInteractionService(db)
+    interaction = service.get_interaction(interaction_id)
     ensure_can_update_interaction(db, current_user, interaction, payload)
     interaction = service.update_interaction(interaction_id, payload, changed_by_user_id=current_user.id)
     AuditService(db).log_event(
