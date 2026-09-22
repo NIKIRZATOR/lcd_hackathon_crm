@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,6 +10,7 @@ from app.core.database import ModelBase
 
 class UniversityInteraction(ModelBase):
     __tablename__ = "university_interactions"
+    __table_args__ = (Index("ix_university_interactions_workflow_version", "workflow_version_id"),)
 
     university_id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True),
@@ -34,6 +35,11 @@ class UniversityInteraction(ModelBase):
     workflow_template_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("workflow_templates.id"),
+        nullable=True,
+    )
+    workflow_version_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_versions.id"),
         nullable=True,
     )
     current_stage_instance_id: Mapped[UUID | None] = mapped_column(

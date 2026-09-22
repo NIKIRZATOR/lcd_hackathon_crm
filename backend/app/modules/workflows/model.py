@@ -1,7 +1,10 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from typing import Any
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,12 +32,128 @@ class WorkflowTemplate(ModelBase):
     )
 
 
-class WorkflowStage(ModelBase):
-    __tablename__ = "workflow_stages"
+class WorkflowVersion(ModelBase):
+    __tablename__ = "workflow_versions"
+    __table_args__ = (
+        UniqueConstraint("workflow_template_id", "version", name="uq_workflow_versions_template_version"),
+        Index("ix_workflow_versions_template_status", "workflow_template_id", "status"),
+    )
 
     workflow_template_id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("workflow_templates.id"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT")
+    supersedes_version_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_versions.id"),
+        nullable=True,
+    )
+    created_by: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class WorkflowChangeRequest(ModelBase):
+    __tablename__ = "workflow_change_requests"
+    __table_args__ = (Index("ix_workflow_change_requests_version_status", "workflow_version_id", "status"),)
+
+    workflow_version_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_versions.id"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
+    requested_by: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    reviewed_by: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dangerous_changes_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+
+class WorkflowStageMapping(ModelBase):
+    __tablename__ = "workflow_stage_mappings"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_version_id",
+            "target_version_id",
+            "source_stage_id",
+            name="uq_workflow_stage_mappings_source_target_stage",
+        ),
+        Index("ix_workflow_stage_mappings_versions", "source_version_id", "target_version_id"),
+    )
+
+    source_version_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_versions.id"),
+        nullable=False,
+    )
+    target_version_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_versions.id"),
+        nullable=False,
+    )
+    source_stage_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_stages.id"),
+        nullable=False,
+    )
+    target_stage_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_stages.id"),
+        nullable=False,
+    )
+    created_by: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+
+class WorkflowMigrationJob(ModelBase):
+    __tablename__ = "workflow_migration_jobs"
+    __table_args__ = (Index("ix_workflow_migration_jobs_versions", "source_version_id", "target_version_id"),)
+
+    source_version_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_versions.id"),
+        nullable=False,
+    )
+    target_version_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_versions.id"),
+        nullable=False,
+    )
+    change_request_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_change_requests.id"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
+    created_by: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    affected_interaction_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    migrated_interaction_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class WorkflowStage(ModelBase):
+    __tablename__ = "workflow_stages"
+    __table_args__ = (Index("ix_workflow_stages_version_order", "workflow_version_id", "order_index"),)
+
+    workflow_template_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_templates.id"),
+        nullable=False,
+    )
+    workflow_version_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_versions.id"),
         nullable=False,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -51,10 +170,16 @@ class WorkflowStage(ModelBase):
 
 class WorkflowTransition(ModelBase):
     __tablename__ = "workflow_transitions"
+    __table_args__ = (Index("ix_workflow_transitions_version_from", "workflow_version_id", "from_stage_id"),)
 
     workflow_template_id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("workflow_templates.id"),
+        nullable=False,
+    )
+    workflow_version_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("workflow_versions.id"),
         nullable=False,
     )
     from_stage_id: Mapped[UUID] = mapped_column(

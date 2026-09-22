@@ -9,13 +9,17 @@ from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.universities.model import University
 from app.modules.users.model import DataAccessScope, ManagerMembership, ResponsibleAssignmentHistory, Role, User, user_roles
 from app.modules.workflows.model import (
+    WorkflowChangeRequest,
+    WorkflowMigrationJob,
     WorkflowStage,
     WorkflowStageAttachment,
     WorkflowStageComment,
     WorkflowStageInstance,
+    WorkflowStageMapping,
     WorkflowTemplate,
     WorkflowTransition,
     WorkflowTransitionHistory,
+    WorkflowVersion,
 )
 
 __all__ = [
@@ -40,7 +44,11 @@ __all__ = [
     "WorkflowStageAttachment",
     "WorkflowStageComment",
     "WorkflowStageInstance",
+    "WorkflowStageMapping",
     "WorkflowTemplate",
     "WorkflowTransition",
     "WorkflowTransitionHistory",
+    "WorkflowVersion",
+    "WorkflowChangeRequest",
+    "WorkflowMigrationJob",
 ]

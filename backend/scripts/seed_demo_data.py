@@ -15,8 +15,9 @@ from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.universities.model import University
 from app.modules.interactions.model import UniversityInteraction
 from app.modules.users.model import ManagerMembership, Role, User
-from app.modules.workflows.model import WorkflowStage, WorkflowTemplate, WorkflowTransition
+from app.modules.workflows.model import WorkflowStage, WorkflowTemplate, WorkflowTransition, WorkflowVersion
 from app.modules.workflows.service import WorkflowRuntimeService
+from scripts.workflow_seed_data import LEGACY_WORKFLOW_TEMPLATE_NAMES, WORKFLOW_STAGES, WORKFLOW_TEMPLATE
 
 
 UNIVERSITIES = [
@@ -202,51 +203,6 @@ INTERACTIONS = [
     },
 ]
 
-WORKFLOW_TEMPLATE = {
-    "name": "Basic University Interaction",
-    "description": "Demo workflow for university CRM interaction.",
-    "version": "1",
-    "is_default": True,
-}
-
-WORKFLOW_STAGES = [
-    {
-        "name": "Find university contact",
-        "order_index": 1,
-        "is_initial": True,
-        "default_duration_days": 3,
-    },
-    {
-        "name": "Clarify program relevance",
-        "order_index": 2,
-        "default_duration_days": 5,
-    },
-    {
-        "name": "Organize meeting",
-        "order_index": 3,
-        "default_duration_days": 7,
-    },
-    {
-        "name": "Exchange documents",
-        "order_index": 4,
-        "default_duration_days": 10,
-        "requires_comment": True,
-    },
-    {
-        "name": "Correct documents",
-        "order_index": 5,
-        "is_optional": True,
-        "default_duration_days": 5,
-    },
-    {
-        "name": "Sign documents",
-        "order_index": 6,
-        "is_final": True,
-        "default_duration_days": 10,
-    },
-]
-
-
 def get_by_field[T](db: Session, model: type[T], field: str, value: object) -> T | None:
     return db.scalar(select(model).where(getattr(model, field) == value))
 
@@ -412,21 +368,70 @@ def seed_workflow(db: Session, users: dict[str, User]) -> WorkflowTemplate:
     creator = users["admin1"]
     template = get_by_field(db, WorkflowTemplate, "name", WORKFLOW_TEMPLATE["name"])
     if template is None:
+        template = db.scalar(
+            select(WorkflowTemplate).where(WorkflowTemplate.name.in_(LEGACY_WORKFLOW_TEMPLATE_NAMES))
+        )
+    if template is None:
         template = WorkflowTemplate(**WORKFLOW_TEMPLATE, created_by=creator.id, is_active=True)
         db.add(template)
         db.flush()
+    else:
+        for field, value in WORKFLOW_TEMPLATE.items():
+            setattr(template, field, value)
+        template.created_by = template.created_by or creator.id
+        template.is_active = True
+        db.flush()
+
+    for other_template in db.scalars(
+        select(WorkflowTemplate).where(
+            WorkflowTemplate.id != template.id,
+            WorkflowTemplate.is_default.is_(True),
+        )
+    ):
+        other_template.is_default = False
+
+    version = db.scalar(
+        select(WorkflowVersion).where(
+            WorkflowVersion.workflow_template_id == template.id,
+            WorkflowVersion.version == int(WORKFLOW_TEMPLATE["version"]),
+        )
+    )
+    if version is None:
+        version = WorkflowVersion(
+            workflow_template_id=template.id,
+            version=int(WORKFLOW_TEMPLATE["version"]),
+            status="PUBLISHED",
+            created_by=creator.id,
+        )
+        db.add(version)
+        db.flush()
+    else:
+        version.status = "PUBLISHED"
+        version.created_by = version.created_by or creator.id
+
+    official_stage_names = {data["name"] for data in WORKFLOW_STAGES}
+    for legacy_stage in db.scalars(
+        select(WorkflowStage).where(
+            WorkflowStage.workflow_template_id == template.id,
+            WorkflowStage.workflow_version_id == version.id,
+            WorkflowStage.name.not_in(official_stage_names),
+        )
+    ):
+        legacy_stage.is_active = False
 
     stages_by_name = {}
     for data in WORKFLOW_STAGES:
         stage = db.scalar(
             select(WorkflowStage).where(
                 WorkflowStage.workflow_template_id == template.id,
+                WorkflowStage.workflow_version_id == version.id,
                 WorkflowStage.name == data["name"],
             )
         )
         if stage is None:
             stage = WorkflowStage(
                 workflow_template_id=template.id,
+                workflow_version_id=version.id,
                 description=data.get("description"),
                 is_active=True,
                 is_initial=data.get("is_initial", False),
@@ -440,27 +445,40 @@ def seed_workflow(db: Session, users: dict[str, User]) -> WorkflowTemplate:
             )
             db.add(stage)
             db.flush()
+        else:
+            stage.description = data.get("description")
+            stage.is_active = True
+            stage.is_initial = data.get("is_initial", False)
+            stage.is_final = data.get("is_final", False)
+            stage.is_optional = data.get("is_optional", False)
+            stage.default_duration_days = data.get("default_duration_days")
+            stage.requires_comment = data.get("requires_comment", False)
+            stage.requires_attachment = data.get("requires_attachment", False)
+            stage.order_index = data["order_index"]
         stages_by_name[data["name"]] = stage
 
     ordered_stages = [stages_by_name[data["name"]] for data in WORKFLOW_STAGES]
     for from_stage, to_stage in zip(ordered_stages, ordered_stages[1:]):
-        exists = db.scalar(
+        transition = db.scalar(
             select(WorkflowTransition).where(
                 WorkflowTransition.workflow_template_id == template.id,
+                WorkflowTransition.workflow_version_id == version.id,
                 WorkflowTransition.from_stage_id == from_stage.id,
                 WorkflowTransition.to_stage_id == to_stage.id,
             )
         )
-        if exists is None:
-            db.add(
-                WorkflowTransition(
-                    workflow_template_id=template.id,
-                    from_stage_id=from_stage.id,
-                    to_stage_id=to_stage.id,
-                    name=f"{from_stage.name} -> {to_stage.name}",
-                    is_default=True,
-                )
+        transition_name = f"{from_stage.name} -> {to_stage.name}"
+        if transition is None:
+            transition = WorkflowTransition(
+                workflow_template_id=template.id,
+                workflow_version_id=version.id,
+                from_stage_id=from_stage.id,
+                to_stage_id=to_stage.id,
             )
+            db.add(transition)
+        transition.name = transition_name
+        transition.is_default = True
+        transition.condition_code = None
 
     return template
 
