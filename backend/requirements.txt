@@ -7,5 +7,6 @@ PyJWT[crypto]==2.9.0
 pydantic-settings==2.5.2
 SQLAlchemy==2.0.35
 uvicorn[standard]==0.30.6
+minio==7.2.10
 pytest==8.3.3
 ruff==0.8.0

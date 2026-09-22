@@ -503,18 +503,40 @@ Fields:
 
 - `id`
 - `original_name: varchar(255)`
-- `storage_name: varchar(255)`
-- `storage_path: varchar(1024)`
+- `storage_name: varchar(255)` legacy compatibility field
+- `storage_path: varchar(1024)` legacy compatibility field
 - `mime_type: varchar(255), nullable`
 - `extension: varchar(32), nullable`
 - `size_bytes: bigint, nullable`
 - `checksum: varchar(255), nullable`
+- `provider: varchar(32), nullable`
+- `bucket: varchar(255), nullable`
+- `object_key: varchar(1024), nullable`
 - `uploaded_by: uuid, FK -> users.id, nullable`
+- `scan_status: varchar(32), default NOT_SCANNED`
+- `deleted_at: timestamptz, nullable`
+- `delete_after: timestamptz, nullable`
+- `deleted_by: uuid, FK -> users.id, nullable`
+- `purged_at: timestamptz, nullable`
 - `created_at`
 
 Relations:
 
 - `files.id` <- `workflow_stage_attachments.file_id`
+- `users.id` <- `files.uploaded_by`
+- `users.id` <- `files.deleted_by`
+
+Constraints and indexes:
+
+- Unique: `(provider, bucket, object_key)`
+- Index: `(deleted_at, delete_after, purged_at)`
+
+Lifecycle:
+
+- Active: `deleted_at IS NULL` and `purged_at IS NULL`
+- Soft deleted: `deleted_at IS NOT NULL` and `purged_at IS NULL`
+- Purged: `deleted_at IS NOT NULL` and `purged_at IS NOT NULL`
+- Binary content is stored in S3-compatible object storage. PostgreSQL stores metadata and lifecycle state only.
 
 ### `audit_events`
 
@@ -901,6 +923,11 @@ Demo users:
 | `GET` | `/workflows/stage-instances` | `KAM`, `MANAGER`, `ADMIN` | `interaction_id`, `status`, pagination/sort | `Page[WorkflowStageInstanceRead]` |
 | `GET` | `/workflows/interactions/{interaction_id}/current-stage` | `KAM`, `MANAGER`, `ADMIN` | path id | `WorkflowStageInstanceRead` |
 | `PATCH` | `/workflows/stage-instances/{stage_instance_id}/status` | `KAM`, `MANAGER`, `ADMIN` | `WorkflowStageInstanceStatusUpdate` | `WorkflowStageInstanceRead` |
+| `POST` | `/workflows/stage-instances/{stage_instance_id}/attachments` | `KAM`, `MANAGER`, `ADMIN` with interaction scope | multipart `file`, optional `description` | `WorkflowAttachmentRead` |
+| `GET` | `/workflows/stage-instances/{stage_instance_id}/attachments` | `KAM`, `MANAGER`, `ADMIN` with interaction scope | path id | `list[WorkflowAttachmentRead]` |
+| `GET` | `/workflows/attachments/{attachment_id}/download` | `KAM`, `MANAGER`, `ADMIN` with interaction scope | path id | binary stream |
+| `DELETE` | `/workflows/attachments/{attachment_id}` | `KAM`, `MANAGER`, `ADMIN` with interaction scope | path id | `WorkflowAttachmentRead` |
+| `POST` | `/workflows/attachments/{attachment_id}/restore` | `KAM`, `MANAGER`, `ADMIN` with interaction scope | path id | `WorkflowAttachmentRead` |
 | `GET` | `/workflows/transition-history` | `KAM`, `MANAGER`, `ADMIN` | `interaction_id`, pagination/sort | `Page[WorkflowTransitionHistoryRead]` |
 | `POST` | `/workflows/interactions/{interaction_id}/transition` | `KAM`, `MANAGER`, `ADMIN` | `WorkflowTransitionExecute` | `WorkflowTransitionResult` |
 
@@ -976,7 +1003,7 @@ GET /api/audit/events?result=SUCCESS
 | Этап | Плановые изменения |
 | --- | --- |
 | 2 | Частично реализовано: `workflow_versions`, draft/publish lifecycle, runtime binding. Впереди: governance, change requests, approvals, stage mappings, migration jobs. |
-| 3 | Object storage: расширение `files` полями `provider`, `bucket`, `object_key`, `checksum`, `scan_status`. |
+| 3 | Implemented: S3-compatible object storage metadata in `files`, workflow attachment upload/list/download, soft delete, restore, purge command, and active-file checks for `requires_attachment`. |
 | 4 | Imports: `import_jobs`, mappings, row errors, import artifacts. |
 | 5 | Reports: `report_jobs`, `report_artifacts`, `report_templates`. |
 | 6 | Integrations: sources, inbox/outbox, external links, mappings, delivery attempts. |
