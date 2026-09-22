@@ -1,16 +1,16 @@
 # Stage 3 Storage Audit
 
-Date: 2026-09-22
+Дата: 2026-09-22
 
-This audit documents the existing file-related backend before Stage 3 changes. No runtime code was changed in this step.
+Этот audit фиксирует состояние file-related backend до изменений Stage 3. На этом шаге runtime-код не менялся.
 
-## Existing State
+## Текущее состояние
 
-### Database Models
+### Database models
 
 - `backend/app/modules/documents/model.py`
-  - Defines `File` mapped to `files`.
-  - Current columns:
+  - Определяет `File`, связанный с таблицей `files`.
+  - Текущие поля:
     - `id`
     - `original_name`
     - `storage_name`
@@ -22,52 +22,52 @@ This audit documents the existing file-related backend before Stage 3 changes. N
     - `uploaded_by`
     - `created_at`
 - `backend/app/modules/workflows/model.py`
-  - Defines `WorkflowStageAttachment` mapped to `workflow_stage_attachments`.
-  - Current columns:
+  - Определяет `WorkflowStageAttachment`, связанный с таблицей `workflow_stage_attachments`.
+  - Текущие поля:
     - `id`
     - `stage_instance_id`
     - `file_id`
     - `uploaded_by`
     - `description`
     - `created_at`
-  - Keeps the existing relation chain:
+  - Существующая цепочка связей сохраняется:
     - `workflow_stage_attachments.stage_instance_id -> workflow_stage_instances.id`
     - `workflow_stage_instances.interaction_id -> university_interactions.id`
     - `workflow_stage_attachments.file_id -> files.id`
 
 ### Migration
 
-- Initial schema is created in `backend/migrations/versions/cade47f9d409_init_crm_schema.py`.
-- `files.uploaded_by -> users.id` already exists.
-- `workflow_stage_attachments.uploaded_by -> users.id` already exists.
-- `workflow_stage_attachments.file_id -> files.id` already exists.
-- `workflow_stage_attachments.stage_instance_id -> workflow_stage_instances.id` already exists.
+- Initial schema создается в `backend/migrations/versions/cade47f9d409_init_crm_schema.py`.
+- `files.uploaded_by -> users.id` уже существует.
+- `workflow_stage_attachments.uploaded_by -> users.id` уже существует.
+- `workflow_stage_attachments.file_id -> files.id` уже существует.
+- `workflow_stage_attachments.stage_instance_id -> workflow_stage_instances.id` уже существует.
 
-### Repositories, Services, Schemas, Routers
+### Repositories, services, schemas, routers
 
-- `backend/app/modules/documents/repository.py`, `service.py`, and `schemas.py` are currently placeholders.
-- `backend/app/modules/documents/router.py` registers an empty `/documents` router.
-- `backend/app/modules/workflows/repository.py` has `WorkflowStageAttachmentRepository`, currently only as a basic `CRUDRepository` subclass.
-- `backend/app/modules/workflows/router.py` exposes workflow runtime endpoints, but no attachment upload/list/download/delete endpoints yet.
-- No existing backend endpoint currently accepts `UploadFile`.
-- No existing backend endpoint currently streams file content with `FileResponse` or `StreamingResponse`.
+- `backend/app/modules/documents/repository.py`, `service.py`, `schemas.py` на момент audit были placeholders.
+- `backend/app/modules/documents/router.py` регистрировал пустой router `/documents`.
+- `backend/app/modules/workflows/repository.py` содержал `WorkflowStageAttachmentRepository` как базовый subclass `CRUDRepository`.
+- `backend/app/modules/workflows/router.py` уже отдавал workflow runtime endpoints, но attachment upload/list/download/delete endpoints еще не было.
+- Backend endpoint, принимающий `UploadFile`, отсутствовал.
+- Backend endpoint, отдающий file content через `FileResponse` или `StreamingResponse`, отсутствовал.
 
-### Current Workflow Attachment Behavior
+### Текущее поведение workflow attachments
 
-- Stage 2 uses attachment rows only as metadata/readiness markers.
-- `backend/app/modules/workflows/service.py` checks `WorkflowStage.requires_attachment` through `_count_stage_attachments(stage_instance_id)`.
-- The current check counts all rows in `workflow_stage_attachments` for a stage instance.
-- Because Stage 3 introduces soft delete on `files`, this check must later count only active, non-purged files.
+- Stage 2 использовал attachment rows только как metadata/readiness markers.
+- `backend/app/modules/workflows/service.py` проверял `WorkflowStage.requires_attachment` через `_count_stage_attachments(stage_instance_id)`.
+- На момент audit проверка считала все rows в `workflow_stage_attachments` для stage instance.
+- Так как Stage 3 вводит soft delete в `files`, этот счетчик нужно было изменить так, чтобы учитывались только active, non-purged files.
 
-### Local Filesystem Usage
+### Local filesystem usage
 
-- No active local filesystem upload/download implementation was found.
-- `storage_name` and `storage_path` exist in the `files` table/model, but no code currently writes binary content to those paths.
-- Script usage of `Path` is limited to helper scripts such as demo data setup and is unrelated to file storage.
+- Активная реализация upload/download через local filesystem не найдена.
+- `storage_name` и `storage_path` существуют в таблице/model `files`, но код не пишет binary content по этим путям.
+- Использование `Path` в scripts ограничено helper scripts вроде demo data setup и не относится к file storage.
 
-### Docker And Environment
+### Docker и environment
 
-- `docker-compose.yml` currently defines:
+- `docker-compose.yml` на момент audit содержал:
   - `postgres`
   - `backend`
   - `keycloak-db-init`
@@ -76,84 +76,84 @@ This audit documents the existing file-related backend before Stage 3 changes. N
 - Existing persistent volumes:
   - `postgres_data`
   - `frontend_node_modules`
-- No MinIO/S3 service is configured yet.
-- Root `.env.example` and `backend/.env.example` do not contain S3/MinIO settings yet.
+- MinIO/S3 service еще не был настроен.
+- Root `.env.example` и `backend/.env.example` еще не содержали S3/MinIO settings.
 
-### Audit Helpers
+### Audit helpers
 
-- `backend/app/modules/audit/model.py` defines `audit_events`.
-- `backend/app/modules/audit/service.py` exposes `AuditService.log_event(...)`.
+- `backend/app/modules/audit/model.py` определяет `audit_events`.
+- `backend/app/modules/audit/service.py` предоставляет `AuditService.log_event(...)`.
 - Existing file-related audit action constants:
   - `file.upload`
   - `file.download`
   - `file.delete`
   - `file.scan_status_changed`
   - `storage.presign_generated`
-- Stage 3 must add/use:
+- Stage 3 должен был добавить/использовать:
   - `file.upload`
   - `file.download`
   - `file.delete`
   - `file.restore`
   - `file.purge`
 
-### Data Scope Helpers
+### Data scope helpers
 
-- `backend/app/modules/auth/access.py` provides reusable interaction scope checks.
-- Existing helpers to reuse:
+- `backend/app/modules/auth/access.py` предоставляет reusable interaction scope checks.
+- Existing helpers для переиспользования:
   - `ensure_can_read_interaction`
   - `forbidden`
   - `is_admin`
   - role constants: `CRM_ROLES`, `ADMIN_ROLES`
-- Workflow runtime routes already use `_ensure_can_access_interaction(...)` before interaction-scoped operations.
+- Workflow runtime routes уже используют `_ensure_can_access_interaction(...)` перед interaction-scoped operations.
 
-## Existing API To Preserve
+## Existing API, который нужно сохранить
 
-- Stage 2 workflow runtime API must remain compatible:
+- Stage 2 workflow runtime API должен остаться compatible:
   - `GET /api/workflows/stage-instances`
   - `GET /api/workflows/interactions/{interaction_id}/current-stage`
   - `GET /api/workflows/interactions/{interaction_id}/available-transitions`
   - `PATCH /api/workflows/stage-instances/{stage_instance_id}/status`
   - `GET /api/workflows/transition-history`
   - `POST /api/workflows/interactions/{interaction_id}/transition`
-- Existing `requires_attachment` behavior must remain conceptually the same: a transition is blocked when the current stage requires an active attachment and none exists.
-- New Stage 3 attachment endpoints should be additive.
+- Existing `requires_attachment` behavior должен остаться концептуально тем же: transition блокируется, если текущий stage требует active attachment, а его нет.
+- Новые Stage 3 attachment endpoints должны быть additive.
 
-## Legacy Columns
+## Legacy columns
 
-The following `files` columns are legacy for Stage 3:
+Следующие поля `files` считаются legacy для Stage 3:
 
 - `storage_name`
 - `storage_path`
 
-They should not be used as the primary object storage identity in new code. Stage 3 should introduce and use:
+Их нельзя использовать как основной object storage identity в новом коде. Stage 3 должен ввести и использовать:
 
 - `provider`
 - `bucket`
 - `object_key`
 
-The legacy columns should remain during Stage 3 for backward-compatible migrations and to avoid destructive schema changes.
+Legacy columns должны остаться на Stage 3 для backward-compatible migrations и чтобы не делать destructive schema changes.
 
-## What Will Be Replaced Or Extended
+## Что будет заменено или расширено
 
-- The placeholder `documents` module should become the shared file metadata and storage orchestration layer.
-- Workflow attachment logic should call a `FileService`, not object storage directly.
-- Object storage access should go through a `StorageAdapter` abstraction.
-- No workflow/import/report business service should import a MinIO client directly.
-- `files` should be extended with object storage metadata, scan status, and lifecycle fields.
-- Attachment list/download/readiness checks should exclude soft-deleted and purged files.
+- Placeholder `documents` module должен стать shared file metadata и storage orchestration layer.
+- Workflow attachment logic должна вызывать `FileService`, а не object storage напрямую.
+- Object storage access должен идти через abstraction `StorageAdapter`.
+- Workflow/import/report business service не должен напрямую импортировать MinIO client.
+- `files` должна быть расширена object storage metadata, scan status и lifecycle fields.
+- Attachment list/download/readiness checks должны исключать soft-deleted и purged files.
 
-## Stage 2 Dependencies To Reuse
+## Stage 2 dependencies для переиспользования
 
 - Existing workflow runtime model:
   - `WorkflowStageInstance`
   - `WorkflowStageAttachment`
   - `WorkflowStage.requires_attachment`
-- Existing interaction scope and RBAC helpers.
+- Existing interaction scope и RBAC helpers.
 - Existing audit infrastructure.
-- Existing error envelope and request id helpers.
+- Existing error envelope и request id helpers.
 - Existing SQLAlchemy/Alembic conventions.
 - Existing Docker Compose layout.
 
-## Step A Verification
+## Step A verification
 
-This step is complete when this file exists and accurately reflects the current implementation. The next verifiable step is MinIO infrastructure in Docker Compose and env examples.
+Step A считается выполненным, когда этот файл существует и точно отражает состояние implementation на момент audit. Следующий проверяемый шаг после него - MinIO infrastructure в Docker Compose и env examples.

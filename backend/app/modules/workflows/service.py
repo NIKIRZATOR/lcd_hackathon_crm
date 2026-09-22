@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.common.repository import ListResult
 from app.modules.audit.model import AuditEvent
 from app.modules.audit.repository import AuditEventRepository
+from app.modules.documents.model import File
 from app.modules.interactions.model import UniversityInteraction
 from app.modules.users.model import User
 from app.modules.workflows.model import (
@@ -1508,8 +1509,15 @@ class TransitionService:
         return instance
 
     def _count_stage_attachments(self, stage_instance_id: UUID) -> int:
-        statement = select(func.count()).select_from(WorkflowStageAttachment).where(
-            WorkflowStageAttachment.stage_instance_id == stage_instance_id
+        statement = (
+            select(func.count())
+            .select_from(WorkflowStageAttachment)
+            .join(File, File.id == WorkflowStageAttachment.file_id)
+            .where(
+                WorkflowStageAttachment.stage_instance_id == stage_instance_id,
+                File.deleted_at.is_(None),
+                File.purged_at.is_(None),
+            )
         )
         return self.db.scalar(statement) or 0
 
