@@ -1,16 +1,28 @@
 # Stage 2 Workflow Backend Progress
 
-Дата фиксации: 2026-09-21
+Дата фиксации: 2026-09-22
 
 ## Краткий статус
 
-Работа остановлена после шагов A-C из промта:
+Stage 2 backend Workflow Engine закрыт.
+
+Закрыты шаги A-H:
 
 1. Audit.
 2. Seed официального workflow.
-3. Базовое workflow versioning / draft / publish / runtime binding.
+3. Workflow versioning / draft / publish / runtime binding.
+4. Graph transitions.
+5. TransitionService.
+6. Governance / dangerous changes / approval.
+7. Migration preview / execution.
+8. Completion / verification docs.
 
 Frontend не изменялся.
+
+Итоговые документы:
+
+- `docs/stage_2_be/stage2_completion.md`
+- `docs/stage_2_be/stage2_verification.md`
 
 ## Что сделано
 
@@ -245,16 +257,41 @@ RTK EduFlow Base Workflow | 1 | PUBLISHED | 14 active stages
 
 ### Step H - Tests / Docs
 
-- Расширить unit/integration tests по списку из промта.
-- Обновить Swagger-facing schemas/descriptions при необходимости.
-- Создать финальный документ:
-  - `docs/stage2_workflow_backend.md`
-- Прогнать полный набор проверок:
-  - `ruff`;
-  - `pytest`;
-  - `alembic upgrade head`;
-  - `alembic check`;
-  - `compileall`.
+- Закрыто:
+  - добавлен completion document:
+    - `docs/stage_2_be/stage2_completion.md`;
+  - добавлен verification document:
+    - `docs/stage_2_be/stage2_verification.md`;
+  - прогнан финальный набор проверок:
+    - `docker compose run --rm backend pytest tests/unit -q`;
+    - `docker compose run --rm backend ruff check app tests scripts migrations`;
+    - `docker compose run --rm backend python -m compileall app tests scripts migrations`;
+    - `docker compose run --rm backend alembic upgrade head`;
+    - `docker compose run --rm backend alembic check`.
+- Результаты:
+  - unit tests: `37 passed, 1 warning`;
+  - ruff: passed;
+  - compileall: passed;
+  - alembic upgrade head: passed;
+  - alembic check: no new upgrade operations detected.
+
+## Stage 2 closure
+
+Stage 2 backend считается закрытым.
+
+Definition of Done backend-среза выполнен:
+
+- официальный workflow seeded;
+- published version существует;
+- draft/publish lifecycle реализован;
+- published version immutable;
+- interactions привязаны к concrete workflow version;
+- graph transitions поддержаны backend-логикой;
+- transitions атомарны и пишут history/audit;
+- data scope применяется на workflow endpoints;
+- dangerous changes и approval реализованы;
+- migration preview/execution реализованы;
+- migration/tests/lint/compile/alembic checks прошли.
 
 ## Известные ограничения текущего среза
 
