@@ -20,3 +20,10 @@ def test_official_workflow_seed_marks_document_correction_optional() -> None:
 
     assert [stage["order_index"] for stage in optional_stages] == [5]
     assert optional_stages[0]["name"] == "Корректировка документов перед подписанием"
+
+
+def test_official_workflow_seed_requires_attachment_for_document_signing() -> None:
+    document_signing_stage = next(stage for stage in WORKFLOW_STAGES if stage["order_index"] == 6)
+
+    assert document_signing_stage["name"] == "Подписание документов"
+    assert document_signing_stage["requires_attachment"] is True
