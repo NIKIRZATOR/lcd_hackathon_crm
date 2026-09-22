@@ -88,3 +88,44 @@ export const transitionToNextStage = (
     changed: true,
   };
 };
+
+// Свободная корректировка: текущим можно сделать любой этап, в том числе предыдущий.
+// Попадание на последний шаг само по себе цепочку не завершает — для этого остаётся
+// отдельный переход «далее» с уже открытого последнего этапа.
+export const transitionToStage = (
+  stages: WorkflowStageRef[],
+  stageName: string,
+  status: WorkflowStatus,
+  progress: number,
+  targetStageId: number,
+): StageTransition | undefined => {
+  if (stages.length === 0) return undefined;
+
+  const targetIndex = stages.findIndex((stage) => stage.id === targetStageId);
+  if (targetIndex === -1) return undefined;
+
+  const target = stages[targetIndex];
+  const currentIndex = resolveCurrentStageIndex(stages, stageName);
+  const finished = isWorkflowChainFinished(stages, stageName, status, progress);
+  const alreadyHere = stages[currentIndex]?.name === stageName && currentIndex === targetIndex;
+
+  if (alreadyHere && !finished) {
+    return {
+      stageId: target.id,
+      stageName: target.name,
+      status,
+      progress,
+      completed: false,
+      changed: false,
+    };
+  }
+
+  return {
+    stageId: target.id,
+    stageName: target.name,
+    status: status === 'completed' ? 'active' : status,
+    progress: stageProgress(targetIndex, stages.length),
+    completed: false,
+    changed: true,
+  };
+};

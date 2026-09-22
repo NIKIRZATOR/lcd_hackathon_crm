@@ -111,6 +111,14 @@
   min-width: 135px;
 }
 
+.statusFilter {
+  min-width: 176px;
+}
+
+.period {
+  width: 250px;
+}
+
 .actions {
   display: flex;
   gap: 8px;
@@ -276,8 +284,10 @@
   .metricIcon { flex-basis: 32px; width: 32px; height: 32px; font-size: 15px; }
   .metricValue { font-size: 19px; }
   .tabsRow { overflow-x: auto; }
-  .search { width: 100%; }
-  .filter { flex: 1 1 140px; min-width: 0; }
+  .search,
+  .period { width: 100%; }
+  .filter,
+  .statusFilter { flex: 1 1 140px; min-width: 0; }
   .actions > * { flex: 1; }
 }
 

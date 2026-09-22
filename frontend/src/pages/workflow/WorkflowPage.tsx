@@ -7,14 +7,15 @@ import {
   FilterOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
-import { Button, Collapse, Grid, Input, message, Progress, Segmented, Select, Spin, Table, Tag, Tooltip } from 'antd';
+import { Button, Collapse, DatePicker, Grid, Input, message, Progress, Segmented, Select, Spin, Table, Tag, Tooltip } from 'antd';
 import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+import { useAuth } from '../../auth';
 import PageLayout from '../../components/pageLayout/PageLayout';
-import { workflowFilterOptions, workflowItemsMock, workflowSummaryMock } from './mocks';
+import { listWorkflows, summarizeWorkflows } from './api';
 import type { WorkflowFilters, WorkflowItem, WorkflowStatus } from './types';
 
 import styles from './WorkflowPage.module.scss';
@@ -43,10 +44,14 @@ const getIntermediateViewportSnapshot = () => window.matchMedia(intermediateView
 
 const readFiltersFromUrl = (searchParams: URLSearchParams): WorkflowFilters => ({
   search: searchParams.get('search') ?? '',
+  university: searchParams.get('university') ?? '',
   program: searchParams.get('program') ?? '',
   product: searchParams.get('product') ?? '',
   stage: searchParams.get('stage') ?? '',
+  status: (searchParams.get('status') ?? '') in statusConfig ? searchParams.get('status') ?? '' : '',
   responsible: searchParams.get('responsible') ?? '',
+  periodFrom: searchParams.get('periodFrom') ?? '',
+  periodTo: searchParams.get('periodTo') ?? '',
 });
 
 const renderStatus = (status: WorkflowStatus, compact = false) => {
@@ -85,6 +90,13 @@ const WorkflowPage = () => {
   );
   const isCompactVisual = isTableCompact || isIntermediateViewport;
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const workflows = listWorkflows();
+  const summary = summarizeWorkflows(workflows);
+  const mineNames = useMemo(
+    () => [user?.full_name, user?.username].map((value) => value?.trim() ?? '').filter(Boolean),
+    [user?.full_name, user?.username],
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState(() => readFiltersFromUrl(searchParams));
   const [view, setView] = useState<'all' | 'mine'>(() => (searchParams.get('view') === 'mine' ? 'mine' : 'all'));
@@ -103,27 +115,36 @@ const WorkflowPage = () => {
     setSearchParams(nextParams, { replace: true });
   }, [filters, setSearchParams, view]);
 
-  const filteredItems = useMemo(() => {
-    const query = filters.search.trim().toLowerCase();
+  const workflowFilterOptions = {
+    universities: [...new Set(workflows.map((item) => item.universityShort))].sort((left, right) => left.localeCompare(right, 'ru')),
+    programs: [...new Set(workflows.map((item) => item.program))],
+    products: [...new Set(workflows.map((item) => item.product))],
+    stages: [...new Set(workflows.map((item) => item.stage))],
+    responsibles: [...new Set(workflows.map((item) => item.responsible))],
+  };
 
-    return workflowItemsMock.filter((item) => {
-      const matchesSearch =
-        !query ||
-        [item.university, item.universityShort, item.program].some((value) =>
-          value.toLowerCase().includes(query),
-        );
-      const matchesView = view === 'all' || item.responsible === 'Иванов И.И.';
-
-      return (
-        matchesSearch &&
-        matchesView &&
-        (!filters.program || item.program === filters.program) &&
-        (!filters.product || item.product === filters.product) &&
-        (!filters.stage || item.stage === filters.stage) &&
-        (!filters.responsible || item.responsible === filters.responsible)
+  const query = filters.search.trim().toLowerCase();
+  const filteredItems = workflows.filter((item) => {
+    const matchesSearch =
+      !query ||
+      [item.university, item.universityShort, item.program].some((value) =>
+        value.toLowerCase().includes(query),
       );
-    });
-  }, [filters, view]);
+    const matchesView = view === 'all' || mineNames.includes(item.responsible);
+
+    return (
+      matchesSearch &&
+      matchesView &&
+      (!filters.university || item.universityShort === filters.university) &&
+      (!filters.program || item.program === filters.program) &&
+      (!filters.product || item.product === filters.product) &&
+      (!filters.stage || item.stage === filters.stage) &&
+      (!filters.status || item.status === filters.status) &&
+      (!filters.responsible || item.responsible === filters.responsible) &&
+      (!filters.periodFrom || item.deadline >= filters.periodFrom) &&
+      (!filters.periodTo || item.deadline <= filters.periodTo)
+    );
+  });
 
   useEffect(() => {
     const loadMoreNode = loadMoreRef.current;
@@ -158,12 +179,14 @@ const WorkflowPage = () => {
     message.success(`Подготовлено к экспорту: ${filteredItems.length} workflow`);
   };
 
-  const desktopColumns: TableColumnsType<WorkflowItem> = [
+  const tableLayout = isTableCompact ? 'narrow' : isIntermediateViewport ? 'mid' : 'wide';
+  const columns = ([
     {
       title: 'ВУЗ',
       dataIndex: 'universityShort',
       key: 'university',
-      sorter: (a, b) => a.university.localeCompare(b.university),
+      show: ['wide', 'mid', 'narrow'],
+      sorter: (a: WorkflowItem, b: WorkflowItem) => a.university.localeCompare(b.university),
       render: (value: string) => (
         <div className={styles.universityCell}>
           <span className={styles.universityBadge}>{getInitials(value)}</span>
@@ -171,12 +194,13 @@ const WorkflowPage = () => {
         </div>
       ),
     },
-    { title: 'ИТ-программа', dataIndex: 'program', key: 'program' },
-    { title: 'ИТ-продукт', dataIndex: 'product', key: 'product' },
+    { title: tableLayout === 'wide' ? 'ИТ-программа' : 'Программа', dataIndex: 'program', key: 'program', show: ['wide', 'mid', 'narrow'] },
+    { title: 'ИТ-продукт', dataIndex: 'product', key: 'product', show: ['wide'] },
     {
       title: 'Текущий этап',
       dataIndex: 'stage',
       key: 'stage',
+      show: ['wide'],
       render: (value: string) => (
         <div className={styles.stageCell}>
           <span className={styles.stageDot} />
@@ -188,6 +212,7 @@ const WorkflowPage = () => {
       title: 'Ответственный',
       dataIndex: 'responsible',
       key: 'responsible',
+      show: ['wide'],
       render: (value: string) => (
         <div className={styles.responsibleCell}>
           <span className={styles.responsibleBadge}>{getInitials(value)}</span>
@@ -195,58 +220,51 @@ const WorkflowPage = () => {
         </div>
       ),
     },
-    { title: 'Срок', dataIndex: 'deadline', key: 'deadline', render: (value: string) => dayjs(value).format('DD.MM.YYYY') },
-    { title: 'Статус', dataIndex: 'status', key: 'status', render: (status: WorkflowStatus) => renderStatus(status, isCompactVisual) },
+    { title: 'Срок', dataIndex: 'deadline', key: 'deadline', show: ['wide'], render: (value: string) => dayjs(value).format('DD.MM.YYYY') },
+    { title: 'Статус', dataIndex: 'status', key: 'status', show: ['wide', 'mid', 'narrow'], render: (status: WorkflowStatus) => renderStatus(status, isCompactVisual) },
     {
-      title: 'Прогресс',
+      title: tableLayout === 'mid' ? '%' : 'Прогресс',
       dataIndex: 'progress',
       key: 'progress',
+      show: ['wide', 'mid'],
       render: (value: number) => renderProgress(value, isCompactVisual),
     },
-  ];
-
-  const mobileColumns: TableColumnsType<WorkflowItem> = [
-    {
-      title: 'ВУЗ',
-      dataIndex: 'universityShort',
-      key: 'university',
-      sorter: (a, b) => a.university.localeCompare(b.university),
-      render: (value: string) => (
-        <div className={styles.universityCell}>
-          <span className={styles.universityBadge}>{getInitials(value)}</span>
-          {value}
-        </div>
-      ),
-    },
-    { title: 'Программа', dataIndex: 'program', key: 'program' },
-    { title: 'Статус', dataIndex: 'status', key: 'status', render: (status: WorkflowStatus) => renderStatus(status, true) },
-  ];
-
-  const intermediateColumns: TableColumnsType<WorkflowItem> = [
-    {
-      title: 'ВУЗ',
-      dataIndex: 'universityShort',
-      key: 'university',
-      sorter: (a, b) => a.university.localeCompare(b.university),
-      render: (value: string) => (
-        <div className={styles.universityCell}>
-          <span className={styles.universityBadge}>{getInitials(value)}</span>
-          {value}
-        </div>
-      ),
-    },
-    { title: 'Программа', dataIndex: 'program', key: 'program' },
-    { title: 'Статус', dataIndex: 'status', key: 'status', render: (status: WorkflowStatus) => renderStatus(status, true) },
-    { title: '%', dataIndex: 'progress', key: 'progress', render: (value: number) => renderProgress(value, true) },
-  ];
+  ] satisfies Array<TableColumnsType<WorkflowItem>[number] & { show: string[] }>)
+    .filter((column) => column.show.includes(tableLayout))
+    .map((column) => {
+      const visible = { ...column } as Omit<typeof column, 'show'> & { show?: string[] };
+      delete visible.show;
+      return visible;
+    });
 
   const filterControls = (
     <>
       <Input className={styles.search} prefix={<SearchOutlined />} placeholder="Поиск по названию или вузу..." value={filters.search} onChange={(event) => updateFilter('search', event.target.value)} allowClear />
+      <Select className={styles.filter} placeholder="Вуз" value={filters.university || undefined} onChange={(value) => updateFilter('university', value ?? '')} allowClear showSearch optionFilterProp="label" options={workflowFilterOptions.universities.map((value) => ({ label: value, value }))} />
       <Select className={styles.filter} placeholder="ИТ-программа" value={filters.program || undefined} onChange={(value) => updateFilter('program', value ?? '')} allowClear options={workflowFilterOptions.programs.map((value) => ({ label: value, value }))} />
       <Select className={styles.filter} placeholder="ИТ-продукт" value={filters.product || undefined} onChange={(value) => updateFilter('product', value ?? '')} allowClear options={workflowFilterOptions.products.map((value) => ({ label: value, value }))} />
       <Select className={styles.filter} placeholder="Этап" value={filters.stage || undefined} onChange={(value) => updateFilter('stage', value ?? '')} allowClear options={workflowFilterOptions.stages.map((value) => ({ label: value, value }))} />
+      <Select className={`${styles.filter} ${styles.statusFilter}`} placeholder="Статус" value={filters.status || undefined} onChange={(value) => updateFilter('status', value ?? '')} allowClear options={(Object.keys(statusConfig) as WorkflowStatus[]).map((value) => ({ value, label: statusConfig[value].label }))} />
       <Select className={styles.filter} placeholder="Ответственный" value={filters.responsible || undefined} onChange={(value) => updateFilter('responsible', value ?? '')} allowClear options={workflowFilterOptions.responsibles.map((value) => ({ label: value, value }))} />
+      <DatePicker.RangePicker
+        className={styles.period}
+        placeholder={['Период с', 'Период по']}
+        format="DD.MM.YYYY"
+        value={filters.periodFrom && filters.periodTo ? [dayjs(filters.periodFrom), dayjs(filters.periodTo)] : null}
+        onChange={(values) => {
+          const from = values?.[0];
+          const to = values?.[1];
+          if (!from || !to) {
+            setFilters((current) => ({ ...current, periodFrom: '', periodTo: '' }));
+            return;
+          }
+          setFilters((current) => ({
+            ...current,
+            periodFrom: from.format('YYYY-MM-DD'),
+            periodTo: to.format('YYYY-MM-DD'),
+          }));
+        }}
+      />
       <div className={styles.actions}>
         <Button icon={<DownloadOutlined />} onClick={handleExport}>Экспорт</Button>
       </div>
@@ -264,10 +282,10 @@ const WorkflowPage = () => {
         </header>
 
         <section className={styles.metrics} aria-label="Сводка workflow">
-          <div className={styles.metric}><span className={`${styles.metricIcon} ${styles.metricIconActive}`}><CheckOutlined /></span><span><span className={styles.metricLabel}>Активные</span><strong className={styles.metricValue}>{workflowSummaryMock.active}</strong></span></div>
-          <div className={styles.metric}><span className={`${styles.metricIcon} ${styles.metricIconAttention}`}><ExclamationCircleFilled /></span><span><span className={styles.metricLabel}>Требуют внимания</span><strong className={styles.metricValue}>{workflowSummaryMock.attention}</strong></span></div>
-          <div className={styles.metric}><span className={`${styles.metricIcon} ${styles.metricIconCompleted}`}><CheckCircleFilled /></span><span><span className={styles.metricLabel}>Завершены</span><strong className={styles.metricValue}>{workflowSummaryMock.completed}</strong></span></div>
-          <div className={styles.metric}><span className={`${styles.metricIcon} ${styles.metricIconOverdue}`}><ClockCircleOutlined /></span><span><span className={styles.metricLabel}>Просрочены</span><strong className={styles.metricValue}>{workflowSummaryMock.overdue}</strong></span></div>
+          <div className={styles.metric}><span className={`${styles.metricIcon} ${styles.metricIconActive}`}><CheckOutlined /></span><span><span className={styles.metricLabel}>Активные</span><strong className={styles.metricValue}>{summary.active}</strong></span></div>
+          <div className={styles.metric}><span className={`${styles.metricIcon} ${styles.metricIconAttention}`}><ExclamationCircleFilled /></span><span><span className={styles.metricLabel}>Требуют внимания</span><strong className={styles.metricValue}>{summary.attention}</strong></span></div>
+          <div className={styles.metric}><span className={`${styles.metricIcon} ${styles.metricIconCompleted}`}><CheckCircleFilled /></span><span><span className={styles.metricLabel}>Завершены</span><strong className={styles.metricValue}>{summary.completed}</strong></span></div>
+          <div className={styles.metric}><span className={`${styles.metricIcon} ${styles.metricIconOverdue}`}><ClockCircleOutlined /></span><span><span className={styles.metricLabel}>Просрочены</span><strong className={styles.metricValue}>{summary.overdue}</strong></span></div>
         </section>
 
         <section className={styles.toolbar} aria-label="Фильтры workflow">
@@ -301,7 +319,7 @@ const WorkflowPage = () => {
             sticky
             rowKey="id"
             size="middle"
-            columns={isIntermediateViewport ? intermediateColumns : isTableCompact ? mobileColumns : desktopColumns}
+            columns={columns}
             dataSource={filteredItems.slice(0, visibleCount)}
             pagination={false}
             rowClassName={styles.clickableRow}

@@ -28,8 +28,8 @@ import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { advanceWorkflowStage, addWorkflowStageComment, addWorkflowStageFile, getWorkflowDetailMock, getWorkflowStageActivity, getWorkflowStepConfigs } from './mocks';
-import { transitionToNextStage, type StageTransition } from './stageTransition';
+import { advanceWorkflowStage, addWorkflowStageComment, addWorkflowStageFile, getWorkflow, getWorkflowStageActivity, getWorkflowStepConfigs, moveWorkflowToStage } from './api';
+import { transitionToNextStage, transitionToStage, type StageTransition } from './stageTransition';
 import type { WorkflowChecklistItem } from './types';
 import { isAllowedWorkflowFile, workflowFileRejectionMessage, workflowFileTypeLabel } from './workflowFiles';
 import WorkflowSteps from './components/WorkflowSteps';
@@ -41,7 +41,7 @@ const getInitials = (value: string) => value.replaceAll('.', '').split(' ').map(
 const WorkflowDetailPage = () => {
   const { id } = useParams();
   const workflowId = Number(id);
-  const detail = getWorkflowDetailMock(Number(id));
+  const detail = getWorkflow(Number(id));
   const [viewedStageId, setViewedStageId] = useState<number | null>(null);
   // Мок меняется вне React. Счётчик перечитывает карточку, когда id этапа тот же
   // или когда добавились комментарий и файл.
@@ -54,7 +54,7 @@ const WorkflowDetailPage = () => {
   ));
   const [commentText, setCommentText] = useState('');
   const [transitionComment, setTransitionComment] = useState('');
-  const [pendingTransition, setPendingTransition] = useState<StageTransition | null>(null);
+  const [pendingTransition, setPendingTransition] = useState<(StageTransition & { mode: 'next' | 'set' }) | null>(null);
 
   const viewedStage = detail?.stages.find((stage) => stage.id === viewedStageId)
     ?? detail?.stages.find((stage) => stage.state === 'current')
@@ -143,7 +143,24 @@ const WorkflowDetailPage = () => {
     }
 
     setTransitionComment('');
-    setPendingTransition(preview);
+    setPendingTransition({ ...preview, mode: 'next' });
+  };
+
+  const handleMakeCurrent = () => {
+    const preview = transitionToStage(stepConfigs, detail.item.stage, detail.item.status, detail.item.progress, viewedStage.id);
+
+    if (!preview) {
+      message.error('Не удалось сменить этап');
+      return;
+    }
+
+    if (!preview.changed) {
+      message.info('Этот этап уже текущий');
+      return;
+    }
+
+    setTransitionComment('');
+    setPendingTransition({ ...preview, mode: 'set' });
   };
 
   const closeTransition = () => {
@@ -154,10 +171,12 @@ const WorkflowDetailPage = () => {
   const confirmTransition = () => {
     if (!pendingTransition) return;
 
-    const transition = advanceWorkflowStage(workflowId);
+    const transition = pendingTransition.mode === 'set'
+      ? moveWorkflowToStage(workflowId, pendingTransition.stageId)
+      : advanceWorkflowStage(workflowId);
 
     if (!transition?.changed) {
-      message.error('Не удалось перейти на следующий этап');
+      message.error(pendingTransition.mode === 'set' ? 'Не удалось сменить этап' : 'Не удалось перейти на следующий этап');
       closeTransition();
       return;
     }
@@ -171,10 +190,17 @@ const WorkflowDetailPage = () => {
       });
     }
 
+    const mode = pendingTransition.mode;
     closeTransition();
     setViewedStageId(transition.stageId);
     setStageRevision((revision) => revision + 1);
-    message.success(transition.completed ? 'Workflow завершён' : `Переход на этап «${transition.stageName}» выполнен`);
+    message.success(
+      transition.completed
+        ? 'Workflow завершён'
+        : mode === 'set'
+          ? `Текущий этап — «${transition.stageName}»`
+          : `Переход на этап «${transition.stageName}» выполнен`,
+    );
   };
 
   return (
@@ -229,9 +255,14 @@ const WorkflowDetailPage = () => {
                 <div>
                   <h2>{String(viewedStageIndex + 1).padStart(2, '0')} · {viewedStage.name}</h2>
                 </div>
-                <Tag className={`${styles.stageStatus} ${styles[`stageStatus${viewedStage.state[0].toUpperCase()}${viewedStage.state.slice(1)}`]}`}>
-                  {viewedStage.state === 'completed' ? 'Завершено' : viewedStage.state === 'current' ? 'Текущий этап' : 'Следующий этап'}
-                </Tag>
+                <div className={styles.stageActions}>
+                  <Tag className={`${styles.stageStatus} ${styles[`stageStatus${viewedStage.state[0].toUpperCase()}${viewedStage.state.slice(1)}`]}`}>
+                    {viewedStage.state === 'completed' ? 'Завершено' : viewedStage.state === 'current' ? 'Текущий этап' : 'Следующий этап'}
+                  </Tag>
+                  {viewedStage.state !== 'current' && (
+                    <Button onClick={handleMakeCurrent}>Сделать текущим</Button>
+                  )}
+                </div>
               </div>
               <div className={styles.metaGrid}>
                 <div className={styles.metaTile}>
@@ -301,8 +332,8 @@ const WorkflowDetailPage = () => {
         </div>
       <Modal
         open={pendingTransition !== null}
-        title={pendingTransition?.completed ? 'Завершение workflow' : `Переход на этап «${pendingTransition?.stageName ?? ''}»`}
-        okText={pendingTransition?.completed ? 'Завершить' : 'Перейти'}
+        title={pendingTransition?.mode === 'set' ? `Текущий этап — «${pendingTransition.stageName}»` : pendingTransition?.completed ? 'Завершение workflow' : `Переход на этап «${pendingTransition?.stageName ?? ''}»`}
+        okText={pendingTransition?.mode === 'set' ? 'Сделать текущим' : pendingTransition?.completed ? 'Завершить' : 'Перейти'}
         cancelText="Отмена"
         onOk={confirmTransition}
         onCancel={closeTransition}

@@ -2,6 +2,7 @@ export type WorkflowStatus = 'active' | 'attention' | 'completed' | 'overdue';
 
 export interface WorkflowItem {
   id: number;
+  universityId?: number;
   university: string;
   universityShort: string;
   program: string;
@@ -15,10 +16,14 @@ export interface WorkflowItem {
 
 export interface WorkflowFilters {
   search: string;
+  university: string;
   program: string;
   product: string;
   stage: string;
+  status: string;
   responsible: string;
+  periodFrom: string;
+  periodTo: string;
 }
 
 export type WorkflowStageState = 'completed' | 'current' | 'upcoming';

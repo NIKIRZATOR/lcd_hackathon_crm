@@ -125,6 +125,15 @@
   line-height: 1.25;
 }
 
+.stageActions {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .stageStatus {
   flex: 0 0 auto;
   margin: 0;
@@ -217,6 +226,7 @@
   .contextTags { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .contextTags :global(.ant-tag) { min-width: 0; padding-inline: 7px; }
   .stageHeading { flex-direction: column; }
+  .stageActions { justify-content: flex-start; }
   .stageStatus { align-self: flex-start; }
   .itemDate { font-size: 11px; }
 }

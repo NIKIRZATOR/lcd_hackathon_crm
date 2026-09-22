@@ -1,67 +1,77 @@
-import { isWorkflowChainFinished, resolveCurrentStageIndex, transitionToNextStage } from './stageTransition';
-import type { WorkflowComment, WorkflowDetailMock, WorkflowFile, WorkflowItem, WorkflowStepConfig } from './types';
+import { universityItemsMock } from '../universities/mocks';
+import { isWorkflowChainFinished, resolveCurrentStageIndex, transitionToNextStage, transitionToStage } from './stageTransition';
+import type { WorkflowComment, WorkflowDetailMock, WorkflowFile, WorkflowItem, WorkflowStatus, WorkflowStepConfig } from './types';
 
-const workflowBaseMock: WorkflowItem[] = [
-  { id: 1, university: 'Московский государственный университет', universityShort: 'МГУ', program: 'DevOps', product: 'GitLab', stage: 'Поиск контакта', responsible: 'Иванов И.И.', deadline: '2026-09-21', status: 'active', progress: 43 },
-  { id: 2, university: 'Московский физико-технический институт', universityShort: 'МФТИ', program: 'Backend', product: 'Docker', stage: 'Коммуникация', responsible: 'Петров А.А.', deadline: '2026-10-05', status: 'attention', progress: 29 },
-  { id: 3, university: 'Санкт-Петербургский государственный университет', universityShort: 'СПбГУ', program: 'QA', product: 'Jira', stage: 'Документы', responsible: 'Смирнова Е.В.', deadline: '2026-09-15', status: 'overdue', progress: 64 },
-  { id: 4, university: 'Новосибирский государственный университет', universityShort: 'НГУ', program: 'Data Science', product: 'Python', stage: 'Подписание', responsible: 'Иванов И.И.', deadline: '2026-09-30', status: 'active', progress: 43 },
-  { id: 5, university: 'Уральский федеральный университет', universityShort: 'УрФУ', program: 'Frontend', product: 'Linux', stage: 'Материалы', responsible: 'Кузнецова О.В.', deadline: '2026-10-12', status: 'active', progress: 21 },
-  { id: 6, university: 'Томский государственный университет', universityShort: 'ТГУ', program: 'Cybersecurity', product: 'PostgreSQL', stage: 'Внедрение', responsible: 'Петров А.А.', deadline: '2026-11-01', status: 'completed', progress: 100 },
-  { id: 7, university: 'Национальный исследовательский университет ВШЭ', universityShort: 'ВШЭ', program: 'DevOps', product: 'GitLab', stage: 'Обучение', responsible: 'Смирнова Е.В.', deadline: '2026-10-20', status: 'attention', progress: 36 },
-  { id: 8, university: 'Казанский федеральный университет', universityShort: 'КФУ', program: 'Аналитика данных', product: 'Python', stage: 'Контроль', responsible: 'Кузнецова О.В.', deadline: '2026-10-25', status: 'active', progress: 57 },
-];
-
-const additionalUniversities = [
-  ['Российский экономический университет', 'РЭУ'],
-  ['Российская академия народного хозяйства', 'РАНХиГС'],
-  ['Московский авиационный институт', 'МАИ'],
-  ['Московский технический университет связи', 'МТУСИ'],
-  ['Сибирский федеральный университет', 'СФУ'],
-  ['Южный федеральный университет', 'ЮФУ'],
-  ['Самарский государственный технический университет', 'СГТУ'],
-  ['Дальневосточный федеральный университет', 'ДВФУ'],
+const interactionPairs = [
+  ['DevOps', 'GitLab'],
+  ['Backend', 'PostgreSQL'],
+  ['QA', 'TestIT'],
+  ['Data Science', 'DataLens'],
+  ['Frontend', 'React'],
+  ['Кибербезопасность', 'Kaspersky'],
+  ['Аналитика данных', 'Python'],
+  ['Python', 'Docker'],
 ] as const;
 
-const additionalPrograms = ['Python', 'Java', 'QA', 'Frontend', 'DevOps', 'Data Science'];
-const additionalProducts = ['GitLab', 'Docker', 'Jira', 'Linux', 'PostgreSQL', 'Python'];
-const additionalStages = ['Коммуникация', 'Документы', 'Подписание', 'Материалы', 'Обучение', 'Контроль'];
-const additionalResponsibles = ['Иванов И.И.', 'Петров А.А.', 'Смирнова Е.В.', 'Кузнецова О.В.'];
-const additionalStatuses: WorkflowItem['status'][] = ['active', 'attention', 'completed', 'overdue'];
-
-export const workflowItemsMock: WorkflowItem[] = [
-  ...workflowBaseMock,
-  ...Array.from({ length: 48 }, (_, index) => {
-    const university = additionalUniversities[index % additionalUniversities.length];
-
-    return {
-      id: index + workflowBaseMock.length + 1,
-      university: university[0],
-      universityShort: university[1],
-      program: additionalPrograms[index % additionalPrograms.length],
-      product: additionalProducts[index % additionalProducts.length],
-      stage: additionalStages[index % additionalStages.length],
-      responsible: additionalResponsibles[index % additionalResponsibles.length],
-      deadline: `2026-${String((index % 3) + 10).padStart(2, '0')}-${String((index % 25) + 1).padStart(2, '0')}`,
-      status: additionalStatuses[index % additionalStatuses.length],
-      progress: (index * 13 + 17) % 101,
-    };
-  }),
+const stageNames = [
+  'Поиск контакта',
+  'Коммуникация',
+  'Встреча',
+  'Документы',
+  'Корректировка',
+  'Подписание',
+  'Материалы',
+  'Внедрение',
+  'Обучение',
+  'Программа',
+  'Занятия',
+  'Документация',
+  'Квалификация',
+  'Контроль',
 ];
- 
-export const workflowSummaryMock = {
-  active: 18,
-  attention: 4,
-  completed: 6,
-  overdue: 2,
+
+const interactionsPerUniversity = 4;
+
+const addDays = (isoDate: string, days: number) => {
+  const date = new Date(`${isoDate}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 };
 
-export const workflowFilterOptions = {
-  programs: [...new Set(workflowItemsMock.map((item) => item.program))],
-  products: [...new Set(workflowItemsMock.map((item) => item.product))],
-  stages: [...new Set(workflowItemsMock.map((item) => item.stage))],
-  responsibles: [...new Set(workflowItemsMock.map((item) => item.responsible))],
+const buildWorkflowItems = (): WorkflowItem[] => {
+  const items: WorkflowItem[] = [];
+
+  universityItemsMock.forEach((university) => {
+    for (let index = 0; index < interactionsPerUniversity; index += 1) {
+      const [program, product] = interactionPairs[(university.id - 1 + index) % interactionPairs.length];
+      const stage = index === interactionsPerUniversity - 1
+        ? 'Контроль'
+        : stageNames[(index * 3) % (stageNames.length - 1)];
+      const stageIndex = stageNames.indexOf(stage);
+      const completed = stage === 'Контроль';
+      const statusCycle: WorkflowStatus[] = ['active', 'attention', 'overdue'];
+      const status: WorkflowStatus = completed ? 'completed' : statusCycle[index % statusCycle.length];
+
+      items.push({
+        id: items.length + 1,
+        universityId: university.id,
+        university: university.name,
+        universityShort: university.shortName,
+        program,
+        product,
+        stage,
+        responsible: university.manager,
+        deadline: addDays(university.activityAt, index * 21),
+        status,
+        progress: completed ? 100 : Math.round((stageIndex / (stageNames.length - 1)) * 100),
+      });
+    }
+  });
+
+  return items;
 };
+
+export const workflowItemsMock: WorkflowItem[] = buildWorkflowItems();
 
 const baseWorkflowStepConfigs: Omit<WorkflowStepConfig, 'id'>[] = [
   {
@@ -255,6 +265,54 @@ export const getWorkflowStepConfigs = (workflowId: number) => {
   return item ? getStepConfigs(item) : [];
 };
 
+const sameInteraction = (value: string, other: string) => value.trim().toLowerCase() === other.trim().toLowerCase();
+
+export const findWorkflowByInteraction = (universityId: number, program: string, product: string) =>
+  workflowItemsMock.find((item) => (
+    item.universityId === universityId
+    && sameInteraction(item.program, program)
+    && sameInteraction(item.product, product)
+  ));
+
+export const createUniversityWorkflow = (input: {
+  universityId: number;
+  university: string;
+  universityShort: string;
+  program: string;
+  product: string;
+  responsible: string;
+  deadline: string;
+}) => {
+  const program = input.program.trim();
+  const product = input.product.trim();
+  const existing = findWorkflowByInteraction(input.universityId, program, product);
+  if (existing) return { item: existing, created: false as const };
+
+  const item: WorkflowItem = {
+    id: Math.max(0, ...workflowItemsMock.map((workflow) => workflow.id)) + 1,
+    universityId: input.universityId,
+    university: input.university,
+    universityShort: input.universityShort,
+    program,
+    product,
+    stage: baseWorkflowStepConfigs[0]?.name ?? 'Поиск контакта',
+    responsible: input.responsible.trim() || 'Не назначен',
+    deadline: input.deadline,
+    status: 'active',
+    progress: 0,
+  };
+  workflowItemsMock.unshift(item);
+  getStepConfigs(item);
+  return { item, created: true as const };
+};
+
+export const nextWorkflowStepName = (workflowId: number, stageName: string) => {
+  const configs = getWorkflowStepConfigs(workflowId);
+  const index = configs.findIndex((step) => step.name === stageName);
+  if (index === -1 || index >= configs.length - 1) return '—';
+  return configs[index + 1]?.name ?? '—';
+};
+
 export const updateWorkflowStepConfig = (workflowId: number, config: WorkflowStepConfig) => {
   const configs = getWorkflowStepConfigs(workflowId);
   const index = configs.findIndex((step) => step.id === config.id);
@@ -287,6 +345,22 @@ export const advanceWorkflowStage = (workflowId: number) => {
   if (!item) return undefined;
 
   const transition = transitionToNextStage(getWorkflowStepConfigs(workflowId), item.stage, item.status, item.progress);
+
+  if (!transition?.changed) return transition;
+
+  item.stage = transition.stageName;
+  item.status = transition.status;
+  item.progress = transition.progress;
+
+  return transition;
+};
+
+export const moveWorkflowToStage = (workflowId: number, stageId: number) => {
+  const item = workflowItemsMock.find((workflow) => workflow.id === workflowId);
+
+  if (!item) return undefined;
+
+  const transition = transitionToStage(getWorkflowStepConfigs(workflowId), item.stage, item.status, item.progress, stageId);
 
   if (!transition?.changed) return transition;
 

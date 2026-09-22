@@ -13,11 +13,11 @@ import type { WorkflowStepFormValues } from './components/WorkflowStepForm';
 import {
   createWorkflowStepConfig,
   deleteWorkflowStepConfig,
-  getWorkflowDetailMock,
+  getWorkflow,
   getWorkflowStepConfigs,
   reorderWorkflowStepConfigs,
   updateWorkflowStepConfig,
-} from './mocks';
+} from './api';
 import type { WorkflowStepConfig } from './types';
 
 import styles from './WorkflowEditPage.module.scss';
@@ -26,7 +26,7 @@ const WorkflowEditPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const workflowId = Number(id);
-  const detail = getWorkflowDetailMock(workflowId);
+  const detail = getWorkflow(workflowId);
   const [steps, setSteps] = useState<WorkflowStepConfig[]>(() => getWorkflowStepConfigs(workflowId));
   const [selectedStepId, setSelectedStepId] = useState<number | null>(() => steps[0]?.id ?? null);
   const [mode, setMode] = useState<'create' | 'edit'>('edit');

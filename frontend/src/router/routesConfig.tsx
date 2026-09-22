@@ -8,6 +8,7 @@ import RatingPage from '../pages/rating/RatingPage';
 import ReportsPage from '../pages/reports/ReportsPage';
 import TasksPage from '../pages/tasks/TasksPage';
 import UniversitiesPage from '../pages/universities/UniversitiesPage';
+import UniversityDetailPage from '../pages/universities/UniversityDetailPage';
 import WorkflowPage from '../pages/workflow/WorkflowPage';
 import WorkflowEditPage from '../pages/workflow/WorkflowEditPage';
 
@@ -29,6 +30,12 @@ export const routesConfig: AppRoute[] = [
     title: 'Вузы',
     element: <UniversitiesPage />,
     parent: '/',
+  },
+  {
+    path: '/universities/:id',
+    title: 'Карточка вуза',
+    element: <UniversityDetailPage />,
+    parent: '/universities',
   },
   {
     path: '/workflow',

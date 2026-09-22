@@ -11,6 +11,7 @@ import RatingPage from '../pages/rating/RatingPage';
 import ReportsPage from '../pages/reports/ReportsPage';
 import TasksPage from '../pages/tasks/TasksPage';
 import UniversitiesPage from '../pages/universities/UniversitiesPage';
+import UniversityDetailPage from '../pages/universities/UniversityDetailPage';
 import WorkflowPage from '../pages/workflow/WorkflowPage';
 import WorkflowDetailPage from '../pages/workflow/WorkflowDetailPage';
 import WorkflowEditPage from '../pages/workflow/WorkflowEditPage';
@@ -33,6 +34,7 @@ const AppRoutes = () => {
         }
       >
         <Route path="/universities" element={<UniversitiesPage />} />
+        <Route path="/universities/:id" element={<UniversityDetailPage />} />
         <Route path="/workflow" element={<WorkflowPage />} />
         <Route path="/workflow/:id" element={<WorkflowDetailPage />} />
         <Route path="/workflow/:id/edit" element={<WorkflowEditPage />} />
