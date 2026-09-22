@@ -10,6 +10,8 @@ export const appTheme: ThemeConfig = {
     purple: '#9466FF',
     orange: '#FF4F12',
 
+    colorFillSecondary: '#FAF7FF',
+
     colorText: '#252632',
     colorTextSecondary: '#8C8FA3',
 

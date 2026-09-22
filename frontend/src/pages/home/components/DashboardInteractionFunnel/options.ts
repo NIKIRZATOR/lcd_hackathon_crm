@@ -2,8 +2,15 @@ import type { EChartsCoreOption } from 'echarts/core';
 
 import type { DashboardInteractionFunnelItem } from './types';
 
+type DashboardInteractionFunnelColors = {
+  primaryColor: string;
+  backgroundColor: string;
+  textColor: string;
+};
+
 export const getDashboardInteractionFunnelOptions = (
   data: DashboardInteractionFunnelItem[],
+  colors: DashboardInteractionFunnelColors,
 ): EChartsCoreOption => {
   const maxValue = Math.max(...data.map(({ value }) => value));
 
@@ -15,7 +22,6 @@ export const getDashboardInteractionFunnelOptions = (
       right: 40,
       bottom: 0,
       left: 0,
-      containLabel: true,
     },
 
     xAxis: {
@@ -38,7 +44,7 @@ export const getDashboardInteractionFunnelOptions = (
       },
 
       axisLabel: {
-        color: '#252632',
+        color: colors.textColor,
         fontSize: 12,
         margin: 16,
       },
@@ -55,12 +61,12 @@ export const getDashboardInteractionFunnelOptions = (
         showBackground: true,
 
         backgroundStyle: {
-          color: '#F3F5F9',
+          color: colors.backgroundColor,
           borderRadius: 4,
         },
 
         itemStyle: {
-          color: '#6B9DF8',
+          color: colors.primaryColor,
           borderRadius: 4,
         },
 
@@ -68,7 +74,7 @@ export const getDashboardInteractionFunnelOptions = (
           show: true,
           position: 'right',
           distance: 12,
-          color: '#252632',
+          color: colors.textColor,
           fontSize: 12,
           formatter: '{c}',
         },

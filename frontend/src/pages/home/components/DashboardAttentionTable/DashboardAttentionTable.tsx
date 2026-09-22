@@ -1,56 +1,48 @@
+import { DownOutlined, UpOutlined } from '@ant-design/icons';
 import { Grid, Table, Tag, Tooltip } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 import { dashboardAttentionMock } from './mocks';
-import type { AttentionStatus, DashboardAttentionItem } from './types';
+import type { AttentionStatus, AttentionStatusCode, DashboardAttentionItem } from './types';
 
 import styles from './DashboardAttentionTable.module.scss';
-import { DownOutlined, UpOutlined } from '@ant-design/icons';
 
 const { useBreakpoint } = Grid;
 
-const statusConfig: Record<
-  AttentionStatus,
+const statusStyles: Record<
+  AttentionStatusCode,
   {
-    label: string;
     tagClassName: string;
     dotClassName: string;
-    priority: number;
   }
 > = {
   critical: {
-    label: 'Критический',
     tagClassName: styles.statusTagCritical,
     dotClassName: styles.statusDotCritical,
-    priority: 3,
   },
   high: {
-    label: 'Высокий',
     tagClassName: styles.statusTagHigh,
     dotClassName: styles.statusDotHigh,
-    priority: 2,
   },
   attention: {
-    label: 'Требует внимания',
     tagClassName: styles.statusTagAttention,
     dotClassName: styles.statusDotAttention,
-    priority: 1,
   },
 };
 
 const renderStatus = (status: AttentionStatus, compact: boolean) => {
-  const config = statusConfig[status];
+  const statusStyle = statusStyles[status.code];
 
   if (compact) {
     return (
-      <Tooltip title={config.label}>
-        <span className={`${styles.statusDot} ${config.dotClassName}`} />
+      <Tooltip title={status.label}>
+        <span className={`${styles.statusDot} ${statusStyle.dotClassName}`} />
       </Tooltip>
     );
   }
 
-  return <Tag className={`${styles.statusTag} ${config.tagClassName}`}>{config.label}</Tag>;
+  return <Tag className={`${styles.statusTag} ${statusStyle.tagClassName}`}>{status.label}</Tag>;
 };
 
 const desktopColumns: TableColumnsType<DashboardAttentionItem> = [
@@ -85,7 +77,7 @@ const desktopColumns: TableColumnsType<DashboardAttentionItem> = [
     dataIndex: 'status',
     key: 'status',
     defaultSortOrder: 'descend',
-    sorter: (a, b) => statusConfig[a.status].priority - statusConfig[b.status].priority,
+    sorter: (a, b) => a.status.priority - b.status.priority,
     render: (status: AttentionStatus) => renderStatus(status, false),
   },
 ];
@@ -106,7 +98,7 @@ const mobileColumns: TableColumnsType<DashboardAttentionItem> = [
     dataIndex: 'status',
     key: 'status',
     defaultSortOrder: 'descend',
-    sorter: (a, b) => statusConfig[a.status].priority - statusConfig[b.status].priority,
+    sorter: (a, b) => a.status.priority - b.status.priority,
     render: (status: AttentionStatus) => renderStatus(status, true),
   },
 ];
@@ -130,7 +122,7 @@ const DashboardAttentionTable = () => {
       <Table
         rowKey="id"
         columns={columns}
-        dataSource={dashboardAttentionMock}
+        dataSource={dashboardAttentionMock.attention}
         pagination={false}
         size="small"
         rowClassName={styles.clickableRow}

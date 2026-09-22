@@ -1,10 +1,16 @@
 import { Flex } from 'antd';
+
 import PageLayout from '../../components/pageLayout/PageLayout';
+
+import DashboardAttentionTable from './components/DashboardAttentionTable';
+import DashboardDynamics from './components/DashboardDynamics';
 import DashboardFilters from './components/DashboardFilters';
 import type { DashboardFiltersValues } from './components/DashboardFilters/types';
-import DashboardKpiCards from './components/DashboardKpiCards/DashboardKpiCards';
-import DashboardAttentionTable from './components/DashboardAttentionTable/DashboardAttentionTable';
-import DashboardInteractionFunnel from './components/DashboardInteractionFunnel/DashboardInteractionFunnel';
+import DashboardInteractionFunnel from './components/DashboardInteractionFunnel';
+import DashboardKpiCards from './components/DashboardKpiCards';
+import DashboardProgramDemandTable from './components/DashboardProgramDemandTable';
+
+import styles from './HomePage.module.scss';
 
 const HomePage = () => {
   const handleApplyFilters = (values: DashboardFiltersValues) => {
@@ -16,7 +22,11 @@ const HomePage = () => {
         <DashboardFilters onApply={handleApplyFilters} />
         <DashboardKpiCards />
         <DashboardAttentionTable />
-        <DashboardInteractionFunnel />
+        <div className={styles.charts}>
+          <DashboardInteractionFunnel />
+          <DashboardDynamics />
+        </div>
+        <DashboardProgramDemandTable />
       </Flex>
     </PageLayout>
   );
