@@ -1,0 +1,52 @@
+.scroller {
+  display: flex;
+  gap: 18px;
+  width: 100%;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+  cursor: grab;
+  scrollbar-width: none;
+  user-select: none;
+}
+
+.scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.scroller:active {
+  cursor: grabbing;
+}
+
+.tab,
+.tabActive {
+  flex: 1 0 auto;
+  min-width: max-content;
+  margin: 0;
+  padding: 10px 8px 12px;
+  text-align: center;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ant-color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tabActive {
+  border-bottom-color: var(--ant-color-primary);
+  color: var(--ant-color-primary);
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .tab,
+  .tabActive {
+    flex: 0 0 auto;
+    text-align: left;
+    padding-inline: 2px;
+  }
+}

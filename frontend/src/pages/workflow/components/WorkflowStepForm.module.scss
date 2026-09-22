@@ -1,0 +1,19 @@
+.form { display: flex; flex-direction: column; gap: 14px; }
+.form :global(.ant-card) { border-color: var(--ant-color-border-secondary); border-radius: var(--ant-border-radius-lg); }
+.form :global(.ant-card-head) { min-height: 48px; padding-inline: 16px; }
+.form :global(.ant-card-head-title) { font-size: 15px; }
+.form :global(.ant-card-body) { padding: 16px; }
+.list { display: flex; flex-direction: column; gap: 8px; }
+.listRow { display: flex; align-items: flex-start; gap: 8px; width: 100%; }
+.listRow :global(.ant-form-item) { flex: 1 1 auto; min-width: 0; margin-bottom: 0; }
+.listRow :global(.ant-input) { width: 100%; min-height: 36px; white-space: normal; overflow-wrap: anywhere; }
+.listRowDragging { position: relative; z-index: 1; opacity: 0.45; }
+.listDragHandle, .listRemoveButton { flex: 0 0 32px; width: 32px; height: 32px; padding: 0; border: 0; color: var(--ant-color-text-secondary); background: transparent; cursor: grab; }
+.listDragHandle:hover { color: var(--ant-color-text); }
+.listDragHandle:active { cursor: grabbing; }
+.listRemoveButton { color: var(--ant-color-error); cursor: pointer; font-size: 20px; line-height: 1; }
+.checklistMarker { flex: 0 0 18px; color: var(--ant-color-text-secondary); font-size: 18px; line-height: 32px; }
+.listField { flex: 1 1 auto; min-width: 0; }
+.actions { display: flex; justify-content: space-between; gap: 12px; padding-top: 2px; }
+.actionsRight { display: flex; gap: 8px; margin-left: auto; }
+@media (max-width: 600px) { .actions { flex-direction: column-reverse; } .actionsRight { width: 100%; margin-left: 0; } .actionsRight button { flex: 1; } }

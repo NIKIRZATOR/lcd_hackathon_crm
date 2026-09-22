@@ -8,6 +8,9 @@ import RatingPage from '../pages/rating/RatingPage';
 import ReportsPage from '../pages/reports/ReportsPage';
 import TasksPage from '../pages/tasks/TasksPage';
 import UniversitiesPage from '../pages/universities/UniversitiesPage';
+import UniversityDetailPage from '../pages/universities/UniversityDetailPage';
+import WorkflowPage from '../pages/workflow/WorkflowPage';
+import WorkflowEditPage from '../pages/workflow/WorkflowEditPage';
 
 export interface AppRoute {
   path: string;
@@ -27,6 +30,24 @@ export const routesConfig: AppRoute[] = [
     title: 'Вузы',
     element: <UniversitiesPage />,
     parent: '/',
+  },
+  {
+    path: '/universities/:id',
+    title: 'Карточка вуза',
+    element: <UniversityDetailPage />,
+    parent: '/universities',
+  },
+  {
+    path: '/workflow',
+    title: 'Workflow',
+    element: <WorkflowPage />,
+    parent: '/',
+  },
+  {
+    path: '/workflow/:id/edit',
+    title: 'Редактирование workflow',
+    element: <WorkflowEditPage />,
+    parent: '/workflow',
   },
   {
     path: '/tasks',

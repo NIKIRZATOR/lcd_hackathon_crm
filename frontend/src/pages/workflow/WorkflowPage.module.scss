@@ -1,0 +1,314 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px 0 24px;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  margin: 0;
+  color: var(--ant-color-text);
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--ant-color-text-secondary);
+  font-size: 14px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 62px;
+  padding: 14px 16px;
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.metricIcon {
+  display: grid;
+  flex: 0 0 38px;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+.metricIconActive { color: #0a9f61; background: #e4f9ef; }
+.metricIconAttention { color: #ef9700; background: #fff0d6; }
+.metricIconCompleted { color: #3f73f6; background: #e6edff; }
+.metricIconOverdue { color: #f04450; background: #ffe5e7; }
+
+.metricLabel {
+  display: block;
+  color: var(--ant-color-text-secondary);
+  font-size: 12px;
+}
+
+.metricValue {
+  display: block;
+  margin-top: 2px;
+  color: var(--ant-color-text);
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filtersPanel {
+  min-width: 0;
+}
+
+.filtersToggle :global(.ant-collapse-header) {
+  padding-inline: 0;
+  color: var(--ant-color-text);
+  font-weight: 600;
+}
+
+.filtersToggle :global(.ant-collapse-content-box) {
+  padding: 4px 0 0;
+}
+
+.tabsRow,
+.filtersRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filtersRow {
+  flex-wrap: wrap;
+}
+
+.search {
+  width: 220px;
+}
+
+.filter {
+  min-width: 135px;
+}
+
+.statusFilter {
+  min-width: 176px;
+}
+
+.period {
+  width: 250px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.tableCard {
+  overflow: hidden;
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.tableCard :global(.ant-table-sticky-holder) {
+  z-index: 2;
+}
+
+.tableCard :global(.ant-table-cell) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.universityCell {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+}
+
+.universityBadge,
+.responsibleBadge {
+  display: grid;
+  flex: 0 0 26px;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #26334d;
+  background: #e8efff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.stageCell {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.stageDot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ant-color-primary);
+}
+
+.responsibleCell {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.responsibleBadge { color: #586a9d; background: #edf1fb; }
+
+.status {
+  margin: 0;
+  border: 0;
+  border-radius: 5px;
+}
+
+.statusActive { color: #2367d7; background: #e8f0ff; }
+.statusAttention { color: #dc8700; background: #fff2db; }
+.statusCompleted { color: #16844f; background: #e5f8ed; }
+.statusOverdue { color: #dc3c48; background: #ffe8ea; }
+
+.statusDot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.statusDot.statusActive { background: #e8f0ff; }
+.statusDot.statusAttention { background: #fff2db; }
+.statusDot.statusCompleted { background: #e5f8ed; }
+.statusDot.statusOverdue { background: #ffe8ea; }
+
+.progress {
+  width: 82px;
+  max-width: 100%;
+}
+
+.progress :global(.ant-progress-text) {
+  min-width: 27px;
+  font-size: 11px;
+}
+
+.progressValue {
+  color: var(--ant-color-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.expandedProgress {
+  width: min(220px, 100%);
+  margin: 0;
+}
+
+.mobileDetails {
+  display: grid;
+  gap: 10px;
+  padding: 4px 0;
+  white-space: normal;
+}
+
+.mobileDetail {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 10px;
+}
+
+.mobileDetailLabel { color: var(--ant-color-text-secondary); }
+
+.loadMoreTrigger {
+  height: 1px;
+}
+
+.loadMore {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--ant-color-text-secondary);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .actions { width: 100%; margin-left: 0; }
+
+  .tableCard :global(.ant-table-cell) {
+    padding-inline: 8px;
+  }
+
+  .universityCell,
+  .responsibleCell,
+  .stageCell {
+    gap: 5px;
+  }
+}
+
+@media (max-width: 600px) {
+  .page { gap: 16px; }
+  .title { font-size: 24px; }
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .metric { gap: 8px; min-height: 56px; padding: 10px; }
+  .metricIcon { flex-basis: 32px; width: 32px; height: 32px; font-size: 15px; }
+  .metricValue { font-size: 19px; }
+  .tabsRow { overflow-x: auto; }
+  .search,
+  .period { width: 100%; }
+  .filter,
+  .statusFilter { flex: 1 1 140px; min-width: 0; }
+  .actions > * { flex: 1; }
+}
+
+@media (min-width: 986px) and (max-width: 1246px) {
+  .tableCard :global(.ant-table-cell) {
+    padding-inline: 5px;
+    font-size: 12px;
+  }
+
+  .universityCell {
+    gap: 4px;
+  }
+
+  .universityBadge {
+    flex-basis: 22px;
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+  }
+
+  .progressValue {
+    font-size: 11px;
+  }
+}
