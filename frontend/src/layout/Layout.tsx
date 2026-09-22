@@ -8,6 +8,7 @@ import {
   ProductOutlined,
   ReadOutlined,
   TrophyOutlined,
+  ApartmentOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { Drawer, Grid, Layout as LayoutAnt, Menu } from 'antd';
@@ -30,6 +31,11 @@ const navigationItems = [
     path: '/universities',
     title: 'Вузы',
     icon: <BankOutlined />,
+  },
+  {
+    path: '/workflow',
+    title: 'Workflow',
+    icon: <ApartmentOutlined />,
   },
   {
     path: '/tasks',

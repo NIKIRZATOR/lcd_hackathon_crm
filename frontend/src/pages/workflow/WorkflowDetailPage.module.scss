@@ -1,0 +1,222 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding-bottom: 24px;
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ant-color-primary) !important;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.breadcrumbs a,
+.breadcrumbSeparator,
+.breadcrumbCurrent {
+  color: var(--ant-color-primary) !important;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.breadcrumbSeparator {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.breadcrumbCurrent {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heading,
+.contextTags {
+  min-width: 0;
+}
+
+.contextTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.contextTags :global(.ant-tag) {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--ant-color-text-secondary);
+  background: var(--ant-color-bg-container);
+  border-color: var(--ant-color-border-secondary);
+  border-radius: 8px;
+}
+
+.contextTags strong {
+  color: var(--ant-color-text);
+  font-weight: 600;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(235px, 260px) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.stageCard,
+.content > .ant-card {
+  min-width: 0;
+  border-color: var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.stageCard {
+  position: sticky;
+  top: 80px;
+}
+
+.stageCard :global(.ant-card-head) {
+  min-height: 50px;
+  padding-inline: 16px;
+}
+
+.stageCard :global(.ant-card-head-title) {
+  font-size: 16px;
+}
+
+.stageCard :global(.ant-card-body) {
+  padding: 8px;
+}
+
+.editStagesButton {
+  display: block;
+  margin-top: 12px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.stageOverview :global(.ant-card-body),
+.sectionCard :global(.ant-card-body) {
+  padding: 18px;
+}
+
+.stageHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stageHeading h2 {
+  margin: 0;
+  color: var(--ant-color-text);
+  font-size: clamp(20px, 2vw, 26px);
+  line-height: 1.25;
+}
+
+.stageStatus {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 7px 12px;
+  border: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.stageStatusCurrent { color: #2367d7; background: #e8f0ff; }
+.stageStatusCompleted { color: #16844f; background: #e5f8ed; }
+.stageStatusUpcoming { color: #7b8498; background: #f1f3f7; }
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metaTile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 78px;
+  padding: 14px;
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+}
+
+.metaLabel { color: var(--ant-color-text-secondary); font-size: 12px; }
+.metaTile strong { color: var(--ant-color-text); font-size: 14px; }
+.metaTile strong :global(.anticon) { margin-right: 6px; color: var(--ant-color-text-secondary); }
+.stageDescription { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ant-color-border-secondary); color: var(--ant-color-text-secondary); font-size: 13px; }
+.stageDescription p { margin: 0; color: var(--ant-color-text); }
+
+.sectionCard :global(.ant-card-head) { min-height: 50px; padding-inline: 18px; }
+.sectionCard :global(.ant-card-head-title) { font-size: 16px; }
+.sectionCard :global(.ant-list-item) { padding-inline: 0; }
+.sectionCard :global(.ant-list-item-action-split) { display: none; }
+.sectionCard :global(.ant-upload) { display: block; width: 100%; }
+.itemDate, .commentDate { color: var(--ant-color-text-secondary); font-size: 12px; }
+.fileIcon { color: #e5484d; background: #ffebec; }
+.addFileButton { width: 100%; margin-top: 12px; }
+.commentComposer { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.commentComposer :global(.ant-input) { flex: 1; min-width: 0; }
+.commentSubmit { flex: 0 0 40px !important; width: 40px; height: 40px; padding: 0; }
+.footerActions { display: flex; align-items: stretch; gap: 12px; }
+.footerActions button { flex: 1 1 0; min-width: 0; }
+.actionLabelShort { display: none; }
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 220px minmax(0, 1fr); gap: 12px; }
+  .contextTags { gap: 6px; }
+  .contextTags :global(.ant-tag) { padding: 7px 9px; }
+}
+
+@media (max-width: 767px) {
+  .page,
+  .layout,
+  .content,
+  .stageCard,
+  .stageOverview,
+  .sectionCard,
+  .footerActions {
+    width: 100%;
+  }
+
+  .page { gap: 12px; }
+  .breadcrumbs { gap: 5px; }
+  .layout { display: flex; flex-direction: column; gap: 12px; }
+  .stageCard { position: static; }
+  .contextTags :global(.ant-tag) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stageHeading { align-items: flex-start; gap: 8px; }
+  .stageHeading h2 { font-size: 20px; }
+  .stageOverview :global(.ant-card-body),
+  .sectionCard :global(.ant-card-body) { padding: 14px; }
+  .metaGrid { grid-template-columns: 1fr; }
+  .footerActions { flex-direction: column-reverse; align-items: stretch; }
+  .footerActions button { flex: 0 0 auto; width: 100%; min-height: 40px; }
+  .commentComposer { align-items: center; }
+}
+
+@media (min-width: 768px) and (max-width: 1100px) {
+  .actionLabelLong { display: none; }
+  .actionLabelShort { display: inline; }
+}
+
+@media (max-width: 420px) {
+  .contextTags { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .contextTags :global(.ant-tag) { min-width: 0; padding-inline: 7px; }
+  .stageHeading { flex-direction: column; }
+  .stageStatus { align-self: flex-start; }
+  .itemDate { font-size: 11px; }
+}
