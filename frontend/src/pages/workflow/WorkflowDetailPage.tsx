@@ -17,19 +17,21 @@ import {
   Empty,
   Input,
   List,
+  Modal,
   Space,
   Tag,
   Tooltip,
   Upload,
   message,
 } from 'antd';
-import type { UploadProps } from 'antd';
 import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { getWorkflowDetailMock, getWorkflowStepConfigs } from './mocks';
-import type { WorkflowChecklistItem, WorkflowComment } from './types';
+import { advanceWorkflowStage, addWorkflowStageComment, addWorkflowStageFile, getWorkflowDetailMock, getWorkflowStageActivity, getWorkflowStepConfigs } from './mocks';
+import { transitionToNextStage, type StageTransition } from './stageTransition';
+import type { WorkflowChecklistItem } from './types';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage, workflowFileTypeLabel } from './workflowFiles';
 import WorkflowSteps from './components/WorkflowSteps';
 
 import styles from './WorkflowDetailPage.module.scss';
@@ -40,33 +42,43 @@ const WorkflowDetailPage = () => {
   const { id } = useParams();
   const workflowId = Number(id);
   const detail = getWorkflowDetailMock(Number(id));
-  const [selectedStageId, setSelectedStageId] = useState(detail?.currentStageId ?? 1);
+  const [viewedStageId, setViewedStageId] = useState<number | null>(null);
+  // Мок меняется вне React. Счётчик перечитывает карточку, когда id этапа тот же
+  // или когда добавились комментарий и файл.
+  const [, setStageRevision] = useState(0);
   const [checklistByStage, setChecklistByStage] = useState<Record<number, WorkflowChecklistItem[]>>(() => (
     detail?.stepConfigs.reduce<Record<number, WorkflowChecklistItem[]>>((result, config) => {
       result[config.id] = config.checklistItems.map((label, index) => ({ id: index + 1, label, completed: false }));
       return result;
     }, {}) ?? {}
   ));
-  const [files, setFiles] = useState(detail?.files ?? []);
-  const [comments, setComments] = useState(detail?.comments ?? []);
   const [commentText, setCommentText] = useState('');
+  const [transitionComment, setTransitionComment] = useState('');
+  const [pendingTransition, setPendingTransition] = useState<StageTransition | null>(null);
 
-  const selectedStage = useMemo(
-    () => detail?.stages.find((stage) => stage.id === selectedStageId) ?? detail?.stages[0],
-    [detail, selectedStageId],
-  );
+  const viewedStage = detail?.stages.find((stage) => stage.id === viewedStageId)
+    ?? detail?.stages.find((stage) => stage.state === 'current')
+    ?? detail?.stages.at(-1);
+  const viewedStageIndex = detail && viewedStage ? detail.stages.findIndex((stage) => stage.id === viewedStage.id) : -1;
+  const currentStageIndex = detail?.stages.findIndex((stage) => stage.state === 'current') ?? -1;
   const stepConfigs = detail ? getWorkflowStepConfigs(workflowId) : [];
-  const selectedConfig = stepConfigs.find((step) => step.id === selectedStageId);
-  const checklist = checklistByStage[selectedStageId] ?? selectedConfig?.checklistItems.map((label, index) => ({ id: index + 1, label, completed: false })) ?? [];
+  const selectedConfig = stepConfigs.find((step) => step.id === viewedStage?.id);
+  const checklist = viewedStage
+    ? checklistByStage[viewedStage.id] ?? selectedConfig?.checklistItems.map((label, index) => ({ id: index + 1, label, completed: false })) ?? []
+    : [];
+  const stageActivity = detail && viewedStage
+    ? getWorkflowStageActivity(workflowId, viewedStage.id, detail.currentStageId)
+    : { files: [], comments: [] };
+  const { files, comments } = stageActivity;
 
-  if (!detail || !selectedStage) {
+  if (!detail || !viewedStage || viewedStageIndex < 0) {
     return <Empty description="Workflow не найден" />;
   }
 
   const updateChecklist = (item: WorkflowChecklistItem, completed: boolean) => {
     setChecklistByStage((current) => ({
       ...current,
-      [selectedStageId]: checklist.map((entry) => entry.id === item.id ? { ...entry, completed } : entry),
+      [viewedStage.id]: checklist.map((entry) => entry.id === item.id ? { ...entry, completed } : entry),
     }));
     message.success(completed ? 'Задача отмечена выполненной' : 'Задача возвращена в работу');
   };
@@ -75,34 +87,39 @@ const WorkflowDetailPage = () => {
     const text = commentText.trim();
     if (!text) return;
 
-    const comment: WorkflowComment = {
-      id: Date.now(),
-      author: 'Иванов И.И.',
+    addWorkflowStageComment(workflowId, viewedStage.id, detail.currentStageId, {
+      author: detail.item.responsible,
       text,
       createdAt: dayjs().format('D MMMM YYYY, HH:mm'),
-    };
-    setComments((current) => [comment, ...current]);
+    });
     setCommentText('');
+    setStageRevision((revision) => revision + 1);
     message.success('Комментарий добавлен');
   };
 
-  const uploadProps: UploadProps = {
-    beforeUpload: (file) => {
-      setFiles((current) => [...current, {
-        id: Date.now(),
-        name: file.name,
-        type: file.type.split('/').at(-1)?.toUpperCase() ?? 'FILE',
-        size: `${(file.size / 1024 / 1024).toFixed(1)} МБ`,
-        uploadedAt: dayjs().format('DD.MM.YYYY, HH:mm'),
-      }]);
-      message.success(`Файл ${file.name} добавлен`);
-      return false;
-    },
-    showUploadList: false,
+  const handleBeforeUpload = (file: File) => {
+    if (!isAllowedWorkflowFile(file.name)) {
+      message.error(workflowFileRejectionMessage);
+      return Upload.LIST_IGNORE;
+    }
+
+    addWorkflowStageFile(workflowId, viewedStage.id, detail.currentStageId, {
+      name: file.name,
+      type: workflowFileTypeLabel(file.name),
+      size: `${(file.size / 1024 / 1024).toFixed(1)} МБ`,
+      uploadedAt: dayjs().format('DD.MM.YYYY, HH:mm'),
+    });
+    setStageRevision((revision) => revision + 1);
+    message.success(`Файл ${file.name} добавлен`);
+    return false;
   };
 
   const handleDownloadHistory = () => {
-    const history = comments.map((comment) => `${comment.createdAt} — ${comment.author}: ${comment.text}`).join('\n');
+    const history = detail.stages.flatMap((stage) => (
+      getWorkflowStageActivity(workflowId, stage.id, detail.currentStageId).comments.map(
+        (comment) => `${stage.name} — ${comment.createdAt} — ${comment.author}: ${comment.text}`,
+      )
+    )).join('\n');
     const blob = new Blob([history], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -113,13 +130,51 @@ const WorkflowDetailPage = () => {
   };
 
   const handleNextStage = () => {
-    const nextStage = detail.stages.find((stage) => stage.id === selectedStageId + 1);
-    if (!nextStage) {
-      message.success('Workflow завершён');
+    const preview = transitionToNextStage(stepConfigs, detail.item.stage, detail.item.status, detail.item.progress);
+
+    if (!preview) {
+      message.error('Не удалось перейти на следующий этап');
       return;
     }
-    setSelectedStageId(nextStage.id);
-    message.success(`Переход на этап «${nextStage.name}» выполнен`);
+
+    if (!preview.changed) {
+      message.success('Workflow уже завершён');
+      return;
+    }
+
+    setTransitionComment('');
+    setPendingTransition(preview);
+  };
+
+  const closeTransition = () => {
+    setPendingTransition(null);
+    setTransitionComment('');
+  };
+
+  const confirmTransition = () => {
+    if (!pendingTransition) return;
+
+    const transition = advanceWorkflowStage(workflowId);
+
+    if (!transition?.changed) {
+      message.error('Не удалось перейти на следующий этап');
+      closeTransition();
+      return;
+    }
+
+    const text = transitionComment.trim();
+    if (text) {
+      addWorkflowStageComment(workflowId, transition.stageId, transition.stageId, {
+        author: detail.item.responsible,
+        text,
+        createdAt: dayjs().format('D MMMM YYYY, HH:mm'),
+      });
+    }
+
+    closeTransition();
+    setViewedStageId(transition.stageId);
+    setStageRevision((revision) => revision + 1);
+    message.success(transition.completed ? 'Workflow завершён' : `Переход на этап «${transition.stageName}» выполнен`);
   };
 
   return (
@@ -156,8 +211,12 @@ const WorkflowDetailPage = () => {
           <Card className={styles.stageCard} title="Этапы">
             <WorkflowSteps
               steps={detail.stages.map((stage) => ({ id: stage.id, title: stage.name }))}
-              currentStep={selectedStageId - 1}
-              onStepChange={(index) => setSelectedStageId(index + 1)}
+              currentStep={currentStageIndex === -1 ? detail.stages.length : currentStageIndex}
+              selectedStep={viewedStageIndex}
+              onStepChange={(_index, step) => {
+                setViewedStageId(Number(step.id));
+                setCommentText('');
+              }}
             />
             <Link className={styles.editStagesButton} to={`/workflow/${detail.item.id}/edit`}>
               <Button block icon={<EditOutlined />}>Редактировать этапы</Button>
@@ -168,10 +227,10 @@ const WorkflowDetailPage = () => {
             <Card className={styles.stageOverview}>
               <div className={styles.stageHeading}>
                 <div>
-                  <h2>{String(selectedStage.id).padStart(2, '0')} · {selectedStage.name}</h2>
+                  <h2>{String(viewedStageIndex + 1).padStart(2, '0')} · {viewedStage.name}</h2>
                 </div>
-                <Tag className={`${styles.stageStatus} ${styles[`stageStatus${selectedStage.state[0].toUpperCase()}${selectedStage.state.slice(1)}`]}`}>
-                  {selectedStage.state === 'completed' ? 'Завершено' : selectedStage.state === 'current' ? 'Текущий этап' : 'Следующий этап'}
+                <Tag className={`${styles.stageStatus} ${styles[`stageStatus${viewedStage.state[0].toUpperCase()}${viewedStage.state.slice(1)}`]}`}>
+                  {viewedStage.state === 'completed' ? 'Завершено' : viewedStage.state === 'current' ? 'Текущий этап' : 'Следующий этап'}
                 </Tag>
               </div>
               <div className={styles.metaGrid}>
@@ -213,7 +272,9 @@ const WorkflowDetailPage = () => {
                   </List.Item>
                 )}
               />
-              <Upload {...uploadProps}><Button className={styles.addFileButton} type="dashed" icon={<PlusOutlined />}>Добавить файл</Button></Upload>
+              <Upload accept=".png,.jpeg,.jpg,.pdf,.zip,.gz,.gzip,.rar,.doc,.docx,.xls,.xlsx" beforeUpload={handleBeforeUpload} showUploadList={false}>
+                <Button className={styles.addFileButton} type="dashed" icon={<PlusOutlined />}>Добавить файл</Button>
+              </Upload>
             </Card>
 
             <Card className={styles.sectionCard} title="Комментарии">
@@ -238,6 +299,22 @@ const WorkflowDetailPage = () => {
             </div>
           </main>
         </div>
+      <Modal
+        open={pendingTransition !== null}
+        title={pendingTransition?.completed ? 'Завершение workflow' : `Переход на этап «${pendingTransition?.stageName ?? ''}»`}
+        okText={pendingTransition?.completed ? 'Завершить' : 'Перейти'}
+        cancelText="Отмена"
+        onOk={confirmTransition}
+        onCancel={closeTransition}
+      >
+        <Input.TextArea
+          value={transitionComment}
+          onChange={(event) => setTransitionComment(event.target.value)}
+          placeholder="Комментарий к переходу"
+          autoSize={{ minRows: 3, maxRows: 6 }}
+          maxLength={1000}
+        />
+      </Modal>
     </div>
   );
 };

@@ -1,4 +1,5 @@
-import type { WorkflowDetailMock, WorkflowItem, WorkflowStepConfig } from './types';
+import { isWorkflowChainFinished, resolveCurrentStageIndex, transitionToNextStage } from './stageTransition';
+import type { WorkflowComment, WorkflowDetailMock, WorkflowFile, WorkflowItem, WorkflowStepConfig } from './types';
 
 const workflowBaseMock: WorkflowItem[] = [
   { id: 1, university: 'Московский государственный университет', universityShort: 'МГУ', program: 'DevOps', product: 'GitLab', stage: 'Поиск контакта', responsible: 'Иванов И.И.', deadline: '2026-09-21', status: 'active', progress: 43 },
@@ -280,6 +281,22 @@ export const deleteWorkflowStepConfig = (workflowId: number, stepId: number) => 
   return true;
 };
 
+export const advanceWorkflowStage = (workflowId: number) => {
+  const item = workflowItemsMock.find((workflow) => workflow.id === workflowId);
+
+  if (!item) return undefined;
+
+  const transition = transitionToNextStage(getWorkflowStepConfigs(workflowId), item.stage, item.status, item.progress);
+
+  if (!transition?.changed) return transition;
+
+  item.stage = transition.stageName;
+  item.status = transition.status;
+  item.progress = transition.progress;
+
+  return transition;
+};
+
 export const reorderWorkflowStepConfigs = (workflowId: number, orderedIds: number[]) => {
   const configs = getWorkflowStepConfigs(workflowId);
   const byId = new Map(configs.map((step) => [step.id, step]));
@@ -293,6 +310,85 @@ export const reorderWorkflowStepConfigs = (workflowId: number, orderedIds: numbe
   return [...configs];
 };
 
+type StageActivity = {
+  files: WorkflowFile[];
+  comments: WorkflowComment[];
+};
+
+const stageActivityByWorkflow = new Map<number, Map<number, StageActivity>>();
+let nextActivityId = 1;
+
+const demoContract: WorkflowFile = {
+  id: 1,
+  name: 'Договор.pdf',
+  type: 'PDF',
+  size: '1.2 МБ',
+  uploadedAt: '15.09.2026, 14:32',
+};
+
+const ensureWorkflowActivity = (workflowId: number, currentStageId: number) => {
+  let byStage = stageActivityByWorkflow.get(workflowId);
+
+  if (!byStage) {
+    byStage = new Map();
+    if (currentStageId > 0) {
+      byStage.set(currentStageId, { files: [{ ...demoContract }], comments: [] });
+    }
+    stageActivityByWorkflow.set(workflowId, byStage);
+  }
+
+  return byStage;
+};
+
+const ensureStageActivity = (workflowId: number, stageId: number, currentStageId: number) => {
+  const byStage = ensureWorkflowActivity(workflowId, currentStageId);
+  let activity = byStage.get(stageId);
+
+  if (!activity) {
+    activity = { files: [], comments: [] };
+    byStage.set(stageId, activity);
+  }
+
+  return activity;
+};
+
+export const getWorkflowStageActivity = (workflowId: number, stageId: number, currentStageId: number) => {
+  const activity = ensureStageActivity(workflowId, stageId, currentStageId);
+
+  return {
+    files: activity.files.map((file) => ({ ...file })),
+    comments: activity.comments.map((comment) => ({ ...comment })),
+  };
+};
+
+export const addWorkflowStageComment = (
+  workflowId: number,
+  stageId: number,
+  currentStageId: number,
+  comment: Omit<WorkflowComment, 'id'>,
+) => {
+  const activity = ensureStageActivity(workflowId, stageId, currentStageId);
+  nextActivityId += 1;
+  const created = { ...comment, id: nextActivityId };
+  activity.comments = [created, ...activity.comments];
+
+  return created;
+};
+
+export const addWorkflowStageFile = (
+  workflowId: number,
+  stageId: number,
+  currentStageId: number,
+  file: Omit<WorkflowFile, 'id'>,
+) => {
+  const activity = ensureStageActivity(workflowId, stageId, currentStageId);
+  nextActivityId += 1;
+  const created = { ...file, id: nextActivityId };
+  activity.files = [...activity.files, created];
+
+  return created;
+};
+
 export const getWorkflowDetailMock = (id: number): WorkflowDetailMock | undefined => {
   const item = workflowItemsMock.find((workflow) => workflow.id === id);
 
@@ -301,12 +397,17 @@ export const getWorkflowDetailMock = (id: number): WorkflowDetailMock | undefine
   }
 
   const configs = getStepConfigs(item);
-  const currentStageIndex = configs.findIndex((stage) => stage.name === item.stage);
-  const activeStageIndex = currentStageIndex === -1 ? 5 : currentStageIndex;
+  const currentStageIndex = resolveCurrentStageIndex(configs, item.stage);
+  const finished = isWorkflowChainFinished(configs, item.stage, item.status, item.progress);
+  const activeStageIndex = finished ? configs.length : currentStageIndex;
+  const currentStageId = configs[currentStageIndex]?.id ?? 0;
+  const currentActivity = currentStageId
+    ? getWorkflowStageActivity(id, currentStageId, currentStageId)
+    : { files: [], comments: [] };
 
   return {
     item,
-    currentStageId: activeStageIndex + 1,
+    currentStageId,
     stages: configs.map((stage, index) => ({
       id: stage.id,
       name: stage.name,
@@ -318,9 +419,7 @@ export const getWorkflowDetailMock = (id: number): WorkflowDetailMock | undefine
       label,
       completed: false,
     })) ?? [],
-    files: [
-      { id: 1, name: 'Договор.pdf', type: 'PDF', size: '1.2 МБ', uploadedAt: '15.09.2026, 14:32' },
-    ],
-    comments: [],
+    files: currentActivity.files,
+    comments: currentActivity.comments,
   };
 };

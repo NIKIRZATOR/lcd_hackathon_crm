@@ -5,7 +5,6 @@ import {
   DownloadOutlined,
   ExclamationCircleFilled,
   FilterOutlined,
-  PlusOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
 import { Button, Collapse, Grid, Input, message, Progress, Segmented, Select, Spin, Table, Tag, Tooltip } from 'antd';
@@ -250,7 +249,6 @@ const WorkflowPage = () => {
       <Select className={styles.filter} placeholder="Ответственный" value={filters.responsible || undefined} onChange={(value) => updateFilter('responsible', value ?? '')} allowClear options={workflowFilterOptions.responsibles.map((value) => ({ label: value, value }))} />
       <div className={styles.actions}>
         <Button icon={<DownloadOutlined />} onClick={handleExport}>Экспорт</Button>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => message.info('Форма создания workflow будет доступна после подключения API')}>Создать workflow</Button>
       </div>
     </>
   );

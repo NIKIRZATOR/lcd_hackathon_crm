@@ -39,6 +39,7 @@ const WorkflowEditPage = () => {
   );
 
   const selectedStep = useMemo(() => steps.find((step) => step.id === selectedStepId), [selectedStepId, steps]);
+  const selectedStepNumber = Math.max(steps.findIndex((step) => step.id === selectedStepId) + 1, 1);
 
   if (!detail) return <Empty description="Workflow не найден" />;
 
@@ -173,7 +174,7 @@ const WorkflowEditPage = () => {
         </Card>
         <section className={styles.formPanel}>
           <div className={styles.formHeading}>
-            <h2>{mode === 'create' ? 'Новый этап' : `${String(selectedStep?.id ?? 0).padStart(2, '0')} · ${selectedStep?.name ?? ''}`}</h2>
+            <h2>{mode === 'create' ? 'Новый этап' : `${String(selectedStepNumber).padStart(2, '0')} · ${selectedStep?.name ?? ''}`}</h2>
             <span>{mode === 'create' ? 'Создание' : 'Редактирование'}</span>
           </div>
           <WorkflowStepForm mode={mode} step={selectedStep} onSave={handleSave} onCancel={() => confirmDiscard(() => navigate(`/workflow/${workflowId}`))} onDelete={mode === 'edit' ? handleDelete : undefined} isSaving={isSaving} onDirtyChange={setIsDirty} />
