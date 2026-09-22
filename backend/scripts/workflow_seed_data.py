@@ -42,6 +42,7 @@ WORKFLOW_STAGES = [
         "name": "Подписание документов",
         "order_index": 6,
         "default_duration_days": 10,
+        "requires_attachment": True,
     },
     {
         "name": "Передача обучающих материалов, лицензии и документации",
