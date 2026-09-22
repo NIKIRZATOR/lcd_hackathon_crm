@@ -146,52 +146,102 @@ RTK EduFlow Base Workflow | 1 | PUBLISHED | 14 active stages
 
 ### Step D - Graph
 
-- Расширить transitions как полноценный graph:
-  - forward;
-  - backward;
-  - optional routes;
-  - branch transitions.
-- Добавить graph validation:
-  - stages одной version;
-  - initial/final invariants;
-  - отсутствие некорректных переходов между версиями;
-  - available transitions для current stage.
-- Добавить тесты:
-  - forward transition;
-  - backward transition;
-  - optional transition;
-  - branch transition;
-  - illegal transition returns conflict.
+- Частично сделано:
+  - добавлена выборка transitions для текущей stage с привязкой к workflow version;
+  - добавлен endpoint `GET /api/workflows/interactions/{interaction_id}/available-transitions`;
+  - endpoint использует существующий RBAC/data scope через `_ensure_can_access_interaction`;
+  - available transitions возвращают classification `FORWARD`, `BACKWARD`, `OPTIONAL`, `BRANCH`;
+  - публикация draft валидирует graph до изменения статусов versions.
+- Graph validation проверяет:
+  - stages и transitions одной version;
+  - ровно одну initial stage;
+  - минимум одну final stage;
+  - запрет self-loop;
+  - запрет duplicate transition;
+  - не более одного default transition из одной stage;
+  - outgoing transition для каждой non-final stage;
+  - incoming transition для каждой non-initial stage.
+- Добавлены unit-тесты:
+  - graph принимает forward/backward/optional/branch transitions;
+  - graph отклоняет несколько initial stages;
+  - graph отклоняет transition к stage другой version;
+  - available transition classification для forward/backward/optional/branch.
+- Ещё нужно:
+  - перевести illegal transition runtime-error на стабильную conflict semantics в Step E;
+  - добавить integration/API tests для endpoint available transitions;
+  - при необходимости расширить official seed нелинейными transitions.
 
 ### Step E - TransitionService
 
-- Выделить единый domain-level `TransitionService`.
-- Уточнить error semantics:
-  - illegal transition;
-  - missing comment;
-  - missing attachment readiness;
-  - stale/current stage conflict.
-- Усилить atomicity:
-  - current stage update;
-  - target stage update;
-  - history;
-  - audit.
-- Добавить concurrency guard.
-- Добавить тесты history/audit/atomic rollback.
+- Частично сделано:
+  - выделен domain-level `TransitionService`;
+  - `WorkflowRuntimeService.execute_transition` оставлен как compatibility wrapper;
+  - workflow transition audit перенесён из router в domain service;
+  - current stage update, target stage update, transition history и audit создаются до одного `commit`;
+  - router передаёт `request_id`, но не делает отдельный audit commit;
+  - добавлено опциональное поле `expected_current_stage_instance_id` для stale/current stage guard;
+  - interaction, current stage instance и target stage instance блокируются на время перехода через row-level `FOR UPDATE`;
+  - illegal transition, inactive current stage и invalid skip возвращают `409 CONFLICT`;
+  - transition domain errors возвращают стабильные коды/details через единый error envelope;
+  - `performed_by` в request-схеме стал optional для API, router принудительно подставляет authenticated user.
+- Добавлены unit-тесты:
+  - successful transition creates history and audit atomically;
+  - illegal transition returns conflict;
+  - audit failure triggers rollback without commit.
+  - transition endpoint подставляет authenticated user и пишет audit;
+  - transition endpoint возвращает стабильный domain error envelope.
+- Ещё нужно:
+  - при необходимости добавить полноформатные DB integration race-тесты для row-level locking.
 
 ### Step F - Governance
 
-- Dangerous change detection для draft/published/runtime workflow.
-- Change request / approval model, если потребуется в рамках Stage 2.
-- Audit events для publish/governance actions.
+- Частично сделано:
+  - добавлен endpoint `GET /api/workflows/versions/{version_id}/dangerous-changes`;
+  - detector сравнивает draft version с `supersedes_version_id`;
+  - фиксируются removed stages, added stages, stage contract changes, order changes, removed transitions, added transitions;
+  - change severity: `LOW`, `MEDIUM`, `HIGH`;
+  - response включает `active_interaction_count` для superseded version;
+  - `workflow.version.draft_created` пишется в audit при создании draft;
+  - `workflow.version.published` пишется в audit при publish с summary dangerous changes;
+  - audit draft/publish выполняется в той же транзакции, что и lifecycle action;
+  - добавлена approval/change-request модель:
+    - `workflow_change_requests`;
+    - statuses `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`;
+    - dangerous changes snapshot;
+    - approve/reject API;
+    - publish требует approved change request при `MEDIUM/HIGH` dangerous changes;
+  - change request audit:
+    - `workflow.change_request.created`;
+    - `workflow.change_request.approved`;
+    - `workflow.change_request.rejected`.
+- Добавлены unit-тесты:
+  - detector находит removed stage, removed transition и contract change;
+  - added-only изменения считаются low-severity.
 
 ### Step G - Migration
 
-- Stage mappings между versions.
-- Migration preview.
-- Migration jobs.
-- Controlled migration active interactions на новую version.
-- Сохранение старой history.
+- Частично сделано:
+  - добавлены таблицы:
+    - `workflow_stage_mappings`;
+    - `workflow_migration_jobs`.
+  - добавлен migration preview:
+    - `POST /api/workflows/versions/{version_id}/migration/preview`;
+    - auto mapping stages по одинаковому имени;
+    - explicit mappings из request;
+    - missing mapping detection для current active stages.
+  - добавлен migration execution:
+    - `POST /api/workflows/versions/{version_id}/migration/execute`;
+    - переносит active interactions с superseded version на target version;
+    - создаёт target stage instances;
+    - обновляет `workflow_version_id` и `current_stage_instance_id`;
+    - сохраняет старую transition history без удаления;
+    - пишет `workflow.migration.executed` в audit.
+  - добавлены migration jobs со статусами `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`.
+- Добавлены unit-тесты:
+  - missing mapping detection для migration preview helper.
+- Ещё нужно:
+  - добавить более широкие integration tests на migration execution на реальной БД;
+  - при необходимости хранить подробный per-interaction migration report.
 
 ### Step H - Tests / Docs
 
@@ -210,8 +260,8 @@ RTK EduFlow Base Workflow | 1 | PUBLISHED | 14 active stages
 
 - Graph пока остаётся в основном линейным в seed.
 - Backward/branch transitions ещё не добавлены в официальный workflow.
-- Available transitions endpoint ещё не выделен отдельно.
-- TransitionService пока остаётся частью `WorkflowRuntimeService`.
-- Audit publish/draft lifecycle пока не расширен отдельными событиями.
-- Migration active instances между versions пока не реализована.
+- Available transitions endpoint добавлен, но пока покрыт только unit-тестом classification.
+- TransitionService выделен; DB-level row locking добавлен, но race-тесты на реальной БД ещё можно расширить.
+- Audit publish/draft lifecycle расширен событиями `workflow.version.draft_created` и `workflow.version.published`.
+- Migration active instances между versions реализована базово через stage mappings и migration jobs.
 - Frontend не изменялся и пока не адаптирован под versioning.

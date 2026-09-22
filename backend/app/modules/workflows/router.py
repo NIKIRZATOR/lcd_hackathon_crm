@@ -6,13 +6,21 @@ from sqlalchemy.orm import Session
 from app.common.errors import get_request_id
 from app.common.schemas.pagination import Page, PaginationParams
 from app.core.database import get_db_session
-from app.modules.audit.service import AuditService
 from app.modules.auth.access import ADMIN_ROLES, CRM_ROLES, ensure_can_read_interaction, forbidden, is_admin
 from app.modules.auth.dependencies import require_roles
 from app.modules.interactions.model import UniversityInteraction
 from app.modules.users.model import User
 from app.modules.workflows.model import WorkflowStageInstance
 from app.modules.workflows.schemas import (
+    WorkflowAvailableTransitionRead,
+    WorkflowChangeRequestCreate,
+    WorkflowChangeRequestRead,
+    WorkflowChangeRequestReview,
+    WorkflowDangerousChangesRead,
+    WorkflowMigrationExecuteRequest,
+    WorkflowMigrationJobRead,
+    WorkflowMigrationPreviewRead,
+    WorkflowMigrationPreviewRequest,
     WorkflowStageCreate,
     WorkflowStageInstanceRead,
     WorkflowStageInstanceStatusUpdate,
@@ -103,22 +111,143 @@ def list_template_versions(template_id: UUID, db: Session = Depends(get_db_sessi
     return WorkflowVersionService(db).list_versions(template_id)
 
 
-@router.post("/templates/{template_id}/versions/draft", response_model=WorkflowVersionRead, status_code=201)
-def create_template_draft(
-    template_id: UUID,
+@router.get("/change-requests", response_model=Page[WorkflowChangeRequestRead])
+def list_workflow_change_requests(
+    workflow_version_id: UUID | None = None,
+    status: str | None = None,
+    pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*ADMIN_ROLES)),
 ):
-    return WorkflowVersionService(db).create_draft(template_id, created_by=current_user.id)
+    result = WorkflowVersionService(db).list_change_requests(
+        workflow_version_id=workflow_version_id,
+        status_value=status,
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort_by=pagination.sort_by,
+        sort_order=pagination.sort_order,
+    )
+    return Page(items=result.items, total=result.total, limit=pagination.limit, offset=pagination.offset)
+
+
+@router.get("/change-requests/{change_request_id}", response_model=WorkflowChangeRequestRead)
+def get_workflow_change_request(
+    change_request_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return WorkflowVersionService(db).get_change_request(change_request_id)
+
+
+@router.post("/templates/{template_id}/versions/draft", response_model=WorkflowVersionRead, status_code=201)
+def create_template_draft(
+    template_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return WorkflowVersionService(db).create_draft(
+        template_id,
+        created_by=current_user.id,
+        request_id=get_request_id(request),
+    )
+
+
+@router.post("/versions/{version_id}/change-request", response_model=WorkflowChangeRequestRead, status_code=201)
+def create_workflow_change_request(
+    version_id: UUID,
+    payload: WorkflowChangeRequestCreate,
+    request: Request,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return WorkflowVersionService(db).create_change_request(
+        version_id,
+        payload,
+        requested_by=current_user.id,
+        request_id=get_request_id(request),
+    )
+
+
+@router.post("/change-requests/{change_request_id}/approve", response_model=WorkflowChangeRequestRead)
+def approve_workflow_change_request(
+    change_request_id: UUID,
+    payload: WorkflowChangeRequestReview,
+    request: Request,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return WorkflowVersionService(db).approve_change_request(
+        change_request_id,
+        payload,
+        reviewed_by=current_user.id,
+        request_id=get_request_id(request),
+    )
+
+
+@router.post("/change-requests/{change_request_id}/reject", response_model=WorkflowChangeRequestRead)
+def reject_workflow_change_request(
+    change_request_id: UUID,
+    payload: WorkflowChangeRequestReview,
+    request: Request,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return WorkflowVersionService(db).reject_change_request(
+        change_request_id,
+        payload,
+        reviewed_by=current_user.id,
+        request_id=get_request_id(request),
+    )
 
 
 @router.post("/versions/{version_id}/publish", response_model=WorkflowVersionRead)
 def publish_workflow_version(
     version_id: UUID,
+    request: Request,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*ADMIN_ROLES)),
 ):
-    return WorkflowVersionService(db).publish_version(version_id)
+    return WorkflowVersionService(db).publish_version(
+        version_id,
+        actor_user_id=current_user.id,
+        request_id=get_request_id(request),
+    )
+
+
+@router.get("/versions/{version_id}/dangerous-changes", response_model=WorkflowDangerousChangesRead)
+def get_workflow_version_dangerous_changes(
+    version_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return WorkflowVersionService(db).detect_dangerous_changes(version_id)
+
+
+@router.post("/versions/{version_id}/migration/preview", response_model=WorkflowMigrationPreviewRead)
+def preview_workflow_migration(
+    version_id: UUID,
+    payload: WorkflowMigrationPreviewRequest,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return WorkflowVersionService(db).preview_migration(version_id, payload)
+
+
+@router.post("/versions/{version_id}/migration/execute", response_model=WorkflowMigrationJobRead)
+def execute_workflow_migration(
+    version_id: UUID,
+    payload: WorkflowMigrationExecuteRequest,
+    request: Request,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return WorkflowVersionService(db).execute_migration(
+        version_id,
+        payload,
+        created_by=current_user.id,
+        request_id=get_request_id(request),
+    )
 
 
 @router.get("/stages", response_model=Page[WorkflowStageRead])
@@ -246,6 +375,16 @@ def get_current_stage_instance(
     return WorkflowRuntimeService(db).get_current_stage_instance(interaction_id)
 
 
+@router.get("/interactions/{interaction_id}/available-transitions", response_model=list[WorkflowAvailableTransitionRead])
+def list_available_transitions(
+    interaction_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    _ensure_can_access_interaction(db, current_user, interaction_id)
+    return WorkflowRuntimeService(db).list_available_transitions(interaction_id)
+
+
 @router.patch("/stage-instances/{stage_instance_id}/status", response_model=WorkflowStageInstanceRead)
 def update_stage_instance_status(
     stage_instance_id: UUID,
@@ -290,20 +429,8 @@ def execute_transition(
 ):
     _ensure_can_access_interaction(db, current_user, interaction_id)
     scoped_payload = payload.model_copy(update={"performed_by": current_user.id})
-    result = WorkflowRuntimeService(db).execute_transition(interaction_id, scoped_payload)
-    AuditService(db).log_event(
-        actor_user_id=current_user.id,
-        action="workflow.transition",
-        entity_type="interaction",
-        entity_id=interaction_id,
-        reason=payload.comment,
-        metadata={
-            "transition_id": str(payload.transition_id),
-            "from_stage_instance_id": str(result.from_stage_instance_id),
-            "to_stage_instance_id": str(result.to_stage_instance_id),
-            "transition_history_id": str(result.transition_history_id),
-            "skip_current": payload.skip_current,
-        },
+    return WorkflowRuntimeService(db).execute_transition(
+        interaction_id,
+        scoped_payload,
         request_id=get_request_id(request),
     )
-    return result

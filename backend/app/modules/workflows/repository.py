@@ -4,9 +4,12 @@ from sqlalchemy import select
 
 from app.common.repository import CRUDRepository
 from app.modules.workflows.model import (
+    WorkflowChangeRequest,
+    WorkflowMigrationJob,
     WorkflowStage,
     WorkflowStageAttachment,
     WorkflowStageInstance,
+    WorkflowStageMapping,
     WorkflowTemplate,
     WorkflowTransition,
     WorkflowTransitionHistory,
@@ -88,6 +91,53 @@ class WorkflowTransitionRepository(CRUDRepository[WorkflowTransition]):
         if version_id is not None:
             statement = statement.where(WorkflowTransition.workflow_version_id == version_id)
         return self.db.scalar(statement)
+
+
+class WorkflowChangeRequestRepository(CRUDRepository[WorkflowChangeRequest]):
+    model = WorkflowChangeRequest
+    sortable_fields = {"status", "requested_at", "reviewed_at", "created_at", "updated_at"}
+    default_sort = "created_at"
+
+    def get_approved_for_version(self, workflow_version_id: UUID) -> WorkflowChangeRequest | None:
+        statement = select(WorkflowChangeRequest).where(
+            WorkflowChangeRequest.workflow_version_id == workflow_version_id,
+            WorkflowChangeRequest.status == "APPROVED",
+        )
+        return self.db.scalar(statement)
+
+
+class WorkflowStageMappingRepository(CRUDRepository[WorkflowStageMapping]):
+    model = WorkflowStageMapping
+    sortable_fields = {"created_at", "updated_at"}
+    default_sort = "created_at"
+
+    def list_by_versions(self, source_version_id: UUID, target_version_id: UUID) -> list[WorkflowStageMapping]:
+        statement = select(WorkflowStageMapping).where(
+            WorkflowStageMapping.source_version_id == source_version_id,
+            WorkflowStageMapping.target_version_id == target_version_id,
+        )
+        return list(self.db.scalars(statement).all())
+
+
+class WorkflowMigrationJobRepository(CRUDRepository[WorkflowMigrationJob]):
+    model = WorkflowMigrationJob
+    sortable_fields = {"status", "created_at", "updated_at", "completed_at"}
+    default_sort = "created_at"
+
+    def list_by_version(self, version_id: UUID) -> list[WorkflowTransition]:
+        statement = select(WorkflowTransition).where(WorkflowTransition.workflow_version_id == version_id)
+        return list(self.db.scalars(statement).all())
+
+    def list_from_stage(self, *, version_id: UUID, from_stage_id: UUID) -> list[WorkflowTransition]:
+        statement = (
+            select(WorkflowTransition)
+            .where(
+                WorkflowTransition.workflow_version_id == version_id,
+                WorkflowTransition.from_stage_id == from_stage_id,
+            )
+            .order_by(WorkflowTransition.is_default.desc(), WorkflowTransition.created_at)
+        )
+        return list(self.db.scalars(statement).all())
 
 
 class WorkflowStageInstanceRepository(CRUDRepository[WorkflowStageInstance]):

@@ -6,6 +6,10 @@ from pydantic import BaseModel, ConfigDict
 
 StageStatus = Literal["NOT_STARTED", "IN_PROGRESS", "WAITING", "BLOCKED", "COMPLETED", "SKIPPED"]
 WorkflowVersionStatus = Literal["DRAFT", "PUBLISHED", "ARCHIVED"]
+WorkflowTransitionKind = Literal["FORWARD", "BACKWARD", "OPTIONAL", "BRANCH"]
+WorkflowChangeSeverity = Literal["LOW", "MEDIUM", "HIGH"]
+WorkflowChangeRequestStatus = Literal["PENDING", "APPROVED", "REJECTED", "CANCELLED"]
+WorkflowMigrationJobStatus = Literal["PENDING", "RUNNING", "COMPLETED", "FAILED"]
 
 
 class WorkflowTemplateBase(BaseModel):
@@ -127,6 +131,101 @@ class WorkflowTransitionRead(WorkflowTransitionBase):
     updated_at: datetime
 
 
+class WorkflowDangerousChangeRead(BaseModel):
+    change_type: str
+    severity: WorkflowChangeSeverity
+    stage_name: str | None = None
+    from_stage_name: str | None = None
+    to_stage_name: str | None = None
+    message: str
+    details: dict | None = None
+
+
+class WorkflowDangerousChangesRead(BaseModel):
+    workflow_version_id: UUID
+    supersedes_version_id: UUID | None = None
+    active_interaction_count: int = 0
+    has_dangerous_changes: bool
+    changes: list[WorkflowDangerousChangeRead]
+
+
+class WorkflowChangeRequestCreate(BaseModel):
+    reason: str | None = None
+
+
+class WorkflowChangeRequestReview(BaseModel):
+    review_comment: str | None = None
+
+
+class WorkflowChangeRequestRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    workflow_version_id: UUID
+    status: WorkflowChangeRequestStatus
+    requested_by: UUID
+    reviewed_by: UUID | None = None
+    requested_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    reason: str | None = None
+    review_comment: str | None = None
+    dangerous_changes_snapshot: dict | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class WorkflowStageMappingItem(BaseModel):
+    source_stage_id: UUID
+    target_stage_id: UUID
+
+
+class WorkflowMigrationPreviewRequest(BaseModel):
+    mappings: list[WorkflowStageMappingItem] = []
+
+
+class WorkflowStageMappingRead(BaseModel):
+    source_stage_id: UUID
+    source_stage_name: str
+    target_stage_id: UUID
+    target_stage_name: str
+
+
+class WorkflowMigrationPreviewRead(BaseModel):
+    source_version_id: UUID
+    target_version_id: UUID
+    affected_interaction_count: int
+    can_migrate: bool
+    missing_stage_mappings: list[UUID]
+    stage_mappings: list[WorkflowStageMappingRead]
+
+
+class WorkflowMigrationExecuteRequest(WorkflowMigrationPreviewRequest):
+    change_request_id: UUID | None = None
+
+
+class WorkflowMigrationJobRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    source_version_id: UUID
+    target_version_id: UUID
+    change_request_id: UUID | None = None
+    status: WorkflowMigrationJobStatus
+    created_by: UUID | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    affected_interaction_count: int
+    migrated_interaction_count: int
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class WorkflowAvailableTransitionRead(WorkflowTransitionRead):
+    transition_kind: WorkflowTransitionKind
+    to_stage: WorkflowStageRead
+
+
 class WorkflowStageInstanceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -164,9 +263,10 @@ class WorkflowTransitionHistoryRead(BaseModel):
 
 class WorkflowTransitionExecute(BaseModel):
     transition_id: UUID
-    performed_by: UUID
+    performed_by: UUID | None = None
     comment: str | None = None
     skip_current: bool = False
+    expected_current_stage_instance_id: UUID | None = None
 
 
 class WorkflowTransitionResult(BaseModel):
