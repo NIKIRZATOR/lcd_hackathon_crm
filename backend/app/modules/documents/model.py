@@ -1,6 +1,8 @@
 from uuid import UUID
 
-from sqlalchemy import BigInteger, ForeignKey, String
+from datetime import datetime
+
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -9,6 +11,10 @@ from app.core.database import Base, TimestampCreateMixin, UUIDPrimaryKeyMixin
 
 class File(UUIDPrimaryKeyMixin, TimestampCreateMixin, Base):
     __tablename__ = "files"
+    __table_args__ = (
+        UniqueConstraint("provider", "bucket", "object_key", name="uq_files_provider_bucket_object_key"),
+        Index("ix_files_cleanup_state", "deleted_at", "delete_after", "purged_at"),
+    )
 
     original_name: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -17,8 +23,20 @@ class File(UUIDPrimaryKeyMixin, TimestampCreateMixin, Base):
     extension: Mapped[str | None] = mapped_column(String(32), nullable=True)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     checksum: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    bucket: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    object_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     uploaded_by: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("users.id"),
         nullable=True,
     )
+    scan_status: Mapped[str] = mapped_column(String(32), nullable=False, default="NOT_SCANNED")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delete_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_by: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

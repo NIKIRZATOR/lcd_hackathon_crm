@@ -19,6 +19,15 @@ class Settings(BaseSettings):
     keycloak_frontend_client_id: str = "rtk-eduflow-frontend"
     keycloak_backend_client_id: str = "rtk-eduflow-backend"
     keycloak_audience: str = "rtk-eduflow-backend"
+    s3_endpoint: str = "localhost:9000"
+    s3_access_key: str = "rtk_eduflow_minio"
+    s3_secret_key: str = "rtk_eduflow_minio_secret"
+    s3_region: str = "us-east-1"
+    s3_use_ssl: bool = False
+    s3_bucket_workflow_files: str = "workflow-files"
+    s3_bucket_imports: str = "imports"
+    s3_bucket_reports: str = "reports"
+    file_retention_days: int = 30
 
     model_config = SettingsConfigDict(
         env_file=".env",
