@@ -56,12 +56,18 @@ const excelSerialToDate = (value: number) => {
   return date.toLocaleDateString('ru-RU');
 };
 
+const stripControlCharacters = (value: string) =>
+  [...value].filter((symbol) => {
+    const code = symbol.charCodeAt(0);
+    return code === 9 || code === 10 || code === 13 || code >= 32;
+  }).join('');
+
 export const catalogText = (value: unknown) => {
   if (value == null) return '';
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toLocaleDateString('ru-RU');
   if (typeof value === 'number') return excelSerialToDate(value) || String(value);
 
-  return repairMojibake(String(value).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')).trim();
+  return repairMojibake(stripControlCharacters(String(value))).trim();
 };
 
 export const readCatalogRows = (buffer: ArrayBuffer) => {

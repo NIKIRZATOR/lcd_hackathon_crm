@@ -35,11 +35,11 @@ const UniversityDetailPage = () => {
   const screens = useBreakpoint();
   const compactScore = screens.md === false;
   const { id } = useParams();
-  const [revision, setRevision] = useState(0);
-  const university = useMemo(() => findUniversity(Number(id)), [id, revision]);
+  const [, setRevision] = useState(0);
+  const university = findUniversity(Number(id));
   const card = useMemo(() => (university ? buildUniversityCard(university) : undefined), [university]);
   const sections = useMemo(() => (university ? buildUniversitySections(university) : undefined), [university]);
-  const interactions = useMemo(() => (university ? listUniversityWorkflows(university.id).map((row) => ({
+  const interactions = university ? listUniversityWorkflows(university.id).map((row) => ({
     id: String(row.id),
     program: row.program,
     product: row.product,
@@ -49,7 +49,7 @@ const UniversityDetailPage = () => {
     due: row.due,
     owner: row.owner,
     at: row.at,
-  })) : []), [university, revision]);
+  })) : [];
   const [score, setScore] = useState(() => (university && card ? getUniversityScore(university.id, card.score) : 0));
   const [tab, setTab] = useState('overview');
   const [period, setPeriod] = useState<Period>(null);
