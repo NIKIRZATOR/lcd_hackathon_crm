@@ -1,10 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, Form, Path, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.common.errors import get_request_id
+from app.common.errors import ErrorEnvelope, get_request_id
 from app.common.schemas.pagination import Page, PaginationParams
 from app.core.database import get_db_session
 from app.modules.auth.access import ADMIN_ROLES, CRM_ROLES, ensure_can_read_interaction, forbidden, is_admin
@@ -442,19 +444,41 @@ def update_stage_instance_status(
     "/stage-instances/{stage_instance_id}/attachments",
     response_model=WorkflowAttachmentRead,
     status_code=201,
-    summary="Upload workflow stage attachment",
+    summary="Загрузить attachment к workflow stage",
+    description=(
+        "Загружает реальный PDF, DOCX или XLSX файл для workflow stage instance. "
+        "Backend валидирует extension, MIME type, пустой файл и максимальный размер; сохраняет binary content в "
+        "S3-compatible object storage; пишет metadata в `files`; создает связь `workflow_stage_attachments`; "
+        "и записывает audit event `file.upload`. Доступ проверяется через interaction, связанный со stage instance."
+    ),
+    response_description="Созданный workflow attachment с file metadata.",
     responses={
-        400: {"description": "File validation failed."},
-        403: {"description": "Authenticated user cannot access this stage instance."},
-        404: {"description": "Workflow stage instance not found."},
-        413: {"description": "Uploaded file is too large."},
+        400: {
+            "model": ErrorEnvelope,
+            "description": "Файл не прошел валидацию: пустой файл, нет имени, unsupported extension или MIME type.",
+        },
+        401: {"model": ErrorEnvelope, "description": "Bearer token отсутствует или некорректен."},
+        403: {"model": ErrorEnvelope, "description": "Пользователь не имеет доступа к этому stage instance."},
+        404: {"model": ErrorEnvelope, "description": "Workflow stage instance не найден."},
+        413: {"model": ErrorEnvelope, "description": "Файл больше лимита `FILE_MAX_UPLOAD_BYTES`."},
     },
 )
 def upload_stage_attachment(
-    stage_instance_id: UUID,
+    stage_instance_id: Annotated[
+        UUID,
+        Path(description="Id workflow stage instance, к которому будет привязан attachment."),
+    ],
     request: Request,
-    file: UploadFile = File(...),
-    description: str | None = Form(default=None),
+    file: UploadFile = File(
+        ...,
+        description=(
+            "Binary content attachment. Разрешенные extensions и MIME types: "
+            "PDF `application/pdf`, DOCX "
+            "`application/vnd.openxmlformats-officedocument.wordprocessingml.document`, XLSX "
+            "`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`."
+        ),
+    ),
+    description: str | None = Form(default=None, description="Опциональное описание attachment."),
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
@@ -472,14 +496,23 @@ def upload_stage_attachment(
 @router.get(
     "/stage-instances/{stage_instance_id}/attachments",
     response_model=list[WorkflowAttachmentRead],
-    summary="List active workflow stage attachments",
+    summary="Получить active attachments workflow stage",
+    description=(
+        "Возвращает active attachments для workflow stage instance. Soft-deleted и purged files исключаются. "
+        "Доступ проверяется через interaction, связанный со stage instance."
+    ),
+    response_description="Active workflow attachments для stage instance.",
     responses={
-        403: {"description": "Authenticated user cannot access this stage instance."},
-        404: {"description": "Workflow stage instance not found."},
+        401: {"model": ErrorEnvelope, "description": "Bearer token отсутствует или некорректен."},
+        403: {"model": ErrorEnvelope, "description": "Пользователь не имеет доступа к этому stage instance."},
+        404: {"model": ErrorEnvelope, "description": "Workflow stage instance не найден."},
     },
 )
 def list_stage_attachments(
-    stage_instance_id: UUID,
+    stage_instance_id: Annotated[
+        UUID,
+        Path(description="Id workflow stage instance, для которого возвращаются active attachments."),
+    ],
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
@@ -490,15 +523,35 @@ def list_stage_attachments(
 
 @router.get(
     "/attachments/{attachment_id}/download",
-    summary="Download workflow attachment",
+    summary="Скачать workflow attachment",
+    description=(
+        "Отдает active workflow attachment stream через backend. Bucket не public; "
+        "backend проверяет interaction data scope перед чтением object из S3-compatible storage. "
+        "Soft-deleted или purged files возвращают 404."
+    ),
+    response_description="Binary file stream.",
     responses={
-        403: {"description": "Authenticated user cannot access this attachment."},
-        404: {"description": "Workflow attachment or file not found."},
-        409: {"description": "File storage metadata is invalid."},
+        200: {
+            "description": "Binary content файла.",
+            "content": {
+                "application/pdf": {"schema": {"type": "string", "format": "binary"}},
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
+                    "schema": {"type": "string", "format": "binary"}
+                },
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                    "schema": {"type": "string", "format": "binary"}
+                },
+                "application/octet-stream": {"schema": {"type": "string", "format": "binary"}},
+            },
+        },
+        401: {"model": ErrorEnvelope, "description": "Bearer token отсутствует или некорректен."},
+        403: {"model": ErrorEnvelope, "description": "Пользователь не имеет доступа к этому attachment."},
+        404: {"model": ErrorEnvelope, "description": "Workflow attachment или file не найден."},
+        409: {"model": ErrorEnvelope, "description": "File storage metadata некорректна."},
     },
 )
 def download_stage_attachment(
-    attachment_id: UUID,
+    attachment_id: Annotated[UUID, Path(description="Id workflow attachment для download.")],
     request: Request,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
@@ -524,13 +577,20 @@ def download_stage_attachment(
     "/attachments/{attachment_id}",
     response_model=WorkflowAttachmentRead,
     summary="Soft delete workflow attachment",
+    description=(
+        "Выполняет soft delete файла workflow attachment. Object остается в S3-compatible storage до истечения retention; "
+        "в `files` выставляются `deleted_at`, `delete_after` и `deleted_by`. Обычные list/download endpoints перестают "
+        "возвращать attachment после этой операции. Записывается audit event `file.delete`."
+    ),
+    response_description="Metadata soft-deleted workflow attachment.",
     responses={
-        403: {"description": "Authenticated user cannot access this attachment."},
-        404: {"description": "Workflow attachment or file not found."},
+        401: {"model": ErrorEnvelope, "description": "Bearer token отсутствует или некорректен."},
+        403: {"model": ErrorEnvelope, "description": "Пользователь не имеет доступа к этому attachment."},
+        404: {"model": ErrorEnvelope, "description": "Workflow attachment или file не найден."},
     },
 )
 def delete_stage_attachment(
-    attachment_id: UUID,
+    attachment_id: Annotated[UUID, Path(description="Id workflow attachment для soft delete.")],
     request: Request,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
@@ -549,15 +609,22 @@ def delete_stage_attachment(
 @router.post(
     "/attachments/{attachment_id}/restore",
     response_model=WorkflowAttachmentRead,
-    summary="Restore soft-deleted workflow attachment",
+    summary="Восстановить soft-deleted workflow attachment",
+    description=(
+        "Восстанавливает soft-deleted workflow attachment до physical purge. "
+        "Backend очищает `deleted_at`, `delete_after` и `deleted_by`; исходный object key не меняется. "
+        "Purged files восстановить нельзя. Записывается audit event `file.restore`."
+    ),
+    response_description="Metadata восстановленного workflow attachment.",
     responses={
-        403: {"description": "Authenticated user cannot access this attachment."},
-        404: {"description": "Workflow attachment or file not found."},
-        409: {"description": "Purged file cannot be restored."},
+        401: {"model": ErrorEnvelope, "description": "Bearer token отсутствует или некорректен."},
+        403: {"model": ErrorEnvelope, "description": "Пользователь не имеет доступа к этому attachment."},
+        404: {"model": ErrorEnvelope, "description": "Workflow attachment или file не найден."},
+        409: {"model": ErrorEnvelope, "description": "Purged file нельзя восстановить."},
     },
 )
 def restore_stage_attachment(
-    attachment_id: UUID,
+    attachment_id: Annotated[UUID, Path(description="Id workflow attachment для restore.")],
     request: Request,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
