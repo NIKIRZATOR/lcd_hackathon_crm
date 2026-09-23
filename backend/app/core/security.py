@@ -21,7 +21,7 @@ class KeycloakTokenVerifier:
                 signing_key.key,
                 algorithms=["RS256"],
                 audience=settings.keycloak_audience,
-                issuer=settings.keycloak_issuer,
+                issuer=[settings.keycloak_issuer, settings.keycloak_internal_issuer],
                 options={"require": ["exp", "iat", "iss", "sub"]},
             )
         except jwt.ExpiredSignatureError as exc:
