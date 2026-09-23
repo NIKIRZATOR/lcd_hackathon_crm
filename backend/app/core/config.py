@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     import_max_sheets: int = 20
     import_preview_rows: int = 20
     import_file_retention_days: int = 90
+    redis_url: str = "redis://localhost:6379/0"
+    report_queue_name: str = "reports"
+    report_file_retention_days: int = 90
 
     model_config = SettingsConfigDict(
         env_file=".env",
