@@ -1,6 +1,6 @@
 # Database Architecture And Backend API
 
-Дата обновления: 2026-09-21
+Дата обновления: 2026-09-23
 
 Документ описывает текущую backend-схему RTK EduFlow CRM с учётом промежуточных изменений Stage 2 Workflow Engine.
 
@@ -21,6 +21,9 @@
 - `b2d7a89e4c31_extend_interactions_for_contracts.py`
 - `c3f8a4d2b7e1_add_audit_events.py`
 - `d7c1b2a9e8f0_add_workflow_versions.py`
+- `e8f2a4c6d9b1_add_workflow_governance_migration.py`
+- `f4a9c7d2e6b3_extend_files_for_object_storage.py`
+- `a6e4c2f8b9d0_add_import_jobs.py`
 
 ## UML Reference: Поля И Связи Таблиц
 
@@ -87,6 +90,8 @@ Relations:
 - `users.id` <- `workflow_stage_attachments.uploaded_by`
 - `users.id` <- `files.uploaded_by`
 - `users.id` <- `audit_events.actor_user_id`
+- `users.id` <- `import_jobs.created_by`
+- `users.id` <- `import_mappings.created_by`
 
 ### `user_roles`
 
@@ -523,6 +528,8 @@ Fields:
 Relations:
 
 - `files.id` <- `workflow_stage_attachments.file_id`
+- `files.id` <- `import_jobs.source_file_id`
+- `files.id` <- `import_artifacts.file_id`
 - `users.id` <- `files.uploaded_by`
 - `users.id` <- `files.deleted_by`
 
@@ -537,6 +544,99 @@ Lifecycle:
 - Soft deleted: `deleted_at IS NOT NULL` and `purged_at IS NULL`
 - Purged: `deleted_at IS NOT NULL` and `purged_at IS NOT NULL`
 - Binary content is stored in S3-compatible object storage. PostgreSQL stores metadata and lifecycle state only.
+
+### `import_jobs`
+
+Fields:
+
+- `id`
+- `status: varchar(32)` - `UPLOADED`, `MAPPED`, `VALIDATED`, `READY`, `RUNNING`, `DONE`, `FAILED`, `CANCELLED`.
+- `source_file_id: uuid, FK -> files.id, nullable`
+- `created_by: uuid, FK -> users.id`
+- `sheet_name: varchar(255), nullable`
+- `header_row: integer`
+- `mapping_id: uuid, FK -> import_mappings.id, nullable`
+- `mapping_snapshot: jsonb, nullable`
+- `diff_snapshot: jsonb, nullable`
+- counters: `total_rows`, `valid_rows`, `invalid_rows`, `create_count`, `update_count`, `skip_count`, `conflict_count`
+- timestamps: `validated_at`, `confirmed_at`, `started_at`, `finished_at`, `created_at`, `updated_at`
+- `error_code: varchar(64), nullable`
+- `error_message: text, nullable`
+
+Relations:
+
+- `import_jobs.id` <- `import_artifacts.import_job_id`
+- `import_jobs.id` <- `import_row_errors.import_job_id`
+- Index: `(status, created_at)`
+- Index: `created_by`
+
+### `import_artifacts`
+
+Fields:
+
+- `id`
+- `import_job_id: uuid, FK -> import_jobs.id`
+- `file_id: uuid, FK -> files.id`
+- `artifact_type: varchar(32)` - `SOURCE`, future `ERROR_REPORT`, `PROTOCOL`.
+- `created_at`
+- `updated_at`
+
+Constraints and indexes:
+
+- Unique: `(import_job_id, file_id, artifact_type)`
+- Index: `(import_job_id, artifact_type)`
+
+### `import_mappings`
+
+Fields:
+
+- `id`
+- `name: varchar(255), unique`
+- `created_by: uuid, FK -> users.id, nullable`
+- `is_system: boolean`
+- `created_at`
+- `updated_at`
+
+System mapping:
+
+- `RTK_DEFAULT_V1` maps стандартные колонки ТЗ to CRM target fields.
+
+### `import_mapping_fields`
+
+Fields:
+
+- `id`
+- `mapping_id: uuid, FK -> import_mappings.id`
+- `source_column: varchar(255)`
+- `target_field: varchar(128)`
+- `required: boolean`
+- `transformer: varchar(128), nullable`
+- `created_at`
+- `updated_at`
+
+Constraints:
+
+- Unique: `(mapping_id, source_column)`
+- Unique: `(mapping_id, target_field)`
+
+### `import_row_errors`
+
+Fields:
+
+- `id`
+- `import_job_id: uuid, FK -> import_jobs.id`
+- `row_number: integer`
+- `column_name: varchar(255), nullable`
+- `target_field: varchar(128), nullable`
+- `error_code: varchar(64)`
+- `message: text`
+- `raw_fragment: varchar(512), nullable`
+- `created_at`
+- `updated_at`
+
+Indexes:
+
+- Index: `(import_job_id, row_number)`
 
 ### `audit_events`
 
@@ -678,6 +778,16 @@ Runtime-логика:
 | --- | --- | --- | --- |
 | `files` | Метаданные файлов. Бинарный контент должен быть вынесен в object storage на этапе 3. | `uploaded_by -> users.id`; используется в `workflow_stage_attachments`. | `original_name=contract.pdf`, `mime_type=application/pdf` |
 
+### Imports
+
+| Таблица | Назначение | Основные связи | Пример заполнения |
+| --- | --- | --- | --- |
+| `import_jobs` | Жизненный цикл одного XLS/XLSX импорта. | `source_file_id -> files.id`, `created_by -> users.id`, `mapping_id -> import_mappings.id`. | `status=READY`, `total_rows=427` |
+| `import_artifacts` | Связь import job с файловыми артефактами. | `import_job_id -> import_jobs.id`, `file_id -> files.id`. | `artifact_type=SOURCE` |
+| `import_mappings` | Переиспользуемые mapping presets. | `created_by -> users.id`. | `name=RTK_DEFAULT_V1`, `is_system=true` |
+| `import_mapping_fields` | Колонка spreadsheet -> target CRM field. | `mapping_id -> import_mappings.id`. | `source_column=Название ВУЗа`, `target_field=university.name` |
+| `import_row_errors` | Структурированные ошибки строк validation. | `import_job_id -> import_jobs.id`. | `row_number=17`, `error_code=MANAGER_NOT_FOUND` |
+
 ### Audit
 
 | Таблица | Назначение | Основные связи | Пример заполнения |
@@ -702,6 +812,16 @@ Runtime-логика:
 - `file.delete`;
 - `file.scan_status_changed`;
 - `storage.presign_generated`.
+
+Stage 4 import actions:
+
+- `import.upload`;
+- `import.mapping.update`;
+- `import.validate`;
+- `import.diff`;
+- `import.confirm`;
+- `import.complete`;
+- `import.fail`.
 
 Пример `audit_events.metadata`:
 
@@ -873,6 +993,39 @@ Demo users:
 - `ADMIN` видит и администрирует все.
 - `manager_user_id` нельзя менять через `PATCH /interactions/{id}`.
 - Фильтр `manager_user_id` не расширяет data scope.
+
+### Imports
+
+| Method | Path | Доступ | Принимает | Возвращает |
+| --- | --- | --- | --- | --- |
+| `POST` | `/imports` | `ADMIN` | multipart `file=.xls/.xlsx` | `ImportJobRead` |
+| `GET` | `/imports` | `ADMIN` | pagination | `Page[ImportJobRead]` |
+| `GET` | `/imports/{job_id}` | `ADMIN` | path id | `ImportJobRead` |
+| `GET` | `/imports/{job_id}/preview` | `ADMIN` | `limit` | sheet names, headers, sample rows, total rows, file type |
+| `GET` | `/imports/fields` | `ADMIN` | none | list of target CRM fields |
+| `GET` | `/imports/mappings` | `ADMIN` | none | reusable mappings, including `RTK_DEFAULT_V1` |
+| `POST` | `/imports/mappings` | `ADMIN` | mapping name and fields | `ImportMappingRead` |
+| `GET` | `/imports/{job_id}/mapping` | `ADMIN` | path id | job mapping snapshot |
+| `PUT` | `/imports/{job_id}/mapping` | `ADMIN` | `mapping_id` or custom fields | job mapping snapshot |
+| `POST` | `/imports/{job_id}/validate` | `ADMIN` | path id | validation counters |
+| `GET` | `/imports/{job_id}/errors` | `ADMIN` | pagination | `Page[ImportRowErrorRead]` |
+| `GET` | `/imports/{job_id}/diff` | `ADMIN` | path id | CREATE/UPDATE/SKIP/CONFLICT diff |
+| `POST` | `/imports/{job_id}/confirm` | `ADMIN` | path id | final counters and status |
+
+Import pipeline:
+
+```text
+upload -> preview -> mapping -> validation -> diff -> confirm
+```
+
+Rules:
+
+- `POST /imports`, preview, mapping, validation and diff do not mutate CRM business tables.
+- Source spreadsheet metadata is stored in `files`; binary content is stored in S3 bucket `imports`.
+- Object keys are generated as `imports/<import_job_id>/<uuid>.<ext>` and do not use the user filename.
+- `confirm` is rejected when row validation errors or unresolved conflicts exist.
+- XLSX signature is checked as ZIP (`PK`); legacy XLS is checked as OLE Compound (`D0 CF 11 E0 A1 B1 1A E1`).
+- Only `ADMIN` can run import operations.
 
 ### Manager Memberships
 

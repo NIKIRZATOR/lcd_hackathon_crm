@@ -136,7 +136,7 @@ ROLES = {
 USERS = [
     {
         "username": "kam1",
-        "full_name": "KAM One",
+        "full_name": "KAM User",
         "email": "kam1@example.local",
         "roles": ["KAM"],
     },
@@ -148,13 +148,13 @@ USERS = [
     },
     {
         "username": "manager1",
-        "full_name": "Manager One",
+        "full_name": "Manager User",
         "email": "manager1@example.local",
         "roles": ["MANAGER"],
     },
     {
         "username": "admin1",
-        "full_name": "Admin One",
+        "full_name": "Admin User",
         "email": "admin1@example.local",
         "roles": ["ADMIN"],
     },

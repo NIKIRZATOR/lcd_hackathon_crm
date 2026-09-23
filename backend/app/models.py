@@ -3,6 +3,7 @@
 from app.modules.contacts.model import UniversityContact
 from app.modules.audit.model import AuditEvent
 from app.modules.documents.model import File
+from app.modules.imports.model import ImportArtifact, ImportJob, ImportMapping, ImportMappingField, ImportRowError
 from app.modules.interactions.model import InteractionContact, UniversityInteraction
 from app.modules.products.model import ITProduct, ProgramProduct, Vendor
 from app.modules.programs.model import ITDirection, ITProgram
@@ -24,6 +25,11 @@ from app.modules.workflows.model import (
 
 __all__ = [
     "File",
+    "ImportArtifact",
+    "ImportJob",
+    "ImportMapping",
+    "ImportMappingField",
+    "ImportRowError",
     "AuditEvent",
     "ITDirection",
     "ITProduct",

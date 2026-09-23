@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,13 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, str) and value.lower() in {"release", "production", "prod"}:
+            return False
+        return value
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
@@ -47,6 +54,10 @@ class Settings(BaseSettings):
     @property
     def keycloak_issuer(self) -> str:
         return f"{self.keycloak_url.rstrip('/')}/realms/{self.keycloak_realm}"
+
+    @property
+    def keycloak_internal_issuer(self) -> str:
+        return f"{self.keycloak_base_url}/realms/{self.keycloak_realm}"
 
     @property
     def keycloak_openid_configuration_url(self) -> str:
