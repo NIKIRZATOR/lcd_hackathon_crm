@@ -70,3 +70,18 @@ def test_unsupported_extension_is_rejected(tmp_path: Path) -> None:
         reader_for_path(path, "catalog.csv")
 
     assert error.value.detail["code"] == "IMPORT_UNSUPPORTED_FILE"
+
+
+def test_xlsx_rejects_too_many_columns(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "wide.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["A", "B"])
+    sheet.append(["1", "2"])
+    workbook.save(path)
+    monkeypatch.setattr("app.modules.imports.parser.xlsx.settings.import_max_columns", 1)
+
+    with pytest.raises(SpreadsheetError) as error:
+        reader_for_path(path, "wide.xlsx").preview()
+
+    assert error.value.detail["code"] == "IMPORT_TOO_MANY_COLUMNS"

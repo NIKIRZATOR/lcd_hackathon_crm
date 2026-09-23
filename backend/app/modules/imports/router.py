@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, UploadFile
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.common.schemas.pagination import Page, PaginationParams
@@ -19,6 +19,7 @@ from app.modules.imports.schemas import (
     ImportConfirmRead,
     ImportDiffRead,
     ImportJobRead,
+    ImportJobConfigUpdate,
     ImportMappingCreate,
     ImportMappingFieldRead,
     ImportMappingRead,
@@ -121,6 +122,36 @@ def preview_import(job_id: UUID, limit: int = 20, db: Session = Depends(get_db_s
         totalRows=preview.total_rows,
         fileType=preview.file_type,
     )
+
+
+@router.patch(
+    "/{job_id}/config",
+    response_model=ImportJobRead,
+    summary="Update import spreadsheet configuration",
+    description="Updates selected sheet/header row before validation and invalidates mapping, errors and diff.",
+)
+def update_import_config(
+    job_id: UUID,
+    payload: ImportJobConfigUpdate,
+    db: Session = Depends(get_db_session),
+):
+    job = ImportService(db).get_job(job_id)
+    if job.status in {"RUNNING", "DONE"}:
+        raise import_error("IMPORT_CONFIG_LOCKED", "Cannot change config for running or completed import", 409)
+    job.sheet_name = payload.sheet_name
+    job.header_row = payload.header_row
+    job.mapping_id = None
+    job.mapping_snapshot = None
+    job.diff_snapshot = None
+    job.total_rows = job.valid_rows = job.invalid_rows = 0
+    job.create_count = job.update_count = job.skip_count = job.conflict_count = 0
+    job.validated_at = None
+    job.status = "UPLOADED"
+    db.execute(delete(ImportRowError).where(ImportRowError.import_job_id == job.id))
+    ImportService(db).preview(job_id=job.id, limit=1)
+    db.commit()
+    db.refresh(job)
+    return job
 
 
 @router.get("/{job_id}/mapping", response_model=JobMappingRead, summary="Get import job mapping snapshot")

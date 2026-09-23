@@ -2,6 +2,7 @@ from pathlib import Path
 
 import xlrd
 
+from app.core.config import settings
 from app.modules.imports.parser.base import (
     SpreadsheetError,
     SpreadsheetMetadata,
@@ -43,6 +44,8 @@ class XlsSpreadsheetReader:
 
     def read_metadata(self) -> SpreadsheetMetadata:
         book = self._book()
+        if len(book.sheet_names()) > settings.import_max_sheets:
+            raise SpreadsheetError(code="IMPORT_TOO_MANY_SHEETS", message="Spreadsheet has too many sheets")
         return SpreadsheetMetadata(sheet_names=book.sheet_names(), file_type=self.file_type)
 
     def preview(self, *, sheet_name: str | None = None, header_row: int = 1, limit: int = 20) -> SpreadsheetPreview:
@@ -50,6 +53,7 @@ class XlsSpreadsheetReader:
         sheet = book.sheet_by_name(sheet_name) if sheet_name else book.sheet_by_index(0)
         header_index = header_row - 1
         headers = headers_from_values([self._cell_value(book, cell) for cell in sheet.row(header_index)])
+        self._validate_dimensions(headers=headers, total_rows=max(sheet.nrows - header_row, 0))
         rows: list[list[object | None]] = []
         for row_index in range(header_row, sheet.nrows):
             normalized = [self._cell_value(book, cell) for cell in sheet.row(row_index)[: len(headers)]]
@@ -71,6 +75,7 @@ class XlsSpreadsheetReader:
         book = self._book()
         sheet = book.sheet_by_name(sheet_name) if sheet_name else book.sheet_by_index(0)
         headers = headers_from_values([self._cell_value(book, cell) for cell in sheet.row(header_row - 1)])
+        self._validate_dimensions(headers=headers, total_rows=max(sheet.nrows - header_row, 0))
         ensure_not_empty(headers)
         result: list[tuple[int, dict[str, object | None]]] = []
         for row_index in range(header_row, sheet.nrows):
@@ -78,3 +83,9 @@ class XlsSpreadsheetReader:
             if any(cell is not None for cell in normalized):
                 result.append((row_index + 1, dict(zip(headers, normalized, strict=False))))
         return result
+
+    def _validate_dimensions(self, *, headers: list[str], total_rows: int) -> None:
+        if len(headers) > settings.import_max_columns:
+            raise SpreadsheetError(code="IMPORT_TOO_MANY_COLUMNS", message="Spreadsheet has too many columns")
+        if total_rows > settings.import_max_rows:
+            raise SpreadsheetError(code="IMPORT_TOO_MANY_ROWS", message="Spreadsheet has too many rows")

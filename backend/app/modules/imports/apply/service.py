@@ -1,17 +1,20 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from fastapi import HTTPException
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.modules.audit.model import AuditEvent
 from app.modules.audit.repository import AuditEventRepository
 from app.modules.imports.mapping.registry import normalize_text, normalized_key
 from app.modules.imports.mapping.service import import_error
+from app.modules.imports.diff.service import ImportDiffService
 from app.modules.imports.model import ImportJob, ImportRowError
 from app.modules.imports.row import parse_datetime
 from app.modules.imports.service import ImportService
 from app.modules.interactions.model import UniversityInteraction
+from app.modules.licenses.model import Contract, License
 from app.modules.products.model import ITProduct, ProgramProduct, Vendor
 from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.universities.model import University
@@ -40,6 +43,8 @@ class ImportApplyService:
         job.status = "RUNNING"
         job.started_at = datetime.now(timezone.utc)
         try:
+            self._lock_items(items)
+            self._ensure_diff_is_fresh(job, items)
             for item in items:
                 if item.get("action") == "SKIP":
                     continue
@@ -73,9 +78,21 @@ class ImportApplyService:
                     request_id=request_id,
                 )
             )
+            ImportService(self.db).create_json_artifact(
+                job=job,
+                artifact_type="PROTOCOL",
+                actor_user_id=actor_user_id,
+                payload=self._protocol_payload(job, "DONE"),
+            )
             self.db.commit()
             self.db.refresh(job)
             return job
+        except HTTPException:
+            self.db.rollback()
+            job = ImportService(self.db).get_job(job_id)
+            job.status = "READY"
+            self.db.commit()
+            raise
         except Exception as exc:
             self.db.rollback()
             job = ImportService(self.db).get_job(job_id)
@@ -93,6 +110,12 @@ class ImportApplyService:
                     result="ERROR",
                     request_id=request_id,
                 )
+            )
+            ImportService(self.db).create_json_artifact(
+                job=job,
+                artifact_type="PROTOCOL",
+                actor_user_id=actor_user_id,
+                payload=self._protocol_payload(job, "FAILED"),
             )
             self.db.commit()
             raise import_error("IMPORT_APPLY_FAILED", "Import apply failed", 500) from exc
@@ -117,6 +140,7 @@ class ImportApplyService:
             self.db.add(interaction)
         interaction.program_id = program.id
         interaction.manager_user_id = manager.id if manager else interaction.manager_user_id
+        interaction.contract_number = contract_number
         interaction.license_signed_at = parse_datetime(payload.get("license.signed_at"))
         interaction.license_signed = interaction.license_signed_at is not None
         interaction.license_valid_until = parse_datetime(payload.get("license.valid_until"))
@@ -124,6 +148,21 @@ class ImportApplyService:
         interaction.university_responsibles = normalize_text(payload.get("university_contact.full_name"))
         interaction.comment = normalize_text(payload.get("interaction.comment"))
         self.db.flush()
+        if contract_number:
+            contract = self._get_or_create_contract(
+                interaction_id=interaction.id,
+                number=contract_number,
+                signed_at=parse_datetime(payload.get("license.signed_at")),
+                valid_until=parse_datetime(payload.get("license.valid_until")),
+                status=interaction.status,
+            )
+            self._get_or_create_license(
+                contract_id=contract.id,
+                product_id=product.id,
+                signed_at=parse_datetime(payload.get("license.signed_at")),
+                valid_until=parse_datetime(payload.get("license.valid_until")),
+                transfer_status=normalize_text(payload.get("license.transfer_status")),
+            )
 
     def _get_or_create(self, model, name: str | None):
         if not name:
@@ -196,15 +235,101 @@ class ImportApplyService:
         return matches[0]
 
     def _find_interaction(self, university_id: UUID, product_id: UUID, contract_number: str | None) -> UniversityInteraction | None:
-        matches = list(
-            self.db.scalars(
-                select(UniversityInteraction).where(
+        if contract_number:
+            statement = (
+                select(UniversityInteraction)
+                .join(Contract, Contract.interaction_id == UniversityInteraction.id)
+                .where(
                     UniversityInteraction.university_id == university_id,
                     UniversityInteraction.product_id == product_id,
-                    UniversityInteraction.contract_number == contract_number,
+                    Contract.number == contract_number,
                 )
-            ).all()
-        )
+            )
+        else:
+            statement = select(UniversityInteraction).where(
+                UniversityInteraction.university_id == university_id,
+                UniversityInteraction.product_id == product_id,
+                UniversityInteraction.contract_number.is_(None),
+            )
+        matches = list(self.db.scalars(statement).all())
         if len(matches) > 1:
             raise ValueError("ambiguous interaction")
         return matches[0] if matches else None
+
+    def _get_or_create_contract(
+        self,
+        *,
+        interaction_id: UUID,
+        number: str,
+        signed_at,
+        valid_until,
+        status: str,
+    ) -> Contract:
+        contract = self.db.scalar(
+            select(Contract).where(Contract.interaction_id == interaction_id, Contract.number == number)
+        )
+        if contract is None:
+            contract = Contract(interaction_id=interaction_id, number=number)
+            self.db.add(contract)
+        contract.signed_at = signed_at
+        contract.valid_until = valid_until
+        contract.status = status
+        self.db.flush()
+        return contract
+
+    def _get_or_create_license(
+        self,
+        *,
+        contract_id: UUID,
+        product_id: UUID,
+        signed_at,
+        valid_until,
+        transfer_status: str | None,
+    ) -> License:
+        license_record = self.db.scalar(
+            select(License).where(License.contract_id == contract_id, License.product_id == product_id)
+        )
+        if license_record is None:
+            license_record = License(contract_id=contract_id, product_id=product_id)
+            self.db.add(license_record)
+        license_record.signed_at = signed_at
+        license_record.valid_until = valid_until
+        license_record.transfer_status = transfer_status
+        self.db.flush()
+        return license_record
+
+    def _lock_items(self, items: list[dict]) -> None:
+        bind = self.db.get_bind()
+        if bind.dialect.name != "postgresql":
+            return
+        for key in sorted({str(item.get("businessKey") or item.get("business_key")) for item in items}):
+            self.db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": f"import:{key}"})
+
+    def _ensure_diff_is_fresh(self, job: ImportJob, items: list[dict]) -> None:
+        diff_service = ImportDiffService(self.db)
+        expected = job.diff_snapshot or {}
+        if expected.get("input_hash") != diff_service.input_hash(job):
+            raise import_error("IMPORT_STALE_DIFF", "Import input changed after diff was built", 409)
+        if expected.get("mapping_hash") != diff_service.mapping_hash(job):
+            raise import_error("IMPORT_STALE_DIFF", "Import mapping changed after diff was built", 409)
+        if expected.get("crm_fingerprint") != diff_service.crm_fingerprint(items):
+            raise import_error("IMPORT_STALE_DIFF", "CRM data changed after diff was built", 409)
+
+    def _protocol_payload(self, job: ImportJob, result: str) -> dict:
+        source = ImportService(self.db)._get_source_file(job)
+        return {
+            "jobId": str(job.id),
+            "sourceChecksum": source.checksum,
+            "mapping": job.mapping_snapshot,
+            "totalRows": job.total_rows,
+            "validRows": job.valid_rows,
+            "invalidRows": job.invalid_rows,
+            "create": job.create_count,
+            "update": job.update_count,
+            "skip": job.skip_count,
+            "conflict": job.conflict_count,
+            "result": result,
+            "startedAt": job.started_at.isoformat() if job.started_at else None,
+            "finishedAt": job.finished_at.isoformat() if job.finished_at else None,
+            "errorCode": job.error_code,
+        }

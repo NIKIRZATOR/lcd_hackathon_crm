@@ -5,6 +5,7 @@ from app.modules.audit.model import AuditEvent
 from app.modules.documents.model import File
 from app.modules.imports.model import ImportArtifact, ImportJob, ImportMapping, ImportMappingField, ImportRowError
 from app.modules.interactions.model import InteractionContact, UniversityInteraction
+from app.modules.licenses.model import Contract, License
 from app.modules.products.model import ITProduct, ProgramProduct, Vendor
 from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.universities.model import University
@@ -35,11 +36,13 @@ __all__ = [
     "ITProduct",
     "ITProgram",
     "InteractionContact",
+    "Contract",
     "DataAccessScope",
     "ManagerMembership",
     "ProgramProduct",
     "ResponsibleAssignmentHistory",
     "Role",
+    "License",
     "University",
     "UniversityContact",
     "UniversityInteraction",

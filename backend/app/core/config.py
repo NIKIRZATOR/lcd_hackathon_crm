@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     s3_bucket_reports: str = "reports"
     file_retention_days: int = 30
     file_max_upload_bytes: int = 25 * 1024 * 1024
+    import_max_upload_bytes: int = 25 * 1024 * 1024
+    import_max_rows: int = 10_000
+    import_max_columns: int = 100
+    import_max_sheets: int = 20
+    import_preview_rows: int = 20
+    import_file_retention_days: int = 90
 
     model_config = SettingsConfigDict(
         env_file=".env",

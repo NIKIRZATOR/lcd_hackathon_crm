@@ -64,6 +64,25 @@ class ImportValidator:
                 request_id=request_id,
             )
         )
+        if errors:
+            ImportService(self.db).create_json_artifact(
+                job=job,
+                artifact_type="ERROR_REPORT",
+                actor_user_id=actor_user_id,
+                payload={
+                    "jobId": str(job.id),
+                    "errors": [
+                        {
+                            "row": error.row_number,
+                            "column": error.column_name,
+                            "target_field": error.target_field,
+                            "error_code": error.error_code,
+                            "message": error.message,
+                        }
+                        for error in errors
+                    ],
+                },
+            )
         self.db.commit()
         self.db.refresh(job)
         return job

@@ -153,6 +153,38 @@ def test_upload_rejects_unsupported_extension_before_storage_write() -> None:
     assert storage.objects == {}
 
 
+def test_upload_accepts_required_png_attachment_type() -> None:
+    stage_instance = make_stage_instance()
+    db = FakeDb(stage_instance=stage_instance)
+    storage = FakeStorage()
+
+    attachment = FileService(db, storage).upload_workflow_attachment(
+        stage_instance_id=stage_instance.id,
+        upload=FakeUpload(filename="proof.png", content_type="image/png", data=b"\x89PNG\r\n\x1a\ncontent"),
+        uploaded_by=uuid4(),
+    )
+
+    file_record = next(entity for entity in db.added if isinstance(entity, File))
+    assert attachment.file_id == file_record.id
+    assert file_record.extension == "png"
+
+
+def test_upload_rejects_signature_mismatch() -> None:
+    stage_instance = make_stage_instance()
+    db = FakeDb(stage_instance=stage_instance)
+    storage = FakeStorage()
+
+    with pytest.raises(HTTPException) as error:
+        FileService(db, storage).upload_workflow_attachment(
+            stage_instance_id=stage_instance.id,
+            upload=FakeUpload(filename="proof.png", content_type="image/png", data=b"not png"),
+            uploaded_by=uuid4(),
+        )
+
+    assert error.value.detail["code"] == "FILE_INVALID_FORMAT"
+    assert storage.objects == {}
+
+
 def test_upload_cleans_storage_object_when_db_save_fails() -> None:
     stage_instance = make_stage_instance()
     db = FakeDb(stage_instance=stage_instance, fail_flush_after=2)

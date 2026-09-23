@@ -24,6 +24,7 @@
 - `e8f2a4c6d9b1_add_workflow_governance_migration.py`
 - `f4a9c7d2e6b3_extend_files_for_object_storage.py`
 - `a6e4c2f8b9d0_add_import_jobs.py`
+- `b7d9a2e1c4f6_add_contracts_licenses.py`
 
 ## UML Reference: Поля И Связи Таблиц
 
@@ -717,6 +718,8 @@ manager_memberships:
 | `university_interactions` | Основной рабочий объект CRM: вуз, программа, продукт, ответственный и workflow. | `university_id`, `program_id`, `product_id`, `manager_user_id`, `workflow_template_id`, `current_stage_instance_id`. | `contract_number=RTK-DEMO-001`, `manager_user_id=kam1`, `status=ACTIVE` |
 | `interaction_contacts` | Контакты, прикрепленные к конкретному interaction. | `interaction_id -> university_interactions.id`, `contact_id -> university_contacts.id`. | `interaction=RTK-DEMO-001`, `role=decision_maker` |
 | `responsible_assignment_history` | История смены ответственного КАМ. | `interaction_id -> university_interactions.id`, old/new/changed_by -> `users.id`. | `old_manager=kam1`, `new_manager=kam2`, `reason=handoff` |
+| `contracts` | Нормализованные договоры interaction. | `interaction_id -> university_interactions.id`. | `number=RTK-DEMO-001` |
+| `licenses` | Нормализованные лицензии по договору и продукту. | `contract_id -> contracts.id`, `product_id -> it_products.id`. | `transfer_status=TRANSFERRED` |
 
 Поля договора/лицензии в `university_interactions`:
 
@@ -727,6 +730,50 @@ manager_memberships:
 - `transfer_status`;
 - `university_responsibles`;
 - `comment`.
+
+Legacy note:
+
+- Эти flattened поля временно сохранены для backward compatibility существующего Interactions API.
+- Stage 4.1 importer пишет normalized `contracts` / `licenses` и синхронно поддерживает legacy fields.
+
+### `contracts`
+
+Fields:
+
+- `id`
+- `interaction_id: uuid, FK -> university_interactions.id`
+- `number: varchar(255)`
+- `signed_at: timestamptz, nullable`
+- `valid_from: timestamptz, nullable`
+- `valid_until: timestamptz, nullable`
+- `status: varchar(64), nullable`
+- `created_at`
+- `updated_at`
+
+Constraints and indexes:
+
+- Unique: `(interaction_id, number)`
+- Index: `interaction_id`
+
+### `licenses`
+
+Fields:
+
+- `id`
+- `contract_id: uuid, FK -> contracts.id`
+- `product_id: uuid, FK -> it_products.id`
+- `license_number: varchar(255), nullable`
+- `signed_at: timestamptz, nullable`
+- `valid_until: timestamptz, nullable`
+- `transfer_status: varchar(64), nullable`
+- `created_at`
+- `updated_at`
+
+Constraints and indexes:
+
+- Unique: `(contract_id, product_id)`
+- Index: `contract_id`
+- Index: `product_id`
 
 Пример interaction:
 
@@ -1002,6 +1049,7 @@ Demo users:
 | `GET` | `/imports` | `ADMIN` | pagination | `Page[ImportJobRead]` |
 | `GET` | `/imports/{job_id}` | `ADMIN` | path id | `ImportJobRead` |
 | `GET` | `/imports/{job_id}/preview` | `ADMIN` | `limit` | sheet names, headers, sample rows, total rows, file type |
+| `PATCH` | `/imports/{job_id}/config` | `ADMIN` | `sheet_name`, `header_row` | updated `ImportJobRead`, mapping/errors/diff invalidated |
 | `GET` | `/imports/fields` | `ADMIN` | none | list of target CRM fields |
 | `GET` | `/imports/mappings` | `ADMIN` | none | reusable mappings, including `RTK_DEFAULT_V1` |
 | `POST` | `/imports/mappings` | `ADMIN` | mapping name and fields | `ImportMappingRead` |
@@ -1024,6 +1072,7 @@ Rules:
 - Source spreadsheet metadata is stored in `files`; binary content is stored in S3 bucket `imports`.
 - Object keys are generated as `imports/<import_job_id>/<uuid>.<ext>` and do not use the user filename.
 - `confirm` is rejected when row validation errors or unresolved conflicts exist.
+- `confirm` also rejects stale diff with `409 IMPORT_STALE_DIFF` when input, mapping or relevant CRM fingerprint changed after diff.
 - XLSX signature is checked as ZIP (`PK`); legacy XLS is checked as OLE Compound (`D0 CF 11 E0 A1 B1 1A E1`).
 - Only `ADMIN` can run import operations.
 

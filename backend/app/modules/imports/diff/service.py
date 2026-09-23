@@ -1,3 +1,5 @@
+import hashlib
+import json
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,6 +13,7 @@ from app.modules.imports.model import ImportJob, ImportRowError
 from app.modules.imports.row import business_key, mapped_row, serializable_payload
 from app.modules.imports.service import ImportService
 from app.modules.interactions.model import UniversityInteraction
+from app.modules.licenses.model import Contract, License
 from app.modules.products.model import ITProduct, Vendor
 from app.modules.universities.model import University
 
@@ -36,7 +39,12 @@ class ImportDiffService:
             items.append(item)
             counts[item["action"]] += 1
 
-        job.diff_snapshot = {"items": items}
+        job.diff_snapshot = {
+            "items": items,
+            "input_hash": self.input_hash(job),
+            "mapping_hash": self.mapping_hash(job),
+            "crm_fingerprint": self.crm_fingerprint(items),
+        }
         job.create_count = counts["CREATE"]
         job.update_count = counts["UPDATE"]
         job.skip_count = counts["SKIP"]
@@ -71,10 +79,14 @@ class ImportDiffService:
         if university is None or vendor is None or product is None:
             return self._item(row_number, "CREATE", key, row, ["Creates missing catalog data or interaction"])
 
-        statement = select(UniversityInteraction).where(
-            UniversityInteraction.university_id == university.id,
-            UniversityInteraction.product_id == product.id,
-            UniversityInteraction.contract_number == normalize_text(row.get("contract.number")),
+        statement = (
+            select(UniversityInteraction)
+            .join(Contract, Contract.interaction_id == UniversityInteraction.id)
+            .where(
+                UniversityInteraction.university_id == university.id,
+                UniversityInteraction.product_id == product.id,
+                Contract.number == normalize_text(row.get("contract.number")),
+            )
         )
         matches = list(self.db.scalars(statement).all())
         if len(matches) > 1:
@@ -82,15 +94,31 @@ class ImportDiffService:
         if not matches:
             return self._item(row_number, "CREATE", key, row, ["Creates interaction"])
         interaction = matches[0]
+        contract = self.db.scalar(
+            select(Contract).where(
+                Contract.interaction_id == interaction.id,
+                Contract.number == normalize_text(row.get("contract.number")),
+            )
+        )
+        license_record = None
+        if contract is not None:
+            license_record = self.db.scalar(
+                select(License).where(License.contract_id == contract.id, License.product_id == product.id)
+            )
         changed = False
         comparisons = {
-            "transfer_status": normalize_text(row.get("license.transfer_status")),
             "university_responsibles": normalize_text(row.get("university_contact.full_name")),
             "comment": normalize_text(row.get("interaction.comment")),
         }
         for attr, value in comparisons.items():
             if value is not None and getattr(interaction, attr) != value:
                 changed = True
+        if license_record is None:
+            changed = True
+        elif normalize_text(row.get("license.transfer_status")) is not None and license_record.transfer_status != normalize_text(
+            row.get("license.transfer_status")
+        ):
+            changed = True
         return self._item(row_number, "UPDATE" if changed else "SKIP", key, row, ["Existing interaction differs"] if changed else [])
 
     def _one_or_none(self, model, name):
@@ -112,3 +140,62 @@ class ImportDiffService:
             "reasons": reasons,
             "payload": serializable_payload(row),
         }
+
+    def input_hash(self, job) -> str:
+        rows = [
+            {"row": row_number, "data": mapped_row(raw_row, job.mapping_snapshot)}
+            for row_number, raw_row in ImportService(self.db).read_rows(job)
+        ]
+        return self._hash(rows)
+
+    def mapping_hash(self, job) -> str:
+        return self._hash(job.mapping_snapshot or {})
+
+    def crm_fingerprint(self, items: list[dict]) -> str:
+        records: list[dict] = []
+        for item in items:
+            payload = item.get("payload") or {}
+            university = self._one_or_none(University, payload.get("university.name"))
+            vendor = self._one_or_none(Vendor, payload.get("vendor.name"))
+            product = self._one_or_none(ITProduct, payload.get("product.name"))
+            record = {
+                "business_key": item.get("businessKey") or item.get("business_key"),
+                "university": self._entity_state(university),
+                "vendor": self._entity_state(vendor),
+                "product": self._entity_state(product),
+                "interaction": None,
+                "contract": None,
+                "license": None,
+            }
+            if not any(value == "AMBIGUOUS" for value in (university, vendor, product)) and university and product:
+                contract_number = normalize_text(payload.get("contract.number"))
+                interaction = self.db.scalar(
+                    select(UniversityInteraction)
+                    .join(Contract, Contract.interaction_id == UniversityInteraction.id)
+                    .where(
+                        UniversityInteraction.university_id == university.id,
+                        UniversityInteraction.product_id == product.id,
+                        Contract.number == contract_number,
+                    )
+                )
+                record["interaction"] = self._entity_state(interaction)
+                if interaction is not None:
+                    contract = self.db.scalar(
+                        select(Contract).where(Contract.interaction_id == interaction.id, Contract.number == contract_number)
+                    )
+                    record["contract"] = self._entity_state(contract)
+                    if contract is not None:
+                        license_record = self.db.scalar(
+                            select(License).where(License.contract_id == contract.id, License.product_id == product.id)
+                        )
+                        record["license"] = self._entity_state(license_record)
+            records.append(record)
+        return self._hash(records)
+
+    def _entity_state(self, entity) -> dict | None | str:
+        if entity is None or entity == "AMBIGUOUS":
+            return entity
+        return {"id": str(entity.id), "updated_at": entity.updated_at.isoformat() if entity.updated_at else None}
+
+    def _hash(self, value) -> str:
+        return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode("utf-8")).hexdigest()

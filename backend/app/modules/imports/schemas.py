@@ -88,6 +88,11 @@ class JobMappingUpdate(BaseModel):
     fields: list[MappingFieldPayload] | None = None
 
 
+class ImportJobConfigUpdate(BaseModel):
+    sheet_name: str | None = None
+    header_row: int = Field(default=1, ge=1)
+
+
 class JobMappingRead(BaseModel):
     job_id: UUID
     mapping_id: UUID | None
