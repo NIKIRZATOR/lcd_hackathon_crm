@@ -23,6 +23,7 @@ ADMIN
 - `import_mappings` и `import_mapping_fields` хранят переиспользуемые mappings.
 - `import_row_errors` хранит структурированные ошибки строк validation.
 - `files` остается единственным источником metadata для object storage.
+- `contracts` и `licenses` хранят normalized contract/license data; legacy interaction fields временно сохранены как deprecated compatibility fields.
 
 ## Storage
 
@@ -96,6 +97,8 @@ Diff строит row actions:
 
 Система предпочитает `CONFLICT` неоднозначному merge. Fuzzy/AI matching не используется.
 
+Diff snapshot содержит `input_hash`, `mapping_hash` и `crm_fingerprint`. Confirm пересчитывает эти значения и возвращает `409 IMPORT_STALE_DIFF`, если данные устарели.
+
 ## Confirm
 
 `confirm` запрещен, если:
@@ -111,8 +114,12 @@ Apply выполняет transactional upsert в существующую CRM sc
 - `vendors`;
 - `it_products`;
 - `university_interactions`.
+- `contracts`;
+- `licenses`.
 
-Contract/license данные сохраняются в существующих полях `university_interactions`: `contract_number`, `license_signed_at`, `license_valid_until`, `transfer_status`, `university_responsibles`, `comment`.
+Contract/license данные сохраняются в normalized tables. Legacy поля `university_interactions.contract_number`, `license_signed_at`, `license_valid_until`, `transfer_status`, `university_responsibles`, `comment` обновляются для backward compatibility.
+
+Confirm берет PostgreSQL advisory transaction locks per business key, чтобы concurrent imports не создавали duplicates/lost updates.
 
 ## Audit
 

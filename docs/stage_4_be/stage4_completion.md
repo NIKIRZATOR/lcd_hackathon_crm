@@ -16,6 +16,7 @@
 - Audit events для import lifecycle.
 - Unit tests для XLS/XLSX parser и mapping validation.
 - Clean Docker verification, Alembic upgrade/check и API smoke для `.xlsx`/`.xls`.
+- Stage 4.1 hardening: normalized `contracts/licenses`, stale diff protection, concurrent confirm guard, import limits, sheet/header config, protocol/error artifacts.
 
 ## Измененные файлы
 
@@ -27,6 +28,7 @@
 - `backend/scripts/seed_demo_data.py` - demo user full names синхронизированы с Keycloak realm.
 - `backend/requirements.txt` - добавлены `openpyxl`, `xlrd`, `xlwt`.
 - `backend/migrations/versions/a6e4c2f8b9d0_add_import_jobs.py` - schema Stage 4.
+- `backend/migrations/versions/b7d9a2e1c4f6_add_contracts_licenses.py` - normalized contracts/licenses и data migration.
 - `backend/tests/unit/test_import_parser.py` - parser tests.
 - `backend/tests/unit/test_import_mapping.py` - mapping tests.
 - `docs/db_architecture.md` - import tables/API/audit documented.
@@ -63,6 +65,7 @@
 - Redis/worker не добавлялись.
 - Reports, LMS/CMS integrations, AI/fuzzy matching не добавлялись.
 - Отдельный worker/background execution для больших import-файлов не добавлялся.
+- ClamAV не реализован; это production security blocker до внешнего/customer deployment.
 
 ## Итоговый статус
 

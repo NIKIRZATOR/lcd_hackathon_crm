@@ -1,4 +1,7 @@
+import json
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from uuid import UUID, uuid4
@@ -79,6 +82,7 @@ class ImportService:
                 object_key=object_key,
                 uploaded_by=actor_user_id,
                 scan_status="NOT_SCANNED",
+                delete_after=datetime.now(timezone.utc) + timedelta(days=settings.import_file_retention_days),
             )
             self.db.add(file_record)
             self.db.flush()
@@ -113,13 +117,17 @@ class ImportService:
         finally:
             temp_path.unlink(missing_ok=True)
 
-    def preview(self, *, job_id: UUID, limit: int = 20):
+    def preview(self, *, job_id: UUID, limit: int | None = None):
         job = self.get_job(job_id)
         file_record = self._get_source_file(job)
         temp_path = self._download_to_temp(file_record)
         try:
             reader = reader_for_path(temp_path, file_record.original_name)
-            return reader.preview(sheet_name=job.sheet_name, header_row=job.header_row, limit=limit)
+            return reader.preview(
+                sheet_name=job.sheet_name,
+                header_row=job.header_row,
+                limit=limit or settings.import_preview_rows,
+            )
         finally:
             temp_path.unlink(missing_ok=True)
 
@@ -160,12 +168,12 @@ class ImportService:
             upload.file.seek(0)
             while chunk := upload.file.read(CHUNK_SIZE):
                 size += len(chunk)
-                if size > settings.file_max_upload_bytes:
+                if size > settings.import_max_upload_bytes:
                     raise import_error(
-                        "FILE_TOO_LARGE",
+                        "IMPORT_FILE_TOO_LARGE",
                         "Uploaded file is too large",
                         413,
-                        details={"max_upload_bytes": settings.file_max_upload_bytes},
+                        details={"max_upload_bytes": settings.import_max_upload_bytes},
                     )
                 digest.update(chunk)
                 temp.write(chunk)
@@ -174,6 +182,47 @@ class ImportService:
             Path(temp.name).unlink(missing_ok=True)
             raise import_error("FILE_EMPTY", "Uploaded file is empty")
         return size, digest.hexdigest(), Path(temp.name)
+
+    def create_json_artifact(
+        self,
+        *,
+        job: ImportJob,
+        artifact_type: str,
+        payload: dict,
+        actor_user_id: UUID | None,
+    ) -> ImportArtifact:
+        data = json.dumps(payload, ensure_ascii=False, default=str, indent=2).encode("utf-8")
+        object_name = f"{artifact_type.lower()}-{uuid4()}.json"
+        object_key = f"imports/{job.id}/{object_name}"
+        bucket = settings.s3_bucket_imports
+        self.storage.put(
+            bucket=bucket,
+            object_key=object_key,
+            data=BytesIO(data),
+            length=len(data),
+            content_type="application/json",
+        )
+        file_record = File(
+            original_name=object_name,
+            storage_name=object_name,
+            storage_path=f"{bucket}/{object_key}",
+            mime_type="application/json",
+            extension="json",
+            size_bytes=len(data),
+            checksum=sha256(data).hexdigest(),
+            provider="S3",
+            bucket=bucket,
+            object_key=object_key,
+            uploaded_by=actor_user_id,
+            scan_status="NOT_SCANNED",
+            delete_after=datetime.now(timezone.utc) + timedelta(days=settings.import_file_retention_days),
+        )
+        self.db.add(file_record)
+        self.db.flush()
+        artifact = ImportArtifact(import_job_id=job.id, file_id=file_record.id, artifact_type=artifact_type)
+        self.db.add(artifact)
+        self.db.flush()
+        return artifact
 
     def _download_to_temp(self, file_record: File) -> Path:
         stream = self.storage.get_stream(bucket=file_record.bucket, object_key=file_record.object_key)

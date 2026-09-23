@@ -1,1 +1,51 @@
-"""Licenses are outside DATABASE V1 and will be modeled in a later schema version."""
+from datetime import datetime
+from uuid import UUID
+
+from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.database import ModelBase
+
+
+class Contract(ModelBase):
+    __tablename__ = "contracts"
+    __table_args__ = (
+        UniqueConstraint("interaction_id", "number", name="uq_contracts_interaction_number"),
+        Index("ix_contracts_interaction", "interaction_id"),
+    )
+
+    interaction_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("university_interactions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    number: Mapped[str] = mapped_column(String(255), nullable=False)
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class License(ModelBase):
+    __tablename__ = "licenses"
+    __table_args__ = (
+        UniqueConstraint("contract_id", "product_id", name="uq_licenses_contract_product"),
+        Index("ix_licenses_contract", "contract_id"),
+        Index("ix_licenses_product", "product_id"),
+    )
+
+    contract_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("contracts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    product_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("it_products.id"),
+        nullable=False,
+    )
+    license_number: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    transfer_status: Mapped[str | None] = mapped_column(String(64), nullable=True)

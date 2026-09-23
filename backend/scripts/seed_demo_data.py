@@ -14,6 +14,7 @@ from app.modules.products.model import ITProduct, ProgramProduct, Vendor
 from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.universities.model import University
 from app.modules.interactions.model import UniversityInteraction
+from app.modules.licenses.model import Contract, License
 from app.modules.users.model import ManagerMembership, Role, User
 from app.modules.workflows.model import WorkflowStage, WorkflowTemplate, WorkflowTransition, WorkflowVersion
 from app.modules.workflows.service import WorkflowRuntimeService
@@ -543,6 +544,32 @@ def seed_interactions(
         else:
             for field, value in values.items():
                 setattr(interaction, field, value)
+        contract = db.scalar(
+            select(Contract).where(
+                Contract.interaction_id == interaction.id,
+                Contract.number == data["contract_number"],
+            )
+        )
+        if contract is None:
+            contract = Contract(
+                interaction_id=interaction.id,
+                number=data["contract_number"],
+                status=data["status"],
+            )
+            db.add(contract)
+            db.flush()
+        else:
+            contract.status = data["status"]
+        license_record = db.scalar(
+            select(License).where(
+                License.contract_id == contract.id,
+                License.product_id == product.id,
+            )
+        )
+        if license_record is None:
+            license_record = License(contract_id=contract.id, product_id=product.id)
+            db.add(license_record)
+        license_record.transfer_status = data["transfer_status"]
 
 
 def main() -> None:

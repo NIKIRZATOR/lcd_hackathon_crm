@@ -17,9 +17,32 @@ from app.storage import StorageAdapter, get_storage_adapter
 
 
 ALLOWED_ATTACHMENT_TYPES = {
+    ".png": {"image/png"},
+    ".jpg": {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
     ".pdf": {"application/pdf"},
+    ".zip": {"application/zip", "application/x-zip-compressed"},
+    ".gz": {"application/gzip", "application/x-gzip"},
+    ".gzip": {"application/gzip", "application/x-gzip"},
+    ".rar": {"application/vnd.rar", "application/x-rar-compressed"},
+    ".doc": {"application/msword", "application/octet-stream"},
     ".docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+    ".xls": {"application/vnd.ms-excel", "application/octet-stream"},
     ".xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+}
+ATTACHMENT_SIGNATURES = {
+    ".png": (b"\x89PNG\r\n\x1a\n",),
+    ".jpg": (b"\xff\xd8\xff",),
+    ".jpeg": (b"\xff\xd8\xff",),
+    ".pdf": (b"%PDF",),
+    ".zip": (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"),
+    ".docx": (b"PK\x03\x04",),
+    ".xlsx": (b"PK\x03\x04",),
+    ".gz": (b"\x1f\x8b",),
+    ".gzip": (b"\x1f\x8b",),
+    ".rar": (b"Rar!\x1a\x07\x00", b"Rar!\x1a\x07\x01\x00"),
+    ".doc": (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",),
+    ".xls": (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",),
 }
 CHUNK_SIZE = 1024 * 1024
 
@@ -57,7 +80,7 @@ class FileService:
         extension = Path(original_name).suffix.lower()
         self._validate_upload(original_name=original_name, extension=extension, content_type=upload.content_type)
 
-        size_bytes, checksum = self._inspect_upload(upload)
+        size_bytes, checksum = self._inspect_upload(upload, extension=extension)
         object_name = f"{uuid4()}{extension}"
         object_key = f"interactions/{instance.interaction_id}/stages/{stage_instance_id}/{object_name}"
         bucket = settings.s3_bucket_workflow_files
@@ -333,11 +356,14 @@ class FileService:
                 details={"content_type": content_type, "allowed_mime_types": sorted(allowed_mimes)},
             )
 
-    def _inspect_upload(self, upload: UploadFile) -> tuple[int, str]:
+    def _inspect_upload(self, upload: UploadFile, *, extension: str) -> tuple[int, str]:
         digest = sha256()
         size = 0
+        head = b""
         upload.file.seek(0)
         while chunk := upload.file.read(CHUNK_SIZE):
+            if len(head) < 16:
+                head += chunk[: 16 - len(head)]
             size += len(chunk)
             if size > settings.file_max_upload_bytes:
                 raise file_error(
@@ -349,6 +375,13 @@ class FileService:
             digest.update(chunk)
         if size == 0:
             raise file_error(status_code=400, code="FILE_EMPTY", message="Uploaded file is empty")
+        signatures = ATTACHMENT_SIGNATURES.get(extension, ())
+        if signatures and not any(head.startswith(signature) for signature in signatures):
+            raise file_error(
+                status_code=400,
+                code="FILE_INVALID_FORMAT",
+                message="Uploaded file signature does not match extension",
+            )
         upload.file.seek(0)
         return size, digest.hexdigest()
 

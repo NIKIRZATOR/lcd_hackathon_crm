@@ -11,6 +11,22 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rtk_eduflow
+          POSTGRES_USER: rtk_eduflow
+          POSTGRES_PASSWORD: rtk_eduflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rtk_eduflow -d rtk_eduflow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://rtk_eduflow:rtk_eduflow@localhost:5432/rtk_eduflow
     defaults:
       run:
         working-directory: backend
@@ -31,6 +47,12 @@ jobs:
 
       - name: Tests
         run: pytest -q
+
+      - name: Alembic upgrade
+        run: alembic upgrade head
+
+      - name: Alembic check
+        run: alembic check
 
       - name: Compile
         run: python -m compileall app tests

@@ -20,7 +20,7 @@ python -m ruff check .
 python -m pytest tests\unit
 ```
 
-Результат: `50 passed, 1 warning`.
+Результат: `61 passed, 1 warning`.
 
 ## Clean Docker checks
 
@@ -40,7 +40,7 @@ docker compose up --build -d postgres minio minio-init backend keycloak-db-init 
 docker compose run --rm backend alembic upgrade head
 ```
 
-Результат: успешно применены все migrations до `a6e4c2f8b9d0`.
+Результат: успешно применены все migrations до `b7d9a2e1c4f6`.
 
 ```powershell
 docker compose run --rm backend alembic check
@@ -58,7 +58,7 @@ docker compose run --rm backend python scripts/seed_demo_data.py
 docker compose run --rm backend pytest tests/unit
 ```
 
-Результат: `50 passed, 1 warning`.
+Результат: `61 passed, 1 warning`.
 
 ```powershell
 docker compose run --rm backend ruff check .
@@ -92,6 +92,9 @@ confirm
 - `.xls`: upload `201`, preview `200`, mapping `200`, validate `200`, diff `200`, confirm `200`, final status `DONE`.
 - preview returned Cyrillic headers and sample rows; console output displayed mojibake because of Windows shell encoding, but JSON assertions used the actual Cyrillic values.
 - repeated identical `.xlsx` import produced `create_count=0`, `update_count=0`, `skip_count=2`, `conflict_count=0`.
+- stale diff scenario returned `409 IMPORT_STALE_DIFF`.
+- forced rollback scenario returned `IMPORT_APPLY_FAILED`, job became `FAILED`, no partial university remained, `import.fail` and `PROTOCOL` artifact were created.
+- concurrent confirm scenario returned one `DONE` and one `409 IMPORT_STALE_DIFF`; PostgreSQL contained exactly one `Concurrent University`.
 - double confirm returned `409 IMPORT_ALREADY_CONFIRMED`.
 - `KAM` and `MANAGER` access to imports returned `403`.
 
@@ -106,17 +109,18 @@ docker compose run --rm backend python -c "<query import_jobs/files/import_artif
 Result:
 
 ```text
-jobs=7
-done=5
-artifacts=7
-import_files=7
-audit_events=36
+contracts=6
+licenses=6
+protocols=5
+error_reports=0
+import_files=13
+concurrent_universities=1
 sample storage.stat objects:
 - bucket=imports, object_key=imports/<job_id>/<uuid>.xlsx, size=5356
 - bucket=imports, object_key=imports/<job_id>/<uuid>.xls, size=5632
 ```
 
-The extra non-DONE jobs are from negative/debug smoke attempts during verification; successful `.xlsx`, `.xls`, and idempotency jobs are `DONE`.
+Successful `.xlsx`, `.xls`, idempotency, stale-diff, rollback, and concurrent-confirm scenarios were verified on clean Docker volumes after applying migrations.
 
 ## Notes
 

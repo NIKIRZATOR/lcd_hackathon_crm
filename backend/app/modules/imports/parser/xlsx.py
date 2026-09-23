@@ -2,6 +2,7 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
+from app.core.config import settings
 from app.modules.imports.parser.base import (
     SpreadsheetError,
     SpreadsheetMetadata,
@@ -32,6 +33,8 @@ class XlsxSpreadsheetReader:
     def read_metadata(self) -> SpreadsheetMetadata:
         workbook = self._workbook()
         try:
+            if len(workbook.sheetnames) > settings.import_max_sheets:
+                raise SpreadsheetError(code="IMPORT_TOO_MANY_SHEETS", message="Spreadsheet has too many sheets")
             return SpreadsheetMetadata(sheet_names=list(workbook.sheetnames), file_type=self.file_type)
         finally:
             workbook.close()
@@ -41,6 +44,7 @@ class XlsxSpreadsheetReader:
         try:
             sheet = workbook[sheet_name] if sheet_name else workbook[workbook.sheetnames[0]]
             headers = headers_from_values([cell for cell in next(sheet.iter_rows(min_row=header_row, max_row=header_row, values_only=True), [])])
+            self._validate_dimensions(headers=headers, total_rows=max(sheet.max_row - header_row, 0))
             rows: list[list[object | None]] = []
             for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
                 normalized = [normalize_cell(cell) for cell in row[: len(headers)]]
@@ -65,6 +69,7 @@ class XlsxSpreadsheetReader:
         try:
             sheet = workbook[sheet_name] if sheet_name else workbook[workbook.sheetnames[0]]
             headers = headers_from_values([cell for cell in next(sheet.iter_rows(min_row=header_row, max_row=header_row, values_only=True), [])])
+            self._validate_dimensions(headers=headers, total_rows=max(sheet.max_row - header_row, 0))
             ensure_not_empty(headers)
             result: list[tuple[int, dict[str, object | None]]] = []
             for index, row in enumerate(sheet.iter_rows(min_row=header_row + 1, values_only=True), start=header_row + 1):
@@ -74,3 +79,9 @@ class XlsxSpreadsheetReader:
             return result
         finally:
             workbook.close()
+
+    def _validate_dimensions(self, *, headers: list[str], total_rows: int) -> None:
+        if len(headers) > settings.import_max_columns:
+            raise SpreadsheetError(code="IMPORT_TOO_MANY_COLUMNS", message="Spreadsheet has too many columns")
+        if total_rows > settings.import_max_rows:
+            raise SpreadsheetError(code="IMPORT_TOO_MANY_ROWS", message="Spreadsheet has too many rows")
