@@ -1,7 +1,7 @@
 import { Button, Result, Spin } from 'antd';
+import { Navigate } from 'react-router-dom';
 
 import { useAuth } from '../auth';
-import Layout from '../layout';
 import LoginPage from '../pages/login/LoginPage';
 import { allowedRoles } from './constants';
 
@@ -53,7 +53,7 @@ const StartRoute = () => {
     );
   }
 
-  return <Layout />;
+  return <Navigate to="/v2" replace />;
 };
 
 export default StartRoute;

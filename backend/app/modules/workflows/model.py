@@ -30,6 +30,9 @@ class WorkflowTemplate(ModelBase):
         ForeignKey("users.id"),
         nullable=True,
     )
+    code: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    applies_to_type: Mapped[str] = mapped_column(String(32), nullable=False, default="all")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
 
 
 class WorkflowVersion(ModelBase):
@@ -166,6 +169,7 @@ class WorkflowStage(ModelBase):
     requires_comment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     requires_attachment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    stage_catalog_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("workflow_stage_catalog.id"), nullable=True)
 
 
 class WorkflowTransition(ModelBase):

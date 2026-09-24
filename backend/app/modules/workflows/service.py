@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.common.repository import ListResult
 from app.modules.audit.model import AuditEvent
 from app.modules.audit.repository import AuditEventRepository
+from app.modules.checklists.model import PlaybookChecklistItem, ProgramChecklistValue
 from app.modules.documents.model import File
 from app.modules.interactions.model import UniversityInteraction
 from app.modules.users.model import User
@@ -1159,6 +1160,10 @@ class WorkflowRuntimeService:
             )
             self.instance_repository.add(instance)
             instances[stage.id] = instance
+            for checklist_item in self.db.scalars(
+                select(PlaybookChecklistItem).where(PlaybookChecklistItem.workflow_stage_id == stage.id)
+            ):
+                self.db.add(ProgramChecklistValue(checklist_item_id=checklist_item.id, stage_instance_id=instance.id))
 
         interaction.current_stage_instance_id = instances[initial_stage.id].id
 
@@ -1474,6 +1479,27 @@ class TransitionService:
                 code="WORKFLOW_STAGE_REQUIRES_ATTACHMENT",
                 message="Current stage requires attachment",
                 details={"currentStageId": str(stage.id), "currentStageInstanceId": str(instance.id)},
+            )
+        missing = self.db.scalar(
+            select(func.count())
+            .select_from(PlaybookChecklistItem)
+            .outerjoin(
+                ProgramChecklistValue,
+                (ProgramChecklistValue.checklist_item_id == PlaybookChecklistItem.id)
+                & (ProgramChecklistValue.stage_instance_id == instance.id),
+            )
+            .where(
+                PlaybookChecklistItem.workflow_stage_id == stage.id,
+                PlaybookChecklistItem.required.is_(True),
+                (ProgramChecklistValue.id.is_(None)) | (ProgramChecklistValue.is_done.is_(False)),
+            )
+        ) or 0
+        if missing:
+            raise workflow_error(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                code="WORKFLOW_CHECKLIST_INCOMPLETE",
+                message="Required checklist items are incomplete",
+                details={"currentStageId": str(stage.id), "missingCount": missing},
             )
         performed_by = self._get_performed_by(payload)
         if self.db.get(User, performed_by) is None:

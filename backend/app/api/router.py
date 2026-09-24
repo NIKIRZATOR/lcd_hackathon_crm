@@ -12,13 +12,17 @@ from app.modules.interactions.router import router as interactions_router
 from app.modules.licenses.router import router as licenses_router
 from app.modules.materials.router import router as materials_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.organizations.router import router as organizations_router
 from app.modules.products.router import router as products_router
+from app.modules.program_instances.router import router as program_instances_router
 from app.modules.programs.router import router as programs_router
 from app.modules.tasks.router import router as tasks_router
 from app.modules.teachers.router import router as teachers_router
 from app.modules.universities.router import router as universities_router
 from app.modules.users.router import router as users_router
 from app.modules.workflows.router import router as workflows_router
+from app.modules.workflow_catalog.router import router as workflow_catalog_router
+from app.modules.checklists.router import router as checklists_router
 
 api_router = APIRouter()
 
@@ -40,10 +44,14 @@ api_router.include_router(interactions_router)
 api_router.include_router(licenses_router)
 api_router.include_router(materials_router)
 api_router.include_router(notifications_router)
+api_router.include_router(organizations_router)
 api_router.include_router(products_router)
+api_router.include_router(program_instances_router)
 api_router.include_router(programs_router)
 api_router.include_router(tasks_router)
 api_router.include_router(teachers_router)
 api_router.include_router(universities_router)
 api_router.include_router(users_router)
 api_router.include_router(workflows_router)
+api_router.include_router(workflow_catalog_router)
+api_router.include_router(checklists_router)
