@@ -8,6 +8,7 @@ from app.modules.interactions.model import InteractionContact, UniversityInterac
 from app.modules.licenses.model import Contract, License
 from app.modules.products.model import ITProduct, ProgramProduct, Vendor
 from app.modules.programs.model import ITDirection, ITProgram
+from app.modules.reports.model import ReportArtifact, ReportJob
 from app.modules.universities.model import University
 from app.modules.users.model import DataAccessScope, ManagerMembership, ResponsibleAssignmentHistory, Role, User, user_roles
 from app.modules.workflows.model import (
@@ -43,6 +44,8 @@ __all__ = [
     "ResponsibleAssignmentHistory",
     "Role",
     "License",
+    "ReportArtifact",
+    "ReportJob",
     "University",
     "UniversityContact",
     "UniversityInteraction",
