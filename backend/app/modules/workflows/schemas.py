@@ -246,6 +246,20 @@ class WorkflowStageInstanceStatusUpdate(BaseModel):
     status: StageStatus
 
 
+class WorkflowStageCommentCreate(BaseModel):
+    text: str
+
+
+class WorkflowStageCommentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    stage_instance_id: UUID
+    author_user_id: UUID
+    text: str
+    created_at: datetime
+
+
 class WorkflowTransitionHistoryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -46,6 +46,19 @@ class OrganizationRead(BaseModel):
     updated_at: datetime
 
 
+class Organization360Read(BaseModel):
+    id: UUID
+    type_name: str
+    kam_name: str | None
+    documents_count: int
+    feed_events_count: int
+
+
+class KamRead(BaseModel):
+    id: UUID
+    full_name: str
+
+
 class AssignmentCreate(BaseModel):
     kam_user_id: UUID
 

@@ -3,12 +3,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
-from app.modules.auth.access import CATALOG_WRITE_ROLES
+from app.modules.auth.access import CRM_ROLES
 from app.modules.auth.dependencies import require_roles
 from app.modules.workflow_catalog.model import WorkflowPhase, WorkflowStageCatalog
 from app.modules.workflows.model import WorkflowTemplate, WorkflowVersion
 
-router = APIRouter(prefix="/management", tags=["management"], dependencies=[Depends(require_roles(*CATALOG_WRITE_ROLES))])
+router = APIRouter(prefix="/management", tags=["management"], dependencies=[Depends(require_roles(*CRM_ROLES))])
 
 @router.get("/stages")
 def list_stages(db: Session = Depends(get_db_session)):

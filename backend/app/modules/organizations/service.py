@@ -3,15 +3,18 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
 from app.common.repository import ListResult
-from app.modules.auth.access import get_subordinate_kam_ids, has_any_role, is_admin
+from app.modules.auth.access import forbidden, get_subordinate_kam_ids, has_any_role, is_admin
+from app.modules.audit.model import AuditEvent
+from app.modules.licenses.model import Contract, License
 from app.modules.organizations.model import OrgAssignment, Organization, OrganizationType, Stakeholder
+from app.modules.program_instances.model import ProgramInstance
 from app.modules.organizations.schemas import AssignmentCreate, OrganizationCreate, OrganizationUpdate, StakeholderCreate
-from app.modules.users.model import User
+from app.modules.users.model import Role, User
 
 
 class OrganizationService:
@@ -86,6 +89,26 @@ class OrganizationService:
     def stakeholders(self, organization_id: UUID, current_user: User) -> list[Stakeholder]:
         self.get(organization_id, current_user)
         return list(self.db.scalars(select(Stakeholder).where(Stakeholder.organization_id == organization_id).order_by(Stakeholder.full_name)).all())
+
+    def summary_360(self, organization_id: UUID, current_user: User) -> dict[str, object]:
+        organization = self.get(organization_id, current_user)
+        type_name = self.db.scalar(select(OrganizationType.name).where(OrganizationType.id == organization.type_id))
+        kam_name = self.db.scalar(
+            select(User.full_name)
+            .join(OrgAssignment, OrgAssignment.user_id == User.id)
+            .where(OrgAssignment.organization_id == organization.id, OrgAssignment.status == "active")
+        )
+        documents_count = (self.db.scalar(select(func.count()).select_from(Contract).where(Contract.organization_id == organization.id, Contract.attachment_id.is_not(None))) or 0) + (self.db.scalar(select(func.count()).select_from(License).join(ProgramInstance).where(ProgramInstance.organization_id == organization.id, License.attachment_id.is_not(None))) or 0)
+        feed_events_count = self.db.scalar(select(func.count()).select_from(AuditEvent).where(AuditEvent.entity_id == organization.id)) or 0
+        return {"id": organization.id, "type_name": type_name or "—", "kam_name": kam_name, "documents_count": documents_count, "feed_events_count": feed_events_count}
+
+    def eligible_kams(self, organization_id: UUID, current_user: User) -> list[User]:
+        self.get(organization_id, current_user)
+        if is_admin(current_user):
+            return list(self.db.scalars(select(User).join(User.roles).where(Role.name == "KAM", User.is_active.is_(True)).order_by(User.full_name)).all())
+        if has_any_role(current_user, "MANAGER"):
+            return list(self.db.scalars(select(User).where(User.id.in_(get_subordinate_kam_ids(self.db, current_user.id)), User.is_active.is_(True)).order_by(User.full_name)).all())
+        raise forbidden("Only MANAGER or ADMIN can reassign KAM")
 
     def add_stakeholder(self, organization_id: UUID, payload: StakeholderCreate, current_user: User) -> Stakeholder:
         self.get(organization_id, current_user)

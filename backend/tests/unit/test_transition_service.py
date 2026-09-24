@@ -62,6 +62,8 @@ class FakeDb:
         return self.entities.get((model, entity_id))
 
     def scalar(self, statement):
+        if "count(" in str(statement).lower():
+            return 0
         if self.scalar_results:
             return self.scalar_results.pop(0)
         return self.next_instance

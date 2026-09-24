@@ -12,6 +12,7 @@ from app.modules.interactions.router import router as interactions_router
 from app.modules.licenses.router import router as licenses_router
 from app.modules.materials.router import router as materials_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.nba.router import router as nba_router
 from app.modules.organizations.router import router as organizations_router
 from app.modules.products.router import router as products_router
 from app.modules.program_instances.router import router as program_instances_router
@@ -44,6 +45,7 @@ api_router.include_router(interactions_router)
 api_router.include_router(licenses_router)
 api_router.include_router(materials_router)
 api_router.include_router(notifications_router)
+api_router.include_router(nba_router)
 api_router.include_router(organizations_router)
 api_router.include_router(products_router)
 api_router.include_router(program_instances_router)

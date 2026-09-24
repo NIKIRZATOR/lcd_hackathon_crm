@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlalchemy import select
@@ -16,10 +16,14 @@ from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.universities.model import University
 from app.modules.interactions.model import UniversityInteraction
 from app.modules.licenses.model import Contract, License
+from app.modules.teachers.model import TeacherCarrier
 from app.modules.organizations.model import OrgAssignment, Organization, OrganizationType, Stakeholder
 from app.modules.program_instances.model import AcademicWindow, ProgramInstance
 from app.modules.workflow_catalog.model import WorkflowPhase, WorkflowStageCatalog
 from app.modules.checklists.model import PlaybookChecklistItem, ProgramChecklistValue
+from app.modules.health.service import HealthService
+from app.modules.integrations.service import IntegrationSyncService
+from app.modules.nba.service import NbaService
 from app.modules.users.model import ManagerMembership, Role, User
 from app.modules.workflows.model import WorkflowStage, WorkflowStageInstance, WorkflowTemplate, WorkflowTransition, WorkflowVersion
 from app.modules.workflows.service import WorkflowRuntimeService
@@ -761,6 +765,61 @@ def seed_program_instances(db: Session) -> None:
             ))
 
 
+def seed_contracts_licenses_and_teachers(db: Session) -> None:
+    programs = list(db.scalars(select(ProgramInstance).order_by(ProgramInstance.created_at)).all())
+    if not programs:
+        return
+    now = datetime.now(timezone.utc)
+    contracts: dict[object, Contract] = {}
+    for index, program in enumerate(programs):
+        health_case = index % 3
+        contract = contracts.get(program.organization_id)
+        if contract is None:
+            contract = db.scalar(select(Contract).where(Contract.organization_id == program.organization_id))
+            if contract is None:
+                contract = Contract(
+                    organization_id=program.organization_id,
+                    number=f"RTK-FRAME-{str(program.organization_id)[:8]}",
+                    signed_on=date(2026, 1, 15),
+                    valid_until=datetime(2028, 12, 31, tzinfo=timezone.utc),
+                    comment="Demo framework agreement for V2 organization.",
+                )
+                db.add(contract)
+                db.flush()
+            contracts[program.organization_id] = contract
+        license_record = db.scalar(select(License).where(License.program_instance_id == program.id))
+        if license_record is None:
+            db.add(License(
+                contract_id=contract.id,
+                program_instance_id=program.id,
+                product_id=program.product_id,
+                license_number=f"LIC-{str(program.id)[:8]}",
+                signed_at=now,
+                valid_until=datetime.combine(
+                    date.today() + timedelta(days=365 if health_case == 0 else 30 if health_case == 1 else -1),
+                    datetime.min.time(),
+                    tzinfo=timezone.utc,
+                ),
+                transfer_status="transferred" if health_case in (0, 1) else "in_progress",
+                transferred_on=date.today() if health_case in (0, 1) else None,
+                comment="Demo license linked to V2 program instance.",
+            ))
+        carrier = db.scalar(select(TeacherCarrier).where(TeacherCarrier.program_instance_id == program.id))
+        if carrier is None:
+            stakeholder = db.scalar(select(Stakeholder).where(Stakeholder.organization_id == program.organization_id, Stakeholder.role_code.in_(["teacher", "school_teacher"])))
+            db.add(TeacherCarrier(
+                organization_id=program.organization_id,
+                program_instance_id=program.id,
+                product_id=program.product_id,
+                stakeholder_id=stakeholder.id if stakeholder else None,
+                full_name=stakeholder.full_name if stakeholder else "Demo Teacher Carrier",
+                trained_on=date(2026, 2, 15),
+                qualification_until=date.today() + timedelta(days=365 if health_case != 2 else -1),
+                last_lms_activity_on=date.today() - timedelta(days=0 if health_case != 2 else 60),
+                status="active",
+            ))
+
+
 def seed_workflow_catalog(db: Session) -> None:
     phases = [("outreach", "Выход на вуз"), ("paperwork", "Оформление"), ("onboarding", "Онбординг"), ("operations", "Эксплуатация"), ("retention", "Удержание"), ("control", "Контроль")]
     phase_by_code = {}
@@ -801,7 +860,13 @@ def main() -> None:
         seed_interactions(db, universities, programs, products, users, workflow_template)
         seed_organization_core(db, universities)
         seed_program_instances(db)
+        db.flush()
+        seed_contracts_licenses_and_teachers(db)
         db.commit()
+        for program in db.scalars(select(ProgramInstance)).all():
+            HealthService(db).recompute(program.id)
+            NbaService(db).recompute_program(program.id)
+            IntegrationSyncService(db).sync_program(program.id)
     finally:
         db.close()
 

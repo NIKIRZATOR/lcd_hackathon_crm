@@ -92,6 +92,21 @@ class WorkflowTransitionRepository(CRUDRepository[WorkflowTransition]):
             statement = statement.where(WorkflowTransition.workflow_version_id == version_id)
         return self.db.scalar(statement)
 
+    def list_by_version(self, version_id: UUID) -> list[WorkflowTransition]:
+        statement = select(WorkflowTransition).where(WorkflowTransition.workflow_version_id == version_id)
+        return list(self.db.scalars(statement).all())
+
+    def list_from_stage(self, *, version_id: UUID, from_stage_id: UUID) -> list[WorkflowTransition]:
+        statement = (
+            select(WorkflowTransition)
+            .where(
+                WorkflowTransition.workflow_version_id == version_id,
+                WorkflowTransition.from_stage_id == from_stage_id,
+            )
+            .order_by(WorkflowTransition.is_default.desc(), WorkflowTransition.created_at)
+        )
+        return list(self.db.scalars(statement).all())
+
 
 class WorkflowChangeRequestRepository(CRUDRepository[WorkflowChangeRequest]):
     model = WorkflowChangeRequest
@@ -123,22 +138,6 @@ class WorkflowMigrationJobRepository(CRUDRepository[WorkflowMigrationJob]):
     model = WorkflowMigrationJob
     sortable_fields = {"status", "created_at", "updated_at", "completed_at"}
     default_sort = "created_at"
-
-    def list_by_version(self, version_id: UUID) -> list[WorkflowTransition]:
-        statement = select(WorkflowTransition).where(WorkflowTransition.workflow_version_id == version_id)
-        return list(self.db.scalars(statement).all())
-
-    def list_from_stage(self, *, version_id: UUID, from_stage_id: UUID) -> list[WorkflowTransition]:
-        statement = (
-            select(WorkflowTransition)
-            .where(
-                WorkflowTransition.workflow_version_id == version_id,
-                WorkflowTransition.from_stage_id == from_stage_id,
-            )
-            .order_by(WorkflowTransition.is_default.desc(), WorkflowTransition.created_at)
-        )
-        return list(self.db.scalars(statement).all())
-
 
 class WorkflowStageInstanceRepository(CRUDRepository[WorkflowStageInstance]):
     model = WorkflowStageInstance

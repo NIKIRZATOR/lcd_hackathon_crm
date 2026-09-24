@@ -204,11 +204,12 @@ class WorkflowTransition(ModelBase):
 class WorkflowStageInstance(ModelBase):
     __tablename__ = "workflow_stage_instances"
 
-    interaction_id: Mapped[UUID] = mapped_column(
+    interaction_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("university_interactions.id"),
-        nullable=False,
+        nullable=True,
     )
+    program_instance_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("program_instances.id"), nullable=True)
     workflow_stage_id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("workflow_stages.id"),
@@ -229,11 +230,12 @@ class WorkflowStageInstance(ModelBase):
 class WorkflowTransitionHistory(ModelBase):
     __tablename__ = "workflow_transition_history"
 
-    interaction_id: Mapped[UUID] = mapped_column(
+    interaction_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("university_interactions.id"),
-        nullable=False,
+        nullable=True,
     )
+    program_instance_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("program_instances.id"), nullable=True)
     from_stage_instance_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("workflow_stage_instances.id"),

@@ -33,6 +33,8 @@ class ProgramInstance(ModelBase):
     product_id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("it_products.id"), nullable=False)
     kam_user_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     playbook_template_id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("workflow_templates.id"), nullable=False)
+    workflow_version_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("workflow_versions.id"), nullable=True)
+    current_stage_instance_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("workflow_stage_instances.id"), nullable=True)
     template_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="draft")
     current_stage_code: Mapped[str | None] = mapped_column(String(64), nullable=True)

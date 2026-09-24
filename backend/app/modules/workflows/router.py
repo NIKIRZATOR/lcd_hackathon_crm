@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Path, Request, UploadFile
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.common.errors import ErrorEnvelope, get_request_id
@@ -15,8 +16,10 @@ from app.modules.documents.file_service import FileService
 from app.modules.documents.model import File as FileModel
 from app.modules.documents.schemas import WorkflowAttachmentRead
 from app.modules.interactions.model import UniversityInteraction
+from app.modules.organizations.service import OrganizationService
+from app.modules.program_instances.model import ProgramInstance
 from app.modules.users.model import User
-from app.modules.workflows.model import WorkflowStageAttachment, WorkflowStageInstance
+from app.modules.workflows.model import WorkflowStageAttachment, WorkflowStageComment, WorkflowStageInstance
 from app.modules.workflows.schemas import (
     WorkflowAvailableTransitionRead,
     WorkflowChangeRequestCreate,
@@ -28,6 +31,8 @@ from app.modules.workflows.schemas import (
     WorkflowMigrationPreviewRead,
     WorkflowMigrationPreviewRequest,
     WorkflowStageCreate,
+    WorkflowStageCommentCreate,
+    WorkflowStageCommentRead,
     WorkflowStageInstanceRead,
     WorkflowStageInstanceStatusUpdate,
     WorkflowStageRead,
@@ -74,7 +79,19 @@ def _ensure_can_access_stage_instance(db: Session, current_user: User, stage_ins
         from fastapi import HTTPException, status
 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow stage instance not found")
-    _ensure_can_access_interaction(db, current_user, instance.interaction_id)
+    if instance.program_instance_id is not None:
+        program = db.get(ProgramInstance, instance.program_instance_id)
+        if program is None:
+            from fastapi import HTTPException, status
+
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program instance not found")
+        OrganizationService(db).get(program.organization_id, current_user)
+    elif instance.interaction_id is not None:
+        _ensure_can_access_interaction(db, current_user, instance.interaction_id)
+    else:
+        from fastapi import HTTPException, status
+
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow stage owner not found")
     return instance
 
 
@@ -438,6 +455,37 @@ def update_stage_instance_status(
     if instance is not None:
         _ensure_can_access_interaction(db, current_user, instance.interaction_id)
     return WorkflowRuntimeService(db).update_stage_instance_status(stage_instance_id, payload)
+
+
+@router.get("/stage-instances/{stage_instance_id}/comments", response_model=list[WorkflowStageCommentRead])
+def list_stage_comments(
+    stage_instance_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    _ensure_can_access_stage_instance(db, current_user, stage_instance_id)
+    return list(
+        db.scalars(
+            select(WorkflowStageComment)
+            .where(WorkflowStageComment.stage_instance_id == stage_instance_id, WorkflowStageComment.deleted_at.is_(None))
+            .order_by(WorkflowStageComment.created_at)
+        ).all()
+    )
+
+
+@router.post("/stage-instances/{stage_instance_id}/comments", response_model=WorkflowStageCommentRead, status_code=201)
+def create_stage_comment(
+    stage_instance_id: UUID,
+    payload: WorkflowStageCommentCreate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    _ensure_can_access_stage_instance(db, current_user, stage_instance_id)
+    comment = WorkflowStageComment(stage_instance_id=stage_instance_id, author_user_id=current_user.id, text=payload.text)
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return comment
 
 
 @router.post(
