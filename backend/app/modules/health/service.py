@@ -73,6 +73,4 @@ class HealthService:
             score -= 10
         program.health_score = max(score, 0)
         program.health_band = "red" if score < 60 else "yellow" if score < 90 else "green"
-        self.db.commit()
-        self.db.refresh(program)
         return program

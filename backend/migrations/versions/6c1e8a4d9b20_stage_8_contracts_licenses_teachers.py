@@ -16,6 +16,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    if sa.inspect(op.get_bind()).has_table("teacher_carriers"):
+        return
     op.alter_column("contracts", "interaction_id", existing_type=sa.UUID(), nullable=True)
     op.add_column("contracts", sa.Column("organization_id", sa.UUID(), nullable=True))
     op.add_column("contracts", sa.Column("signed_on", sa.Date(), nullable=True))

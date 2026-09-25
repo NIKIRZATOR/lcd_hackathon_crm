@@ -16,10 +16,9 @@ from app.modules.documents.file_service import FileService
 from app.modules.documents.model import File as FileModel
 from app.modules.documents.schemas import WorkflowAttachmentRead
 from app.modules.interactions.model import UniversityInteraction
-from app.modules.organizations.service import OrganizationService
-from app.modules.program_instances.model import ProgramInstance
 from app.modules.users.model import User
 from app.modules.workflows.model import WorkflowStageAttachment, WorkflowStageComment, WorkflowStageInstance
+from app.modules.workflows.access import ensure_can_access_stage_instance
 from app.modules.workflows.schemas import (
     WorkflowAvailableTransitionRead,
     WorkflowChangeRequestCreate,
@@ -74,25 +73,7 @@ def _ensure_can_access_interaction(db: Session, current_user: User, interaction_
 
 
 def _ensure_can_access_stage_instance(db: Session, current_user: User, stage_instance_id: UUID) -> WorkflowStageInstance:
-    instance = db.get(WorkflowStageInstance, stage_instance_id)
-    if instance is None:
-        from fastapi import HTTPException, status
-
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow stage instance not found")
-    if instance.program_instance_id is not None:
-        program = db.get(ProgramInstance, instance.program_instance_id)
-        if program is None:
-            from fastapi import HTTPException, status
-
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Program instance not found")
-        OrganizationService(db).get(program.organization_id, current_user)
-    elif instance.interaction_id is not None:
-        _ensure_can_access_interaction(db, current_user, instance.interaction_id)
-    else:
-        from fastapi import HTTPException, status
-
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow stage owner not found")
-    return instance
+    return ensure_can_access_stage_instance(db, current_user, stage_instance_id)
 
 
 def _ensure_can_access_attachment(

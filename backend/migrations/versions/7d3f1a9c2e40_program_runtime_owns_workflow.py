@@ -8,6 +8,9 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
+    columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("program_instances")}
+    if {"workflow_version_id", "current_stage_instance_id"}.issubset(columns):
+        return
     op.add_column("program_instances", sa.Column("workflow_version_id", sa.UUID(), nullable=True))
     op.add_column("program_instances", sa.Column("current_stage_instance_id", sa.UUID(), nullable=True))
     op.create_foreign_key(op.f("fk_program_instances_workflow_version_id_workflow_versions"), "program_instances", "workflow_versions", ["workflow_version_id"], ["id"])

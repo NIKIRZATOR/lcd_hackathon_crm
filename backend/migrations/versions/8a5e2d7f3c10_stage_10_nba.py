@@ -16,6 +16,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    if sa.inspect(op.get_bind()).has_table("nba_items"):
+        return
     op.create_table(
         "nba_rules",
         sa.Column("code", sa.String(length=64), nullable=False),

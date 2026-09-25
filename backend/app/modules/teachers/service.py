@@ -28,10 +28,11 @@ class TeacherCarrierService:
         self._validate_links(organization_id, payload.product_id, payload.program_instance_id, payload.stakeholder_id)
         carrier = TeacherCarrier(organization_id=organization_id, **payload.model_dump())
         self.db.add(carrier)
-        self.db.commit()
+        self.db.flush()
         if carrier.program_instance_id is not None:
             HealthService(self.db).recompute(carrier.program_instance_id)
             NbaService(self.db).recompute_program(carrier.program_instance_id)
+        self.db.commit()
         self.db.refresh(carrier)
         return carrier
 
@@ -50,7 +51,7 @@ class TeacherCarrierService:
         )
         for field, value in values.items():
             setattr(carrier, field, value)
-        self.db.commit()
+        self.db.flush()
         if carrier.program_instance_id is not None:
             HealthService(self.db).recompute(carrier.program_instance_id)
             NbaService(self.db).recompute_program(carrier.program_instance_id)
@@ -59,6 +60,8 @@ class TeacherCarrierService:
             and previous_program_instance_id != carrier.program_instance_id
         ):
             HealthService(self.db).recompute(previous_program_instance_id)
+            NbaService(self.db).recompute_program(previous_program_instance_id)
+        self.db.commit()
         self.db.refresh(carrier)
         return carrier
 

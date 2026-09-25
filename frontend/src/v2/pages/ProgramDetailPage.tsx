@@ -7,7 +7,7 @@ import { apiRequest } from '../../api/client';
 
 type ProgramInstance = { direction_name: string; product_name: string; playbook_name: string; playbook_code: string | null; status: string; kam_name: string | null; academic_window_title: string | null; current_stage_code: string | null; health_score: number | null; health_band: string };
 type Checklist = { id: string; label: string; required: boolean; is_done: boolean };
-type Stage = { id: string; status: string; due_at: string | null; code: string; name: string; phase_code: string; phase_name: string; order_index: number; is_optional: boolean };
+type Stage = { id: string; status: string; due_at: string | null; code: string; name: string; phase_code: string; phase_name: string; order_index: number; is_optional: boolean; is_final: boolean };
 type Transition = { id: string; name: string | null; to_stage_name: string };
 type Workflow = { stages: Stage[]; current_stage_instance_id: string | null; available_transitions: Transition[] };
 type Comment = { id: string; text: string; created_at: string };
@@ -64,10 +64,10 @@ const ProgramDetailPage = () => {
   useEffect(() => { void load().catch(() => setMessage('Не удалось загрузить workflow программы.')); }, [id]);
 
   const closeStage = async () => {
-    if (!id || !isViewingCurrentStage || !selectedTransition || !workflow?.current_stage_instance_id) return;
+    if (!id || !isViewingCurrentStage || (!selectedTransition && !currentStage?.is_final) || !workflow?.current_stage_instance_id) return;
     setMessage(undefined);
     try {
-      await apiRequest(`/api/program-instances/${id}/transition`, { method: 'POST', body: JSON.stringify({ transition_id: selectedTransition, expected_current_stage_instance_id: workflow.current_stage_instance_id }) });
+      await apiRequest(`/api/program-instances/${id}/transition`, { method: 'POST', body: JSON.stringify({ transition_id: selectedTransition ?? null, expected_current_stage_instance_id: workflow.current_stage_instance_id }) });
       await load();
     } catch {
       setMessage('Переход заблокирован: заполните обязательные пункты checklist или требуемые артефакты этапа.');
@@ -141,6 +141,7 @@ const ProgramDetailPage = () => {
         <List size="small" dataSource={attachments} locale={{ emptyText: 'Файлов пока нет' }} renderItem={(item) => <List.Item>{item.original_name}</List.Item>} />
         <Upload {...uploadProps} disabled={!isViewingCurrentStage}><Button disabled={!isViewingCurrentStage}>Приложить файл</Button></Upload>
         {isViewingCurrentStage && workflow.available_transitions.length > 0 && <div style={{ marginTop: 20 }}><Select style={{ minWidth: 260 }} options={workflow.available_transitions.map((item) => ({ value: item.id, label: item.name ?? item.to_stage_name }))} value={selectedTransition} onChange={setSelectedTransition} /><Button type="primary" disabled={missingRequired > 0 || !selectedTransition} style={{ marginLeft: 8 }} onClick={() => void closeStage()}>Закрыть и перейти к «{transition?.to_stage_name ?? 'следующему этапу'}»</Button></div>}
+        {isViewingCurrentStage && currentStage?.is_final && workflow.available_transitions.length === 0 && <Button type="primary" disabled={missingRequired > 0} style={{ marginTop: 20 }} onClick={() => void closeStage()}>Завершить программу</Button>}
       </Card>
     </div>
   </>;

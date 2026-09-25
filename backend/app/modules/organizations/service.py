@@ -43,20 +43,20 @@ class OrganizationService:
         return organization
 
     def create(self, payload: OrganizationCreate, current_user: User) -> Organization:
+        if not is_admin(current_user):
+            raise HTTPException(status_code=403, detail="Only ADMIN can create organizations")
         if self.db.get(OrganizationType, payload.type_id) is None:
             raise HTTPException(status_code=422, detail="Organization type not found")
-        kam_id = payload.kam_user_id or current_user.id
-        kam_user = self.db.get(User, kam_id)
-        if kam_user is None or not has_any_role(kam_user, "KAM"):
-            raise HTTPException(status_code=422, detail="Organization must be assigned to a KAM user")
-        if has_any_role(current_user, "KAM") and kam_id != current_user.id:
-            raise HTTPException(status_code=403, detail="KAM can only create assigned organizations")
-        if has_any_role(current_user, "MANAGER") and kam_id not in get_subordinate_kam_ids(self.db, current_user.id):
-            raise HTTPException(status_code=403, detail="KAM is outside manager scope")
+        kam_id = payload.kam_user_id
+        if kam_id is not None:
+            kam_user = self.db.get(User, kam_id)
+            if kam_user is None or not has_any_role(kam_user, "KAM"):
+                raise HTTPException(status_code=422, detail="Organization must be assigned to a KAM user")
         organization = Organization(**payload.model_dump(exclude={"kam_user_id"}))
         self.db.add(organization)
         self.db.flush()
-        self._assign(organization.id, kam_id, current_user.id)
+        if kam_id is not None:
+            self._assign(organization.id, kam_id, current_user.id)
         self.db.commit()
         self.db.refresh(organization)
         return organization

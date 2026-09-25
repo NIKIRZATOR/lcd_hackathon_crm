@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,6 +26,16 @@ class ProgramInstance(ModelBase):
     __table_args__ = (
         CheckConstraint("status IN ('draft', 'active', 'paused', 'completed', 'cancelled')", name="program_instance_status"),
         CheckConstraint("health_band IN ('green', 'yellow', 'red')", name="program_instance_health_band"),
+        CheckConstraint("health_score IS NULL OR (health_score >= 0 AND health_score <= 100)", name="program_instance_health_score"),
+        Index(
+            "uq_program_instances_active_scope",
+            "organization_id",
+            "direction_id",
+            "product_id",
+            unique=True,
+            postgresql_where=text("status IN ('draft', 'active', 'paused')"),
+        ),
+        Index("ix_program_instances_kam_status_health", "kam_user_id", "status", "health_band"),
     )
 
     organization_id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)

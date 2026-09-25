@@ -203,6 +203,7 @@ class WorkflowTransition(ModelBase):
 
 class WorkflowStageInstance(ModelBase):
     __tablename__ = "workflow_stage_instances"
+    __table_args__ = (Index("ix_workflow_stage_instances_status_due", "status", "due_at"),)
 
     interaction_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),

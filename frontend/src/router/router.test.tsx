@@ -13,7 +13,19 @@ const authState = vi.hoisted(() => ({
 }));
 
 vi.mock('../auth', () => ({
-  ProtectedRoute: ({ children }: { children: React.ReactNode }) => children,
+  ProtectedRoute: ({
+    children,
+    allowedRoles,
+  }: {
+    children: React.ReactNode;
+    allowedRoles?: string[];
+  }) => {
+    const roles = authState.value.user?.roles ?? [];
+    if (allowedRoles && !roles.some((role) => allowedRoles.includes(role))) {
+      return <div>Denied by route guard</div>;
+    }
+    return children;
+  },
   useAuth: () => ({
     ...authState.value,
     login: vi.fn(),
@@ -46,6 +58,10 @@ vi.mock('../v2/app/V2Layout', async () => {
 
 vi.mock('../v2/pages/V2PlaceholderPage', () => ({
   default: ({ title }: { title: string }) => <div>{title}</div>,
+}));
+
+vi.mock('../v2/pages/NbaTodayPage', () => ({
+  default: () => <div>Главная</div>,
 }));
 
 vi.mock('../pages/analytics/AnalyticsPage', () => ({
@@ -130,5 +146,17 @@ describe('AppRoutes start route', () => {
     renderRoute('/unknown');
 
     expect(await screen.findByText('Login page')).toBeInTheDocument();
+  });
+
+  it('denies KAM direct access to the management route', async () => {
+    authState.value = {
+      authenticated: true,
+      initialized: true,
+      user: { roles: ['KAM'] },
+    };
+
+    renderRoute('/v2/management');
+
+    expect(await screen.findByText('Denied by route guard')).toBeInTheDocument();
   });
 });

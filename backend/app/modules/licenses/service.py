@@ -59,9 +59,10 @@ class ContractLicenseService:
                 raise HTTPException(status_code=422, detail="Contract does not belong to organization")
         license_record = License(product_id=program.product_id, **payload.model_dump())
         self.db.add(license_record)
-        self.db.commit()
+        self.db.flush()
         HealthService(self.db).recompute(program.id)
         NbaService(self.db).recompute_program(program.id)
+        self.db.commit()
         self.db.refresh(license_record)
         return license_record, self.db.scalar(select(ITProduct.name).where(ITProduct.id == license_record.product_id))
 
@@ -78,9 +79,10 @@ class ContractLicenseService:
                 raise HTTPException(status_code=422, detail="Contract does not belong to organization")
         for field, value in payload.model_dump(exclude_unset=True).items():
             setattr(license_record, field, value)
-        self.db.commit()
+        self.db.flush()
         HealthService(self.db).recompute(program.id)
         NbaService(self.db).recompute_program(program.id)
+        self.db.commit()
         self.db.refresh(license_record)
         return license_record, self.db.scalar(select(ITProduct.name).where(ITProduct.id == license_record.product_id))
 

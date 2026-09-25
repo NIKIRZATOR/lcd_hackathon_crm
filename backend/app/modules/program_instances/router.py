@@ -90,6 +90,7 @@ def recompute_program_health(
 ):
     ProgramInstanceService(db).get(program_instance_id, current_user)
     HealthService(db).recompute(program_instance_id)
+    db.commit()
     return ProgramInstanceService(db).get(program_instance_id, current_user)
 
 
@@ -190,6 +191,7 @@ def get_program_instance_workflow(
                     "phase_name": phase.name if phase else "Other",
                     "order_index": stage.order_index,
                     "is_optional": stage.is_optional,
+                    "is_final": stage.is_final,
                 }
                 for instance, stage, catalog, phase in rows
             ],
@@ -242,6 +244,7 @@ def get_program_instance_workflow(
                 "phase_name": phase.name if phase else "Other",
                 "order_index": stage.order_index,
                 "is_optional": stage.is_optional,
+                "is_final": stage.is_final,
             }
             for instance, stage, catalog, phase in rows
         ],
@@ -282,9 +285,9 @@ def transition_program_instance(
             )
             if catalog:
                 model.current_stage_code = catalog.code
-                db.commit()
         HealthService(db).recompute(program_instance_id)
         NbaService(db).recompute_program(program_instance_id)
+        db.commit()
         return result
     scoped_payload = payload.model_copy(update={"performed_by": current_user.id})
     result = WorkflowRuntimeService(db).execute_transition(

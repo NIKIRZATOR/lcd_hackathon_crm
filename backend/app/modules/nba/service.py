@@ -144,7 +144,7 @@ class NbaService:
             if rule and rule.code not in active_codes:
                 item.status = "resolved"
                 item.resolved_at = now
-        self.db.commit()
+        self.db.flush()
         return list(
             self.db.scalars(
                 select(NbaItem).where(NbaItem.entity_key == entity_key, NbaItem.status == "active")

@@ -17,6 +17,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    if sa.inspect(op.get_bind()).has_table("integration_signals"):
+        return
     op.create_table(
         "program_metrics",
         sa.Column("program_instance_id", sa.UUID(), nullable=False),

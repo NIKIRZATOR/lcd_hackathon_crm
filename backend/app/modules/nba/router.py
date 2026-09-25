@@ -46,6 +46,7 @@ def recompute_program(
 ):
     ProgramInstanceService(db).get(program_instance_id, current_user)
     NbaService(db).recompute_program(program_instance_id)
+    db.commit()
     return [
         item
         for item in NbaService(db).today(current_user)

@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,7 +31,16 @@ class Organization(ModelBase):
 
 class OrgAssignment(ModelBase):
     __tablename__ = "org_assignments"
-    __table_args__ = (CheckConstraint("status IN ('active', 'ended')", name="org_assignment_status"),)
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'ended')", name="org_assignment_status"),
+        Index(
+            "uq_org_assignments_active_organization",
+            "organization_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+        Index("ix_org_assignments_user_status", "user_id", "status"),
+    )
 
     organization_id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
     user_id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -57,5 +66,7 @@ class Stakeholder(ModelBase):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    program_instance_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), nullable=True)
+    program_instance_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("program_instances.id"), nullable=True
+    )
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)

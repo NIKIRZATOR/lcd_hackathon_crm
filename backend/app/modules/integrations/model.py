@@ -31,6 +31,7 @@ class IntegrationSignal(ModelBase):
         ),
         Index("ix_integration_signals_program", "program_instance_id"),
         Index("ix_integration_signals_status", "status"),
+        Index("ix_integration_signals_source_status_created", "source", "status", "created_at"),
     )
 
     source: Mapped[str] = mapped_column(String(32), nullable=False)

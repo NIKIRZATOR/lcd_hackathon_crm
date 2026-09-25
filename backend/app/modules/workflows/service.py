@@ -1874,6 +1874,59 @@ class TransitionService:
                 code="WORKFLOW_CURRENT_STAGE_NOT_ACTIVE",
                 message="Current stage is not active",
             )
+        if payload.skip_current and not stage.is_optional:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_STAGE_NOT_OPTIONAL",
+                message="Only optional stages can be skipped",
+                details={"currentStageId": str(stage.id)},
+            )
+
+        if stage.is_final:
+            self._validate_stage_requirements(stage, current, payload)
+            now = datetime.now(timezone.utc)
+            current.status = "SKIPPED" if payload.skip_current else "COMPLETED"
+            current.completed_at = None if payload.skip_current else now
+            current.skipped_at = now if payload.skip_current else None
+            history = WorkflowTransitionHistory(
+                program_instance_id=program.id,
+                from_stage_instance_id=current.id,
+                to_stage_instance_id=None,
+                transition_id=None,
+                performed_by=self._get_performed_by(payload),
+                comment=payload.comment,
+                performed_at=now,
+            )
+            self.history_repository.add(history)
+            program.status = "completed"
+            program.completed_at = now
+            program.current_stage_instance_id = None
+            program.current_stage_code = None
+            self.audit_repository.add(
+                AuditEvent(
+                    actor_user_id=self._get_performed_by(payload),
+                    action="workflow.program_completed",
+                    entity_type="program_instance",
+                    entity_id=program.id,
+                    reason=payload.comment,
+                    event_metadata={"final_stage_instance_id": str(current.id)},
+                    request_id=request_id,
+                )
+            )
+            self.db.flush()
+            return {
+                "program_instance_id": str(program.id),
+                "current_stage_instance_id": None,
+                "transition_history_id": str(history.id),
+                "status": program.status,
+            }
+
+        if payload.transition_id is None:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_TRANSITION_REQUIRED",
+                message="Transition is required for a non-final stage",
+            )
         transition = self.transition_repository.get_allowed_transition(
             transition_id=payload.transition_id,
             template_id=program.playbook_template_id,
@@ -1933,8 +1986,7 @@ class TransitionService:
                 request_id=request_id,
             )
         )
-        self.db.commit()
-        self.db.refresh(history)
+        self.db.flush()
         return {
             "program_instance_id": str(program.id),
             "current_stage_instance_id": str(next_instance.id),

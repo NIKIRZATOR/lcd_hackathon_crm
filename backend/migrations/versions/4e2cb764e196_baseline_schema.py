@@ -1,7 +1,7 @@
 """baseline_schema
 
 Revision ID: 4e2cb764e196
-Revises: 
+Revises: c8a7d5e2f901
 Create Date: 2026-09-24 07:49:03.275350
 
 """
@@ -13,12 +13,177 @@ from sqlalchemy.dialects import postgresql
 
 
 revision: str = '4e2cb764e196'
-down_revision: str | None = None
+down_revision: str | None = "c8a7d5e2f901"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _add_column_if_missing(table_name: str, column: sa.Column) -> None:
+    inspector = sa.inspect(op.get_bind())
+    if column.name not in {item["name"] for item in inspector.get_columns(table_name)}:
+        op.add_column(table_name, column)
+
+
+def _upgrade_from_legacy() -> None:
+    """Bridge the published legacy head to the V2 schema without recreating legacy tables."""
+    from app.core.database import Base
+    import app.models  # noqa: F401
+
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    target_tables = (
+        "academic_windows",
+        "organization_types",
+        "workflow_phases",
+        "organizations",
+        "workflow_stage_catalog",
+        "org_assignments",
+        "program_instances",
+        "stakeholders",
+        "playbook_checklist_items",
+        "program_checklist_values",
+        "teacher_carriers",
+        "nba_rules",
+        "nba_items",
+        "program_metrics",
+        "integration_signals",
+    )
+    for table_name in target_tables:
+        if not inspector.has_table(table_name):
+            Base.metadata.tables[table_name].create(bind=bind, checkfirst=True)
+            inspector = sa.inspect(bind)
+
+    _add_column_if_missing("workflow_templates", sa.Column("code", sa.String(64), nullable=True))
+    _add_column_if_missing(
+        "workflow_templates",
+        sa.Column("applies_to_type", sa.String(32), nullable=False, server_default="all"),
+    )
+    _add_column_if_missing(
+        "workflow_templates",
+        sa.Column("status", sa.String(32), nullable=False, server_default="draft"),
+    )
+    _add_column_if_missing("workflow_stages", sa.Column("stage_catalog_id", sa.UUID(), nullable=True))
+
+    _add_column_if_missing("contracts", sa.Column("organization_id", sa.UUID(), nullable=True))
+    _add_column_if_missing("contracts", sa.Column("signed_on", sa.Date(), nullable=True))
+    _add_column_if_missing("contracts", sa.Column("attachment_id", sa.UUID(), nullable=True))
+    _add_column_if_missing("contracts", sa.Column("comment", sa.Text(), nullable=True))
+    _add_column_if_missing("licenses", sa.Column("program_instance_id", sa.UUID(), nullable=True))
+    _add_column_if_missing("licenses", sa.Column("transferred_on", sa.Date(), nullable=True))
+    _add_column_if_missing("licenses", sa.Column("attachment_id", sa.UUID(), nullable=True))
+    _add_column_if_missing("licenses", sa.Column("comment", sa.Text(), nullable=True))
+    _add_column_if_missing("workflow_stage_instances", sa.Column("program_instance_id", sa.UUID(), nullable=True))
+    _add_column_if_missing("workflow_transition_history", sa.Column("program_instance_id", sa.UUID(), nullable=True))
+
+    op.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_workflow_templates_code ON workflow_templates (code)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_contracts_organization ON contracts (organization_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_licenses_program_instance ON licenses (program_instance_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_workflow_stage_instances_program_instance ON workflow_stage_instances (program_instance_id)")
+    op.execute(
+        """
+        DO $$ BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_workflow_stages_stage_catalog_id_workflow_stage_catalog') THEN
+            ALTER TABLE workflow_stages ADD CONSTRAINT fk_workflow_stages_stage_catalog_id_workflow_stage_catalog FOREIGN KEY (stage_catalog_id) REFERENCES workflow_stage_catalog(id);
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_contracts_organization_id_organizations') THEN
+            ALTER TABLE contracts ADD CONSTRAINT fk_contracts_organization_id_organizations FOREIGN KEY (organization_id) REFERENCES organizations(id);
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_contracts_attachment_id_files') THEN
+            ALTER TABLE contracts ADD CONSTRAINT fk_contracts_attachment_id_files FOREIGN KEY (attachment_id) REFERENCES files(id);
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_licenses_program_instance_id_program_instances') THEN
+            ALTER TABLE licenses ADD CONSTRAINT fk_licenses_program_instance_id_program_instances FOREIGN KEY (program_instance_id) REFERENCES program_instances(id);
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_licenses_attachment_id_files') THEN
+            ALTER TABLE licenses ADD CONSTRAINT fk_licenses_attachment_id_files FOREIGN KEY (attachment_id) REFERENCES files(id);
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_workflow_stage_instances_program_instance_id_program_instances') THEN
+            ALTER TABLE workflow_stage_instances ADD CONSTRAINT fk_workflow_stage_instances_program_instance_id_program_instances FOREIGN KEY (program_instance_id) REFERENCES program_instances(id);
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_workflow_transition_history_program_instance_id_program_instances') THEN
+            ALTER TABLE workflow_transition_history ADD CONSTRAINT fk_workflow_transition_history_program_instance_id_program_instances FOREIGN KEY (program_instance_id) REFERENCES program_instances(id);
+          END IF;
+        END $$
+        """
+    )
+    op.execute("ALTER TABLE contracts ALTER COLUMN interaction_id DROP NOT NULL")
+    op.execute("ALTER TABLE licenses ALTER COLUMN contract_id DROP NOT NULL")
+    op.execute("ALTER TABLE workflow_stage_instances ALTER COLUMN interaction_id DROP NOT NULL")
+    op.execute("ALTER TABLE workflow_transition_history ALTER COLUMN interaction_id DROP NOT NULL")
+
+    op.execute(
+        """
+        INSERT INTO organization_types (id, code, name, is_active, created_at, updated_at)
+        VALUES
+          (gen_random_uuid(), 'university', 'Вуз', true, now(), now()),
+          (gen_random_uuid(), 'spo', 'СПО', true, now(), now()),
+          (gen_random_uuid(), 'school', 'Школа', true, now(), now())
+        ON CONFLICT (code) DO NOTHING
+        """
+    )
+    op.execute(
+        """
+        INSERT INTO organizations (id, type_id, name, short_name, region, city, status, created_at, updated_at)
+        SELECT u.id, t.id, u.name, u.short_name, u.region, u.city, 'active', u.created_at, u.updated_at
+        FROM universities u
+        CROSS JOIN organization_types t
+        WHERE t.code = 'university'
+        ON CONFLICT (id) DO NOTHING
+        """
+    )
+    op.execute(
+        """
+        INSERT INTO org_assignments (id, organization_id, user_id, status, assigned_at, assigned_by, created_at, updated_at)
+        SELECT gen_random_uuid(), source.university_id, source.manager_user_id, 'active', now(), source.manager_user_id, now(), now()
+        FROM (
+          SELECT DISTINCT ON (university_id) university_id, manager_user_id
+          FROM university_interactions
+          WHERE manager_user_id IS NOT NULL
+          ORDER BY university_id, updated_at DESC
+        ) source
+        WHERE NOT EXISTS (
+          SELECT 1 FROM org_assignments assignment
+          WHERE assignment.organization_id = source.university_id AND assignment.status = 'active'
+        )
+        """
+    )
+    op.execute(
+        """
+        INSERT INTO program_instances (
+          id, organization_id, direction_id, product_id, kam_user_id,
+          playbook_template_id, workflow_version_id, current_stage_instance_id,
+          template_snapshot, status, health_band, started_at, completed_at,
+          legacy_interaction_id, created_at, updated_at
+        )
+        SELECT i.id, i.university_id, p.direction_id, i.product_id, i.manager_user_id,
+               i.workflow_template_id, i.workflow_version_id, i.current_stage_instance_id,
+               jsonb_build_object('legacy_interaction_id', i.id),
+               CASE
+                 WHEN upper(i.status) = 'COMPLETED' THEN 'completed'
+                 WHEN upper(i.status) = 'CANCELLED' THEN 'cancelled'
+                 WHEN upper(i.status) = 'PAUSED' THEN 'paused'
+                 WHEN upper(i.status) = 'DRAFT' THEN 'draft'
+                 ELSE 'active'
+               END,
+               'green', i.started_at, i.completed_at, i.id, i.created_at, i.updated_at
+        FROM university_interactions i
+        JOIN it_programs p ON p.id = i.program_id
+        WHERE i.workflow_template_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM program_instances pi WHERE pi.legacy_interaction_id = i.id)
+        ON CONFLICT DO NOTHING
+        """
+    )
+    op.execute(
+        "UPDATE workflow_stage_instances s SET program_instance_id = p.id FROM program_instances p WHERE p.legacy_interaction_id = s.interaction_id AND s.program_instance_id IS NULL"
+    )
+    op.execute(
+        "UPDATE workflow_transition_history h SET program_instance_id = p.id FROM program_instances p WHERE p.legacy_interaction_id = h.interaction_id AND h.program_instance_id IS NULL"
+    )
+
+
 def upgrade() -> None:
+    _upgrade_from_legacy()
+    return
     # ### commands auto generated by Alembic - please adjust! ###
     op.create_table('academic_windows',
     sa.Column('code', sa.String(length=64), nullable=False),
@@ -779,6 +944,28 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if sa.inspect(op.get_bind()).has_table("universities"):
+        op.drop_constraint(
+            "fk_workflow_stages_stage_catalog_id_workflow_stage_catalog",
+            "workflow_stages",
+            type_="foreignkey",
+        )
+        op.drop_column("workflow_stages", "stage_catalog_id")
+        op.drop_index("uq_workflow_templates_code", table_name="workflow_templates")
+        op.drop_column("workflow_templates", "status")
+        op.drop_column("workflow_templates", "applies_to_type")
+        op.drop_column("workflow_templates", "code")
+        op.drop_table("program_checklist_values")
+        op.drop_table("playbook_checklist_items")
+        op.drop_table("stakeholders")
+        op.drop_table("org_assignments")
+        op.drop_table("program_instances")
+        op.drop_table("workflow_stage_catalog")
+        op.drop_table("organizations")
+        op.drop_table("workflow_phases")
+        op.drop_table("organization_types")
+        op.drop_table("academic_windows")
+        return
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('workflow_transition_history')
     op.drop_table('workflow_stage_comments')

@@ -276,7 +276,7 @@ class WorkflowTransitionHistoryRead(BaseModel):
 
 
 class WorkflowTransitionExecute(BaseModel):
-    transition_id: UUID
+    transition_id: UUID | None = None
     performed_by: UUID | None = None
     comment: str | None = None
     skip_current: bool = False

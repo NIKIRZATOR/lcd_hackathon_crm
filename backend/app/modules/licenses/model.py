@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,7 +12,13 @@ class Contract(ModelBase):
     __tablename__ = "contracts"
     __table_args__ = (
         UniqueConstraint("interaction_id", "number", name="uq_contracts_interaction_number"),
+        UniqueConstraint("organization_id", "number", name="uq_contracts_organization_number"),
+        CheckConstraint(
+            "organization_id IS NOT NULL OR interaction_id IS NOT NULL",
+            name="contract_owner_required",
+        ),
         Index("ix_contracts_interaction", "interaction_id"),
+        Index("ix_contracts_organization", "organization_id"),
     )
 
     # interaction_id is retained only for legacy records. New contracts belong to an organization.
@@ -38,8 +44,13 @@ class License(ModelBase):
     __tablename__ = "licenses"
     __table_args__ = (
         UniqueConstraint("contract_id", "product_id", name="uq_licenses_contract_product"),
+        CheckConstraint(
+            "program_instance_id IS NOT NULL OR contract_id IS NOT NULL",
+            name="license_owner_required",
+        ),
         Index("ix_licenses_contract", "contract_id"),
         Index("ix_licenses_product", "product_id"),
+        Index("ix_licenses_program_instance", "program_instance_id"),
     )
 
     contract_id: Mapped[UUID | None] = mapped_column(

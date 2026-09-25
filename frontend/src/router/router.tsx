@@ -45,7 +45,14 @@ const AppRoutes = () => {
           <Route path="workflows" element={<WorkflowJournalPage />} />
           <Route path="programs/:id" element={<ProgramDetailPage />} />
           <Route path="reports" element={<V2PlaceholderPage title="Отчёты" description="Конструктор и очередь отчётов будут подключены на этапе Reports MVP." />} />
-          <Route path="management" element={<ManagementPage />} />
+          <Route
+            path="management"
+            element={
+              <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
+                <ManagementPage />
+              </ProtectedRoute>
+            }
+          />
         </Route>
       </Route>
 

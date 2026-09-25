@@ -32,109 +32,201 @@ from scripts.workflow_seed_data import LEGACY_WORKFLOW_TEMPLATE_NAMES, WORKFLOW_
 
 UNIVERSITIES = [
     {
-        "name": "Moscow State University",
-        "short_name": "MSU",
-        "region": "Moscow",
-        "city": "Moscow",
-        "address": "Leninskie Gory, 1",
-        "website": "https://msu.ru",
+        "name": "Московский государственный университет имени М.В. Ломоносова",
+        "short_name": "МГУ",
+        "region": "Москва",
+        "city": "Москва",
+        "address": "Ленинские горы, д. 1",
+        "website": "https://www.msu.ru",
     },
     {
-        "name": "ITMO University",
-        "short_name": "ITMO",
-        "region": "Saint Petersburg",
-        "city": "Saint Petersburg",
-        "address": "Kronverksky Ave, 49",
+        "name": "Национальный исследовательский университет ИТМО",
+        "short_name": "ИТМО",
+        "region": "Санкт-Петербург",
+        "city": "Санкт-Петербург",
+        "address": "Кронверкский проспект, д. 49, лит. А",
         "website": "https://itmo.ru",
     },
     {
-        "name": "Novosibirsk State University",
-        "short_name": "NSU",
-        "region": "Novosibirsk Oblast",
-        "city": "Novosibirsk",
-        "address": "Pirogova St, 1",
-        "website": "https://nsu.ru",
+        "name": "Национальный исследовательский университет «Высшая школа экономики»",
+        "short_name": "НИУ ВШЭ",
+        "region": "Москва",
+        "city": "Москва",
+        "address": "ул. Мясницкая, д. 20",
+        "website": "https://www.hse.ru",
     },
     {
-        "name": "Tomsk State University",
-        "short_name": "TSU",
-        "region": "Tomsk Oblast",
-        "city": "Tomsk",
-        "address": "Lenina Ave, 36",
-        "website": "https://tsu.ru",
+        "name": "Московский государственный технический университет имени Н.Э. Баумана",
+        "short_name": "МГТУ",
+        "region": "Москва",
+        "city": "Москва",
+        "address": "ул. 2-я Бауманская, д. 5, стр. 1",
+        "website": "https://bmstu.ru",
     },
     {
-        "name": "Kazan Federal University",
-        "short_name": "KFU",
-        "region": "Tatarstan",
-        "city": "Kazan",
-        "address": "Kremlyovskaya St, 18",
+        "name": "Московский физико-технический институт",
+        "short_name": "МФТИ",
+        "region": "Московская область",
+        "city": "Долгопрудный",
+        "address": "Институтский переулок, д. 9",
+        "website": "https://mipt.ru",
+    },
+    {
+        "name": "Новосибирский национальный исследовательский государственный университет",
+        "short_name": "НГУ",
+        "region": "Новосибирская область",
+        "city": "Новосибирск",
+        "address": "ул. Пирогова, д. 1",
+        "website": "https://www.nsu.ru",
+    },
+    {
+        "name": "Национальный исследовательский Томский государственный университет",
+        "short_name": "ТГУ",
+        "region": "Томская область",
+        "city": "Томск",
+        "address": "проспект Ленина, д. 36",
+        "website": "https://www.tsu.ru",
+    },
+    {
+        "name": "Национальный исследовательский Томский политехнический университет",
+        "short_name": "ТПУ",
+        "region": "Томская область",
+        "city": "Томск",
+        "address": "проспект Ленина, д. 30",
+        "website": "https://tpu.ru",
+    },
+    {
+        "name": "Казанский (Приволжский) федеральный университет",
+        "short_name": "КФУ",
+        "region": "Республика Татарстан",
+        "city": "Казань",
+        "address": "ул. Кремлевская, д. 18",
         "website": "https://kpfu.ru",
+    },
+    {
+        "name": "Уральский федеральный университет имени первого Президента России Б.Н. Ельцина",
+        "short_name": "УрФУ",
+        "region": "Свердловская область",
+        "city": "Екатеринбург",
+        "address": "ул. Мира, д. 19",
+        "website": "https://urfu.ru",
     },
 ]
 
 DIRECTIONS = [
-    {"name": "DevOps", "code": "DEVOPS", "description": "Infrastructure, CI/CD, and operations."},
-    {"name": "Data Science", "code": "DS", "description": "Data analysis and machine learning."},
-    {"name": "Quality Assurance", "code": "QA", "description": "Software testing and quality engineering."},
+    {"name": "DevOps и инфраструктура", "code": "DEVOPS", "description": "CI/CD, Linux, контейнеризация и эксплуатация."},
+    {"name": "Тестирование ПО", "code": "QA", "description": "Ручное и автоматизированное тестирование, SQL и Python."},
+    {"name": "Python-разработка", "code": "PYTHON", "description": "Разработка приложений и сервисов на Python."},
+    {"name": "Аналитика данных", "code": "DATA", "description": "Python, BI, визуализация, машинное обучение и аналитика."},
+    {"name": "UX/UI-дизайн", "code": "UXUI", "description": "Проектирование пользовательских интерфейсов и дизайн-систем."},
+    {"name": "Управление ИТ-проектами", "code": "PM", "description": "Управление ИТ-проектами и цифровыми продуктами."},
+    {"name": "Информационная безопасность", "code": "INFOSEC", "description": "Основы защиты информации, риски и безопасный доступ."},
+    {"name": "Low-code / no-code разработка", "code": "LOWCODE", "description": "Веб-разработка и аналитика на платформенных решениях."},
+    {"name": "Искусственный интеллект", "code": "AI", "description": "LLM, промпт-инжиниринг и прикладное использование ИИ."},
 ]
 
 PROGRAMS = [
-    {"direction_code": "DEVOPS", "name": "DevOps Basic", "version": "2026.1"},
-    {"direction_code": "DEVOPS", "name": "Cloud Infrastructure", "version": "2026.1"},
-    {"direction_code": "DS", "name": "Applied Machine Learning", "version": "2026.1"},
-    {"direction_code": "DS", "name": "Data Engineering", "version": "2026.1"},
-    {"direction_code": "QA", "name": "QA Automation", "version": "2026.1"},
+    {"direction_code": "DEVOPS", "name": "DevOps-инженер с нуля", "version": "2026"},
+    {"direction_code": "QA", "name": "Инженер-тестировщик", "version": "2026"},
+    {"direction_code": "PYTHON", "name": "Python-разработчик с использованием инструментов ИИ", "version": "2026"},
+    {"direction_code": "DATA", "name": "Специалист по анализу данных", "version": "2026"},
+    {"direction_code": "DATA", "name": "Анализ данных без программирования", "version": "2026"},
+    {"direction_code": "UXUI", "name": "Основы UX/UI-дизайна", "version": "2026"},
+    {"direction_code": "AI", "name": "Промпт-инжиниринг", "version": "2026"},
+    {"direction_code": "PM", "name": "Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»", "version": "2026"},
+    {"direction_code": "LOWCODE", "name": "Веб-разработка на платформе «Акола»", "version": "2026"},
+    {"direction_code": "INFOSEC", "name": "Введение в информационную безопасность", "version": "2026"},
 ]
 
 VENDORS = [
-    {"name": "RTK Cloud", "description": "Cloud and infrastructure tools."},
-    {"name": "RTK Data", "description": "Data platform products."},
-    {"name": "RTK Quality", "description": "Testing and quality products."},
+    {
+        "name": "ООО «РТК ИТ» / ИТ Школа Ростелеком",
+        "description": "Оператор образовательных программ ИТ Школы Ростелеком.",
+    },
+    {
+        "name": "ПАО «Ростелеком»",
+        "description": "Технологический партнер и владелец решений экосистемы Ростелекома.",
+    },
+    {
+        "name": "Президентская академия РАНХиГС",
+        "description": "Образовательный партнер программ ИТ Школы Ростелеком.",
+    },
 ]
 
 PRODUCTS = [
     {
-        "vendor_name": "RTK Cloud",
-        "name": "Cloud Lab",
-        "description": "Cloud training environment.",
-        "documentation_url": "https://example.org/cloud-lab/docs",
+        "vendor_name": "ООО «РТК ИТ» / ИТ Школа Ростелеком",
+        "name": "DevOps-инженер с нуля",
+        "description": "Образовательная программа ИТ Школы Ростелеком по DevOps.",
+        "documentation_url": "https://edu-rt.ru/course/DevOps",
     },
     {
-        "vendor_name": "RTK Cloud",
-        "name": "Deploy Manager",
-        "description": "Deployment automation toolkit.",
-        "documentation_url": "https://example.org/deploy-manager/docs",
+        "vendor_name": "ООО «РТК ИТ» / ИТ Школа Ростелеком",
+        "name": "Инженер-тестировщик",
+        "description": "Программа по тестированию ПО: QA, SQL, Python и автоматизация.",
+        "documentation_url": "https://edu-rt.ru/course/inzhener-testirovshhik",
     },
     {
-        "vendor_name": "RTK Data",
-        "name": "Data Platform",
-        "description": "Educational data platform.",
-        "documentation_url": "https://example.org/data-platform/docs",
+        "vendor_name": "ООО «РТК ИТ» / ИТ Школа Ростелеком",
+        "name": "Python-разработчик с использованием инструментов ИИ",
+        "description": "Программа по Python-разработке с использованием ИИ-инструментов.",
+        "documentation_url": "https://edu-rt.ru/course/python-razrabotcik-s-ispolzovaniem-instrumentov-ii",
     },
     {
-        "vendor_name": "RTK Data",
-        "name": "ML Studio",
-        "description": "Machine learning lab environment.",
-        "documentation_url": "https://example.org/ml-studio/docs",
+        "vendor_name": "ООО «РТК ИТ» / ИТ Школа Ростелеком",
+        "name": "Специалист по анализу данных",
+        "description": "Python, BI, визуализация, машинное обучение и аналитика больших данных.",
+        "documentation_url": "https://edu-rt.ru/course/specialist-po-analizu-dannyx",
     },
     {
-        "vendor_name": "RTK Quality",
-        "name": "Test Automation Kit",
-        "description": "Automated testing toolkit.",
-        "documentation_url": "https://example.org/test-kit/docs",
+        "vendor_name": "ООО «РТК ИТ» / ИТ Школа Ростелеком",
+        "name": "Анализ данных без программирования",
+        "description": "Low-code/no-code аналитика, BI-платформы и визуализация данных.",
+        "documentation_url": "https://edu-rt.ru/course/analiz-dannykh-bez-programmirovaniya",
+    },
+    {
+        "vendor_name": "ООО «РТК ИТ» / ИТ Школа Ростелеком",
+        "name": "Основы UX/UI-дизайна",
+        "description": "Программа по UX/UI, прототипированию, дизайн-системам и метрикам.",
+        "documentation_url": "https://edu-rt.ru/course/osnovy-uxui-dizaina",
+    },
+    {
+        "vendor_name": "ООО «РТК ИТ» / ИТ Школа Ростелеком",
+        "name": "Промпт-инжиниринг",
+        "description": "Программа по работе с LLM, промптами и прикладными ИИ-сценариями.",
+        "documentation_url": "https://edu-rt.ru/course/prompt-inziniring",
+    },
+    {
+        "vendor_name": "ПАО «Ростелеком»",
+        "name": "Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»",
+        "description": "Программа управления ИТ-проектами на базе решений Ростелекома.",
+        "documentation_url": "https://edu-rt.ru/course/upravlenie-it-proektami-na-baze-programmnogo-produkta-pao-rostelekom",
+    },
+    {
+        "vendor_name": "ПАО «Ростелеком»",
+        "name": "Веб-разработка на платформе «Акола»",
+        "description": "Программа платформенной web-разработки на low-code/no-code решении «Акола».",
+        "documentation_url": "https://edu-rt.ru/course/veb-razrabotka-na-platforme-akola",
+    },
+    {
+        "vendor_name": "ООО «РТК ИТ» / ИТ Школа Ростелеком",
+        "name": "Введение в информационную безопасность",
+        "description": "Программа по основам информационной безопасности и управлению рисками.",
+        "documentation_url": "https://edu-rt.ru/course",
     },
 ]
 
 PROGRAM_PRODUCTS = [
-    ("DevOps Basic", "Cloud Lab", True),
-    ("DevOps Basic", "Deploy Manager", True),
-    ("Cloud Infrastructure", "Cloud Lab", True),
-    ("Applied Machine Learning", "Data Platform", True),
-    ("Applied Machine Learning", "ML Studio", True),
-    ("Data Engineering", "Data Platform", True),
-    ("QA Automation", "Test Automation Kit", True),
-    ("QA Automation", "Deploy Manager", False),
+    ("DevOps-инженер с нуля", "DevOps-инженер с нуля", True),
+    ("Инженер-тестировщик", "Инженер-тестировщик", True),
+    ("Python-разработчик с использованием инструментов ИИ", "Python-разработчик с использованием инструментов ИИ", True),
+    ("Специалист по анализу данных", "Специалист по анализу данных", True),
+    ("Анализ данных без программирования", "Анализ данных без программирования", True),
+    ("Основы UX/UI-дизайна", "Основы UX/UI-дизайна", True),
+    ("Промпт-инжиниринг", "Промпт-инжиниринг", True),
+    ("Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»", "Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»", True),
+    ("Веб-разработка на платформе «Акола»", "Веб-разработка на платформе «Акола»", True),
+    ("Введение в информационную безопасность", "Введение в информационную безопасность", True),
 ]
 
 ROLES = {
@@ -146,93 +238,196 @@ ROLES = {
 USERS = [
     {
         "username": "kam1",
-        "full_name": "KAM User",
+        "full_name": "Анна Крылова",
         "email": "kam1@example.local",
         "roles": ["KAM"],
     },
     {
         "username": "kam2",
-        "full_name": "KAM Two",
+        "full_name": "Илья Соколов",
         "email": "kam2@example.local",
         "roles": ["KAM"],
     },
     {
         "username": "manager1",
-        "full_name": "Manager User",
+        "full_name": "Мария Орлова",
         "email": "manager1@example.local",
         "roles": ["MANAGER"],
     },
     {
         "username": "admin1",
-        "full_name": "Admin User",
+        "full_name": "Алексей Власов",
         "email": "admin1@example.local",
         "roles": ["ADMIN"],
+    },
+    {
+        "username": "kam3",
+        "full_name": "Елена Морозова",
+        "email": "kam3@example.local",
+        "roles": ["KAM"],
+    },
+    {
+        "username": "kam4",
+        "full_name": "Дмитрий Волков",
+        "email": "kam4@example.local",
+        "roles": ["KAM"],
     },
 ]
 
 MANAGER_MEMBERSHIPS = [
     ("manager1", "kam1"),
+    ("manager1", "kam2"),
+    ("manager1", "kam3"),
+    ("manager1", "kam4"),
 ]
 
 INTERACTIONS = [
     {
-        "university": "MSU",
-        "program": "DevOps Basic",
-        "product": "Cloud Lab",
+        "university": "МГУ",
+        "program": "DevOps-инженер с нуля",
+        "product": "DevOps-инженер с нуля",
         "manager": "kam1",
         "status": "ACTIVE",
-        "contract_number": "RTK-DEMO-001",
+        "contract_number": "DEMO-RTK-MSU-2026-001",
         "license_signed": True,
         "transfer_status": "TRANSFERRED",
-        "university_responsibles": "Ivan Sokolov",
-        "comment": "Visible to kam1 and manager1.",
+        "university_responsibles": "Центр развития цифровых компетенций (демо-контакт)",
+        "comment": "Зрелое партнерство: материалы и лицензия переданы, программа запущена.",
     },
     {
-        "university": "ITMO",
-        "program": "Applied Machine Learning",
-        "product": "ML Studio",
+        "university": "ИТМО",
+        "program": "Специалист по анализу данных",
+        "product": "Специалист по анализу данных",
         "manager": "kam1",
         "status": "ACTIVE",
-        "contract_number": "RTK-DEMO-002",
-        "license_signed": False,
-        "transfer_status": "IN_PROGRESS",
-        "university_responsibles": "Anna Petrova",
-        "comment": "Second interaction in manager1 scope.",
+        "contract_number": "DEMO-RTK-ITMO-2026-002",
+        "license_signed": True,
+        "transfer_status": "TRANSFERRED",
+        "university_responsibles": "Офис образовательных программ (демо-контакт)",
+        "comment": "Активная программа по аналитике данных; используется для демонстрации LMS-метрик.",
     },
     {
-        "university": "NSU",
-        "program": "QA Automation",
-        "product": "Test Automation Kit",
+        "university": "НИУ ВШЭ",
+        "program": "Анализ данных без программирования",
+        "product": "Анализ данных без программирования",
+        "manager": "kam1",
+        "status": "ACTIVE",
+        "contract_number": "DEMO-RTK-HSE-2026-003",
+        "license_signed": False,
+        "transfer_status": "IN_PROGRESS",
+        "university_responsibles": "Учебный офис (демо-контакт)",
+        "comment": "Документы согласуются, передача материалов начата.",
+    },
+    {
+        "university": "МГТУ",
+        "program": "Инженер-тестировщик",
+        "product": "Инженер-тестировщик",
         "manager": "kam2",
         "status": "ACTIVE",
-        "contract_number": "RTK-DEMO-003",
+        "contract_number": "DEMO-RTK-BMSTU-2026-004",
+        "license_signed": True,
+        "transfer_status": "TRANSFERRED",
+        "university_responsibles": "Кафедра информационных систем (демо-контакт)",
+        "comment": "Программа QA находится на этапе внедрения в учебный процесс.",
+    },
+    {
+        "university": "МФТИ",
+        "program": "Python-разработчик с использованием инструментов ИИ",
+        "product": "Python-разработчик с использованием инструментов ИИ",
+        "manager": "kam2",
+        "status": "ACTIVE",
+        "contract_number": "DEMO-RTK-MIPT-2026-005",
+        "license_signed": True,
+        "transfer_status": "TRANSFERRED",
+        "university_responsibles": "Учебный департамент (демо-контакт)",
+        "comment": "Программа запущена; хороший кейс для нескольких потоков и высокого спроса.",
+    },
+    {
+        "university": "НГУ",
+        "program": "Введение в информационную безопасность",
+        "product": "Введение в информационную безопасность",
+        "manager": "kam2",
+        "status": "ACTIVE",
+        "contract_number": "DEMO-RTK-NSU-2026-006",
         "license_signed": False,
         "transfer_status": "NOT_STARTED",
-        "university_responsibles": "Dmitry Kuznetsov",
-        "comment": "Visible to kam2 and admin1, not manager1.",
+        "university_responsibles": "Учебно-методическое управление (демо-контакт)",
+        "comment": "Ранний этап: контакт подтвержден, договор и лицензия еще не оформлены.",
+    },
+    {
+        "university": "ТГУ",
+        "program": "Промпт-инжиниринг",
+        "product": "Промпт-инжиниринг",
+        "manager": "kam3",
+        "status": "ACTIVE",
+        "contract_number": "DEMO-RTK-TSU-2026-007",
+        "license_signed": True,
+        "transfer_status": "TRANSFERRED",
+        "university_responsibles": "Институт прикладной математики и компьютерных наук (демо-контакт)",
+        "comment": "Новый продукт в действующем партнерстве; подходит для сценария expansion.",
+    },
+    {
+        "university": "ТПУ",
+        "program": "Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»",
+        "product": "Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»",
+        "manager": "kam3",
+        "status": "ACTIVE",
+        "contract_number": "DEMO-RTK-TPU-2026-008",
+        "license_signed": True,
+        "transfer_status": "IN_PROGRESS",
+        "university_responsibles": "Бизнес-школа ТПУ (демо-контакт)",
+        "comment": "Лицензия подписана, материалы передаются; можно показать риск по SLA.",
+    },
+    {
+        "university": "КФУ",
+        "program": "Основы UX/UI-дизайна",
+        "product": "Основы UX/UI-дизайна",
+        "manager": "kam4",
+        "status": "ACTIVE",
+        "contract_number": "DEMO-RTK-KFU-2026-009",
+        "license_signed": True,
+        "transfer_status": "TRANSFERRED",
+        "university_responsibles": "Институт информационных технологий (демо-контакт)",
+        "comment": "Стабильная программа с действующей лицензией.",
+    },
+    {
+        "university": "УрФУ",
+        "program": "Веб-разработка на платформе «Акола»",
+        "product": "Веб-разработка на платформе «Акола»",
+        "manager": "kam4",
+        "status": "ACTIVE",
+        "contract_number": "DEMO-RTK-URFU-2026-010",
+        "license_signed": True,
+        "transfer_status": "TRANSFERRED",
+        "university_responsibles": "Институт радиоэлектроники и информационных технологий (демо-контакт)",
+        "comment": "Платформенный продукт уже передан; сценарий для контроля факта обучения.",
+    },
+    {
+        "university": "ИТМО",
+        "program": "DevOps-инженер с нуля",
+        "product": "DevOps-инженер с нуля",
+        "manager": "kam1",
+        "status": "ACTIVE",
+        "contract_number": "DEMO-RTK-ITMO-2026-011",
+        "license_signed": True,
+        "transfer_status": "TRANSFERRED",
+        "university_responsibles": "Факультет инфокоммуникационных технологий (демо-контакт)",
+        "comment": "Вторая программа в одном вузе — демонстрирует корректную модель University 360.",
+    },
+    {
+        "university": "НИУ ВШЭ",
+        "program": "Промпт-инжиниринг",
+        "product": "Промпт-инжиниринг",
+        "manager": "kam1",
+        "status": "ACTIVE",
+        "contract_number": "DEMO-RTK-HSE-2026-012",
+        "license_signed": False,
+        "transfer_status": "NOT_STARTED",
+        "university_responsibles": "Учебный офис (демо-контакт)",
+        "comment": "Вторая программа в одном вузе, находящаяся на более раннем этапе.",
     },
 ]
 
-# Extended demo dataset: approximately 2.5x the original catalog volume.
-UNIVERSITIES.extend([
-    {"name": f"Demo Partner University {index}", "short_name": f"DPU{index}", "region": "Demo Region", "city": f"Demo City {index}", "address": f"Demo street {index}", "website": f"https://dpu{index}.example.local"}
-    for index in range(1, 9)
-])
-DIRECTIONS.extend([
-    {"name": name, "code": code, "description": f"{name} learning direction."}
-    for code, name in [("SEC", "Information Security"), ("BA", "Business Analytics"), ("FE", "Frontend Development"), ("BE", "Backend Development"), ("PM", "Project Management")]
-])
-VENDORS.extend([{"name": f"RTK Demo Vendor {index}", "description": "Demo vendor."} for index in range(1, 6)])
-for index, direction in enumerate(DIRECTIONS[3:], 1):
-    PROGRAMS.append({"direction_code": direction["code"], "name": f"{direction['name']} Basic", "version": "2026.1"})
-    PRODUCTS.append({"vendor_name": VENDORS[(index + 2) % len(VENDORS)]["name"], "name": f"Demo Product {index}", "description": "Extended demo product.", "documentation_url": f"https://example.org/demo-{index}"})
-USERS.extend([
-    {"username": f"kam{index}", "full_name": f"KAM Demo {index}", "email": f"kam{index}@example.local", "roles": ["KAM"]}
-    for index in range(3, 7)
-] + [{"username": "manager2", "full_name": "Manager Demo", "email": "manager2@example.local", "roles": ["MANAGER"]}, {"username": "admin2", "full_name": "Admin Demo", "email": "admin2@example.local", "roles": ["ADMIN"]}])
-MANAGER_MEMBERSHIPS.extend([("manager1", "kam3"), ("manager2", "kam4"), ("manager2", "kam5"), ("manager2", "kam6")])
-for index in range(1, 9):
-    INTERACTIONS.append({"university": f"DPU{index}", "program": "DevOps Basic", "product": "Cloud Lab", "manager": f"kam{3 + (index % 4)}", "status": "ACTIVE", "contract_number": f"RTK-EXT-{index:03d}", "license_signed": bool(index % 2), "transfer_status": "IN_PROGRESS", "university_responsibles": f"Demo Contact {index}", "comment": "Extended demo interaction."})
 
 def get_by_field[T](db: Session, model: type[T], field: str, value: object) -> T | None:
     return db.scalar(select(model).where(getattr(model, field) == value))
@@ -251,12 +446,18 @@ def seed_universities(db: Session) -> dict[str, University]:
 
 
 def seed_contacts(db: Session, universities: dict[str, University]) -> None:
+    # Публичные организационные контакты. Не используем вымышленные персональные e-mail реальных людей.
     contacts = [
-        ("MSU", "Ivan Sokolov", "Head of Department", "ivan.sokolov@msu.demo"),
-        ("ITMO", "Anna Petrova", "Program Curator", "anna.petrova@itmo.demo"),
-        ("NSU", "Dmitry Kuznetsov", "Dean Assistant", "dmitry.kuznetsov@nsu.demo"),
-        ("TSU", "Maria Smirnova", "Academic Lead", "maria.smirnova@tsu.demo"),
-        ("KFU", "Sergey Orlov", "Industry Liaison", "sergey.orlov@kfu.demo"),
+        ("МГУ", "Учебный отдел ВМК МГУ", "Профильный публичный контакт", "edu@cs.msu.su"),
+        ("ИТМО", "Канцелярия Университета ИТМО", "Общий контакт университета", "od@itmo.ru"),
+        ("НИУ ВШЭ", "Единая справочная НИУ ВШЭ", "Общий контакт университета", "hse@hse.ru"),
+        ("МГТУ", "Кафедра ИУ-3 МГТУ им. Н.Э. Баумана", "Профильный публичный контакт", "iu3@bmstu.ru"),
+        ("МФТИ", "Приёмная комиссия МФТИ", "Общий контакт университета", "pk@mipt.ru"),
+        ("НГУ", "Приёмная комиссия НГУ", "Общий контакт университета", "priem@nsu.ru"),
+        ("ТГУ", "Приёмная ТГУ", "Общий контакт университета", "rector@tsu.ru"),
+        ("ТПУ", "Приёмная комиссия ТПУ", "Общий контакт университета", "abiturient@tpu.ru"),
+        ("КФУ", "Управление документооборота КФУ", "Общий контакт университета", "public.mail@kpfu.ru"),
+        ("УрФУ", "Техническая поддержка УрФУ", "Публичный организационный контакт", "support@urfu.ru"),
     ]
     for short_name, full_name, position, email in contacts:
         contact = get_by_field(db, UniversityContact, "email", email)
@@ -269,7 +470,7 @@ def seed_contacts(db: Session, universities: dict[str, University]) -> None:
                     email=email,
                     is_primary=True,
                     is_active=True,
-                    comment="Demo contact",
+                    comment="Публичный организационный контакт; источник — официальный сайт вуза.",
                 )
             )
 

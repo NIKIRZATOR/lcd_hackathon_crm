@@ -67,10 +67,11 @@ class IntegrationSyncService:
             else:
                 counts["errors"] += 1
         metric.synced_at = datetime.now(timezone.utc)
-        self.db.commit()
-        self.db.refresh(metric)
+        self.db.flush()
         HealthService(self.db).recompute(program.id)
         NbaService(self.db).recompute_program(program.id)
+        self.db.commit()
+        self.db.refresh(metric)
         return {**counts, "metrics": metric}
 
     @staticmethod

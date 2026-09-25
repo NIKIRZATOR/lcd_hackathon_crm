@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.health.service import HealthService
@@ -96,11 +97,23 @@ class ProgramInstanceService:
             health_band="green",
             comment=payload.comment,
         )
-        self.db.add(program)
-        self.db.flush()
-        WorkflowRuntimeService(self.db).initialize_program_workflow(program)
-        HealthService(self.db).recompute(program.id)
-        NbaService(self.db).recompute_program(program.id)
+        try:
+            self.db.add(program)
+            self.db.flush()
+            WorkflowRuntimeService(self.db).initialize_program_workflow(program)
+            HealthService(self.db).recompute(program.id)
+            NbaService(self.db).recompute_program(program.id)
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            constraint_name = getattr(
+                getattr(exc.orig, "diag", None), "constraint_name", None
+            )
+            if constraint_name == "uq_program_instances_active_scope":
+                raise HTTPException(
+                    status_code=409, detail="Active program already exists"
+                ) from exc
+            raise
         return self.get(program.id, current_user)
 
     def health_summary(
@@ -119,6 +132,7 @@ class ProgramInstanceService:
         )
         for program in programs:
             HealthService(self.db).recompute(program.id)
+        self.db.commit()
         programs.sort(key=lambda program: program.health_score or 0)
         worst = programs[0] if programs else None
         return {
@@ -175,6 +189,8 @@ class ProgramInstanceService:
         ).all()
         for program_id in program_ids:
             HealthService(self.db).recompute(program_id)
+        if program_ids:
+            self.db.commit()
 
     def _statement(self):
         return (
