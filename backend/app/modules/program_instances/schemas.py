@@ -66,5 +66,6 @@ class ProgramInstanceStart(BaseModel):
     direction_id: UUID
     product_id: UUID
     playbook_template_id: UUID
+    kam_user_id: UUID | None = None
     academic_window_id: UUID | None = None
     comment: str | None = None

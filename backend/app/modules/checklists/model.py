@@ -1,5 +1,8 @@
 from uuid import UUID
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, String, Text, UniqueConstraint
+from datetime import date
+from decimal import Decimal
+
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import ModelBase
@@ -12,6 +15,7 @@ class PlaybookChecklistItem(ModelBase):
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     item_type: Mapped[str] = mapped_column(String(32), nullable=False)
     required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    required_stakeholder_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 class ProgramChecklistValue(ModelBase):
     __tablename__ = "program_checklist_values"
@@ -26,3 +30,11 @@ class ProgramChecklistValue(ModelBase):
     stage_instance_id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("workflow_stage_instances.id"), nullable=False)
     is_done: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_number: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    value_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    stakeholder_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("stakeholders.id"), nullable=True
+    )
+    attachment_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("files.id"), nullable=True
+    )

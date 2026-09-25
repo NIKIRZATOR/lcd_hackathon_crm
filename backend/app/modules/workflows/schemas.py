@@ -66,6 +66,7 @@ class WorkflowStageBase(BaseModel):
     is_initial: bool = False
     is_final: bool = False
     is_optional: bool = False
+    semester_critical: bool = False
     default_duration_days: int | None = None
     requires_comment: bool = False
     requires_attachment: bool = False
@@ -85,6 +86,7 @@ class WorkflowStageUpdate(BaseModel):
     is_initial: bool | None = None
     is_final: bool | None = None
     is_optional: bool | None = None
+    semester_critical: bool | None = None
     default_duration_days: int | None = None
     requires_comment: bool | None = None
     requires_attachment: bool | None = None

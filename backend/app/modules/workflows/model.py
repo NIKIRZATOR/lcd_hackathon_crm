@@ -165,6 +165,7 @@ class WorkflowStage(ModelBase):
     is_initial: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_final: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_optional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    semester_critical: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     default_duration_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     requires_comment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     requires_attachment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

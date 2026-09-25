@@ -82,7 +82,7 @@ def _verify(database_url: str, *, expect_backfill: bool) -> None:
             raise RuntimeError(f"Missing target tables: {sorted(missing)}")
         with engine.connect() as connection:
             current = MigrationContext.configure(connection).get_current_revision()
-        if current != "a2c4e6f8b0d1":
+        if current != "b4d6f8a0c2e1":
             raise RuntimeError(f"Unexpected migration revision: {current}")
         if expect_backfill:
             with engine.connect() as connection:

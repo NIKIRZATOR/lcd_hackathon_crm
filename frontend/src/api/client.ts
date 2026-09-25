@@ -2,6 +2,14 @@ type TokenProvider = () => Promise<string | undefined>;
 
 let tokenProvider: TokenProvider | undefined;
 
+export type ApiErrorPayload = { code: string; message: string; details?: unknown; requestId?: string };
+
+export class ApiError extends Error {
+  constructor(public readonly status: number, public readonly payload?: ApiErrorPayload) {
+    super(payload?.message ?? `API request failed with status ${status}`);
+  }
+}
+
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 export const setAuthTokenProvider = (provider: TokenProvider) => {
@@ -26,7 +34,9 @@ export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promi
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
+    let payload: ApiErrorPayload | undefined;
+    try { payload = await response.json() as ApiErrorPayload; } catch { payload = undefined; }
+    throw new ApiError(response.status, payload);
   }
 
   return response.json() as Promise<T>;

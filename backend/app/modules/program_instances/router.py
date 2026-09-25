@@ -23,7 +23,7 @@ from app.modules.program_instances.schemas import (
 from app.modules.program_instances.service import ProgramInstanceService
 from app.modules.users.model import User
 from app.modules.workflow_catalog.model import WorkflowPhase, WorkflowStageCatalog
-from app.modules.workflows.model import WorkflowStage, WorkflowStageInstance
+from app.modules.workflows.model import WorkflowStage, WorkflowStageInstance, WorkflowTransitionHistory
 from app.modules.workflows.schemas import WorkflowTransitionExecute
 from app.modules.workflows.service import TransitionService, WorkflowRuntimeService
 
@@ -66,6 +66,15 @@ def list_program_instances(
         limit=pagination.limit,
         offset=pagination.offset,
     )
+
+
+@router.get("/organizations/{organization_id}/available-playbooks")
+def available_playbooks(
+    organization_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    return ProgramInstanceService(db).available_playbooks(organization_id, current_user)
 
 
 @router.get(
@@ -179,6 +188,11 @@ def get_program_instance_workflow(
         transitions = WorkflowRuntimeService(db).list_available_program_transitions(
             model
         )
+        history = db.scalars(
+            select(WorkflowTransitionHistory)
+            .where(WorkflowTransitionHistory.program_instance_id == program_instance_id)
+            .order_by(WorkflowTransitionHistory.performed_at.desc())
+        ).all()
         return {
             "stages": [
                 {
@@ -205,6 +219,10 @@ def get_program_instance_workflow(
                     "to_stage_name": item.to_stage.name,
                 }
                 for item in transitions
+            ],
+            "transition_history": [
+                {"id": str(item.id), "comment": item.comment, "performed_at": item.performed_at}
+                for item in history
             ],
         }
     interaction = db.get(UniversityInteraction, program.legacy_interaction_id)

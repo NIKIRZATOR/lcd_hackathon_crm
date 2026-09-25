@@ -14,6 +14,7 @@ from app.modules.documents.model import File
 from app.modules.interactions.model import UniversityInteraction
 from app.modules.program_instances.model import ProgramInstance
 from app.modules.users.model import User
+from app.modules.workflow_catalog.model import WorkflowStageCatalog
 from app.modules.workflows.model import (
     WorkflowChangeRequest,
     WorkflowMigrationJob,
@@ -1418,7 +1419,9 @@ class WorkflowRuntimeService:
 
         interaction.current_stage_instance_id = instances[initial_stage.id].id
 
-    def initialize_program_workflow(self, program: ProgramInstance) -> None:
+    def initialize_program_workflow(
+        self, program: ProgramInstance, *, responsible_user_id: UUID | None = None
+    ) -> None:
         program.workflow_version_id = (
             WorkflowVersionService(self.db)
             .get_current_published_version(program.playbook_template_id)
@@ -1434,11 +1437,14 @@ class WorkflowRuntimeService:
             )
         now = datetime.now(timezone.utc)
         initial = next((stage for stage in stages if stage.is_initial), stages[0])
+        if initial.stage_catalog_id is not None:
+            catalog = self.db.get(WorkflowStageCatalog, initial.stage_catalog_id)
+            program.current_stage_code = catalog.code if catalog is not None else None
         for stage in stages:
             instance = WorkflowStageInstance(
                 program_instance_id=program.id,
                 workflow_stage_id=stage.id,
-                responsible_user_id=program.kam_user_id,
+                responsible_user_id=responsible_user_id or program.kam_user_id,
                 status="IN_PROGRESS" if stage.id == initial.id else "NOT_STARTED",
                 started_at=now if stage.id == initial.id else None,
                 due_at=self._calculate_due_at(now, stage)
@@ -1999,56 +2005,65 @@ class TransitionService:
         instance: WorkflowStageInstance,
         payload: WorkflowTransitionExecute,
     ) -> None:
+        reasons: list[dict[str, object]] = []
         if stage.requires_comment and not (payload.comment and payload.comment.strip()):
-            raise workflow_error(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                code="WORKFLOW_STAGE_REQUIRES_COMMENT",
-                message="Current stage requires comment",
-                details={
-                    "currentStageId": str(stage.id),
-                    "currentStageInstanceId": str(instance.id),
-                },
+            reasons.append({"code": "missing_comment", "message": "Current stage requires comment"})
+        if stage.requires_attachment and self._count_stage_attachments(instance.id) == 0:
+            reasons.append({"code": "missing_attachment", "message": "Current stage requires attachment"})
+        missing_query = (
+            select(PlaybookChecklistItem)
+            .outerjoin(
+                ProgramChecklistValue,
+                (ProgramChecklistValue.checklist_item_id == PlaybookChecklistItem.id)
+                & (ProgramChecklistValue.stage_instance_id == instance.id),
             )
-        if (
-            stage.requires_attachment
-            and self._count_stage_attachments(instance.id) == 0
-        ):
-            raise workflow_error(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                code="WORKFLOW_STAGE_REQUIRES_ATTACHMENT",
-                message="Current stage requires attachment",
-                details={
-                    "currentStageId": str(stage.id),
-                    "currentStageInstanceId": str(instance.id),
-                },
+            .where(
+                PlaybookChecklistItem.workflow_stage_id == stage.id,
+                PlaybookChecklistItem.required.is_(True),
+                (ProgramChecklistValue.id.is_(None)) | (ProgramChecklistValue.is_done.is_(False)),
             )
-        missing = (
-            self.db.scalar(
-                select(func.count())
-                .select_from(PlaybookChecklistItem)
-                .outerjoin(
-                    ProgramChecklistValue,
-                    (
-                        ProgramChecklistValue.checklist_item_id
-                        == PlaybookChecklistItem.id
-                    )
-                    & (ProgramChecklistValue.stage_instance_id == instance.id),
-                )
-                .where(
-                    PlaybookChecklistItem.workflow_stage_id == stage.id,
-                    PlaybookChecklistItem.required.is_(True),
-                    (ProgramChecklistValue.id.is_(None))
-                    | (ProgramChecklistValue.is_done.is_(False)),
-                )
-            )
-            or 0
         )
-        if missing:
+        missing_count = self.db.scalar(select(func.count()).select_from(missing_query.subquery())) or 0
+        missing_items = self.db.execute(missing_query).scalars().all() if missing_count else []
+        if missing_count:
+            reasons.append(
+                {
+                    "code": "missing_required_checklist",
+                    "message": "Required checklist items are incomplete",
+                    "item_ids": [str(item.id) for item in missing_items],
+                    "missing_count": missing_count,
+                }
+            )
+        missing_roles = sorted(
+            {
+                item.required_stakeholder_role
+                for item in missing_items
+                if item.item_type == "stakeholder_role" and item.required_stakeholder_role
+            }
+        )
+        if missing_roles:
+            reasons.append(
+                {
+                    "code": "missing_stakeholder_role",
+                    "message": "Required stakeholder roles are missing",
+                    "roles": missing_roles,
+                }
+            )
+        if reasons:
+            first_code = {
+                "missing_comment": "WORKFLOW_STAGE_REQUIRES_COMMENT",
+                "missing_attachment": "WORKFLOW_STAGE_REQUIRES_ATTACHMENT",
+                "missing_required_checklist": "WORKFLOW_CHECKLIST_INCOMPLETE",
+            }.get(str(reasons[0]["code"]), "WORKFLOW_STAGE_BLOCKED")
             raise workflow_error(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                code="WORKFLOW_CHECKLIST_INCOMPLETE",
-                message="Required checklist items are incomplete",
-                details={"currentStageId": str(stage.id), "missingCount": missing},
+                code=first_code,
+                message="Current stage requirements are not satisfied",
+                details={
+                    "currentStageId": str(stage.id),
+                    "currentStageInstanceId": str(instance.id),
+                    "reasons": reasons,
+                },
             )
         performed_by = self._get_performed_by(payload)
         if self.db.get(User, performed_by) is None:

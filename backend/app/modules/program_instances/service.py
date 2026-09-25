@@ -10,19 +10,23 @@ from sqlalchemy.orm import Session
 
 from app.modules.health.service import HealthService
 from app.modules.nba.service import NbaService
+from app.modules.auth.access import get_subordinate_kam_ids, has_any_role, is_admin
+from app.modules.checklists.model import PlaybookChecklistItem
+from app.modules.organizations.model import OrgAssignment, OrganizationType
 from app.modules.organizations.service import OrganizationService
-from app.modules.products.model import ITProduct
+from app.modules.products.model import ITProduct, ProgramProduct
 from app.modules.program_instances.model import AcademicWindow, ProgramInstance
 from app.modules.program_instances.schemas import ProgramInstanceRead, WorkflowJournalRead
 from app.modules.programs.model import ITDirection
 from app.modules.users.model import User
 from app.modules.programs.model import ITProgram
-from app.modules.workflows.model import WorkflowTemplate
+from app.modules.workflows.model import WorkflowTemplate, WorkflowTransition, WorkflowVersion
 from app.modules.workflows.service import WorkflowRuntimeService
 from app.modules.workflows.model import WorkflowStageInstance, WorkflowStage
+from app.modules.workflow_catalog.model import WorkflowPhase, WorkflowStageCatalog
 from app.modules.organizations.model import Organization
 from app.modules.integrations.model import ProgramMetric
-from app.modules.licenses.model import License
+from app.modules.licenses.model import Contract, License
 from app.modules.teachers.model import TeacherCarrier
 from app.modules.program_instances.schemas import ProgramInstanceStart
 
@@ -62,19 +66,32 @@ class ProgramInstanceService:
     def start(
         self, organization_id: UUID, payload: ProgramInstanceStart, current_user: User
     ) -> ProgramInstanceRead:
-        OrganizationService(self.db).get(organization_id, current_user)
+        organization = OrganizationService(self.db).get(organization_id, current_user)
+        if organization.status == "archived":
+            raise HTTPException(status_code=409, detail="Archived organization cannot start a program")
         template = self.db.get(WorkflowTemplate, payload.playbook_template_id)
         if template is None or template.status != "published":
             raise HTTPException(
                 status_code=422, detail="Published playbook is required"
             )
-        legacy_program = self.db.scalar(
-            select(ITProgram).where(ITProgram.direction_id == payload.direction_id)
-        )
-        if legacy_program is None or self.db.get(ITProduct, payload.product_id) is None:
-            raise HTTPException(
-                status_code=422, detail="Direction or product not found"
+        organization_type = self.db.get(OrganizationType, organization.type_id)
+        if organization_type is None or not self._template_applies(template, organization_type.code):
+            raise HTTPException(status_code=422, detail="Playbook is not applicable to organization type")
+        compatible_program = self.db.scalar(
+            select(ITProgram)
+            .join(ProgramProduct, ProgramProduct.program_id == ITProgram.id)
+            .where(
+                ITProgram.direction_id == payload.direction_id,
+                ITProgram.is_active.is_(True),
+                ProgramProduct.product_id == payload.product_id,
             )
+        )
+        product = self.db.get(ITProduct, payload.product_id)
+        if compatible_program is None or product is None or not product.is_active:
+            raise HTTPException(
+                status_code=422, detail="Direction and product are not compatible"
+            )
+        effective_kam_id = self._resolve_kam(organization_id, payload.kam_user_id, current_user)
         existing = self.db.scalar(
             select(ProgramInstance).where(
                 ProgramInstance.organization_id == organization_id,
@@ -89,9 +106,9 @@ class ProgramInstanceService:
             organization_id=organization_id,
             direction_id=payload.direction_id,
             product_id=payload.product_id,
-            kam_user_id=current_user.id,
+            kam_user_id=payload.kam_user_id,
             playbook_template_id=template.id,
-            template_snapshot={"playbook_code": template.code},
+            template_snapshot=self._template_snapshot(template),
             status="active",
             academic_window_id=payload.academic_window_id,
             health_band="green",
@@ -100,7 +117,16 @@ class ProgramInstanceService:
         try:
             self.db.add(program)
             self.db.flush()
-            WorkflowRuntimeService(self.db).initialize_program_workflow(program)
+            WorkflowRuntimeService(self.db).initialize_program_workflow(
+                program, responsible_user_id=effective_kam_id
+            )
+            self.db.add(
+                License(
+                    program_instance_id=program.id,
+                    product_id=program.product_id,
+                    transfer_status="not_transferred",
+                )
+            )
             HealthService(self.db).recompute(program.id)
             NbaService(self.db).recompute_program(program.id)
             self.db.commit()
@@ -115,6 +141,143 @@ class ProgramInstanceService:
                 ) from exc
             raise
         return self.get(program.id, current_user)
+
+    def available_playbooks(self, organization_id: UUID, current_user: User) -> list[dict[str, object]]:
+        organization = OrganizationService(self.db).get(organization_id, current_user)
+        organization_type = self.db.get(OrganizationType, organization.type_id)
+        type_code = organization_type.code if organization_type else ""
+        has_signed_contract = bool(
+            self.db.scalar(
+                select(Contract.id).where(
+                    Contract.organization_id == organization_id,
+                    (Contract.signed_on.is_not(None)) | (Contract.signed_at.is_not(None)),
+                )
+            )
+        )
+        recommended_code = "school_short" if type_code == "school" else "expansion" if has_signed_contract else "full_cycle"
+        templates = self.db.scalars(
+            select(WorkflowTemplate)
+            .where(
+                WorkflowTemplate.status == "published",
+                WorkflowTemplate.is_active.is_(True),
+            )
+            .order_by(WorkflowTemplate.name)
+        ).all()
+        return [
+            {
+                "id": template.id,
+                "code": template.code,
+                "name": template.name,
+                "applies_to_type": template.applies_to_type,
+                "recommended": template.code == recommended_code,
+            }
+            for template in templates
+            if self._template_applies(template, type_code)
+        ]
+
+    @staticmethod
+    def _template_applies(template: WorkflowTemplate, type_code: str) -> bool:
+        if template.code == "full_cycle":
+            return type_code in {"university", "spo"}
+        return template.applies_to_type in {"all", type_code}
+
+    def _resolve_kam(self, organization_id: UUID, selected_kam_id: UUID | None, current_user: User) -> UUID:
+        assignment_kam_id = self.db.scalar(
+            select(OrgAssignment.user_id).where(
+                OrgAssignment.organization_id == organization_id,
+                OrgAssignment.status == "active",
+            )
+        )
+        if has_any_role(current_user, "KAM") and not (is_admin(current_user) or has_any_role(current_user, "MANAGER")):
+            if selected_kam_id not in {None, current_user.id} or assignment_kam_id != current_user.id:
+                raise HTTPException(status_code=403, detail="KAM can start programs only in own portfolio")
+            return current_user.id
+        if selected_kam_id is None:
+            if assignment_kam_id is None:
+                raise HTTPException(status_code=422, detail="Organization has no active KAM assignment")
+            return assignment_kam_id
+        selected = self.db.get(User, selected_kam_id)
+        if selected is None or not selected.is_active or not has_any_role(selected, "KAM"):
+            raise HTTPException(status_code=422, detail="Active KAM is required")
+        if not is_admin(current_user) and selected_kam_id not in get_subordinate_kam_ids(self.db, current_user.id):
+            raise HTTPException(status_code=403, detail="KAM is outside manager scope")
+        return selected_kam_id
+
+    def _template_snapshot(self, template: WorkflowTemplate) -> dict[str, object]:
+        version = self.db.scalar(
+            select(WorkflowVersion)
+            .where(
+                WorkflowVersion.workflow_template_id == template.id,
+                WorkflowVersion.status == "PUBLISHED",
+            )
+            .order_by(WorkflowVersion.version.desc())
+        )
+        if version is None:
+            raise HTTPException(status_code=422, detail="Published playbook version is required")
+        stages = list(
+            self.db.scalars(
+                select(WorkflowStage)
+                .where(WorkflowStage.workflow_version_id == version.id, WorkflowStage.is_active.is_(True))
+                .order_by(WorkflowStage.order_index)
+            ).all()
+        )
+        transitions = list(self.db.scalars(select(WorkflowTransition).where(WorkflowTransition.workflow_version_id == version.id)).all())
+        checklist = list(
+            self.db.scalars(
+                select(PlaybookChecklistItem).where(
+                    PlaybookChecklistItem.workflow_stage_id.in_([stage.id for stage in stages])
+                )
+            ).all()
+        ) if stages else []
+        catalog_details = {
+            catalog.id: {
+                "code": catalog.code,
+                "phase_code": phase.code,
+                "phase_name": phase.name,
+                "phase_order": phase.sort_order,
+            }
+            for catalog, phase in self.db.execute(
+                select(WorkflowStageCatalog, WorkflowPhase)
+                .join(WorkflowPhase, WorkflowPhase.id == WorkflowStageCatalog.default_phase_id)
+                .where(
+                    WorkflowStageCatalog.id.in_([stage.stage_catalog_id for stage in stages if stage.stage_catalog_id])
+                )
+            ).all()
+        }
+        phases = {
+            (details["phase_code"], details["phase_name"], details["phase_order"])
+            for details in catalog_details.values()
+        }
+        return {
+            "playbook": {"code": template.code, "name": template.name, "version": version.version},
+            "phases": [
+                {"code": code, "name": name, "order": order}
+                for code, name, order in sorted(phases, key=lambda item: item[2])
+            ],
+            "stages": [
+                {
+                    "id": str(stage.id),
+                    "code": catalog_details.get(stage.stage_catalog_id, {}).get("code", stage.name),
+                    "name": stage.name, "order": stage.order_index,
+                    "sla_days": stage.default_duration_days, "optional": stage.is_optional,
+                    "semester_critical": stage.semester_critical,
+                    "phase_code": catalog_details.get(stage.stage_catalog_id, {}).get("phase_code"),
+                    "phase_name": catalog_details.get(stage.stage_catalog_id, {}).get("phase_name"),
+                }
+                for stage in stages
+            ],
+            "checklist": [
+                {"stage_id": str(item.workflow_stage_id), "code": item.code, "label": item.label,
+                 "item_type": item.item_type, "required": item.required,
+                 "required_stakeholder_role": item.required_stakeholder_role}
+                for item in checklist
+            ],
+            "transitions": [
+                {"from_stage_id": str(item.from_stage_id), "to_stage_id": str(item.to_stage_id),
+                 "name": item.name, "condition_code": item.condition_code}
+                for item in transitions
+            ],
+        }
 
     def health_summary(
         self, organization_id: UUID, current_user: User

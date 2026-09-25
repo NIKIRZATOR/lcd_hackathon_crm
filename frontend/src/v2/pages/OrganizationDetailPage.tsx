@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 
-import { apiRequest } from '../../api/client';
+import { ApiError, apiRequest } from '../../api/client';
 
 type Organization = { id: string; name: string; short_name: string | null; region: string | null; city: string | null; status: string; comment: string | null };
 type Stakeholder = { id: string; full_name: string; role_code: string; position: string | null; email: string | null; is_primary: boolean };
@@ -27,6 +27,7 @@ const OrganizationDetailPage = () => {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [startError, setStartError] = useState<string>();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,7 +42,7 @@ const OrganizationDetailPage = () => {
 
   return (
     <>
-      <Card title={organization.name} extra={<><Button onClick={async () => { await Promise.all(programs.map((program) => apiRequest(`/api/integrations/program-instances/${program.id}/sync`, { method: 'POST' }))); window.location.reload(); }}>Синхронизировать</Button> <Button onClick={() => navigate('/v2/reports')}>Отчёт</Button> <Button type="primary" onClick={() => setOpen(true)}>Новая программа</Button> <Tag color={organization.status === 'active' ? 'green' : 'default'}>{organization.status}</Tag></>}>
+      <Card title={organization.name} extra={<><Button onClick={async () => { await Promise.all(programs.map((program) => apiRequest(`/api/integrations/program-instances/${program.id}/sync`, { method: 'POST' }))); window.location.reload(); }}>Синхронизировать</Button> <Button onClick={() => navigate('/v2/reports')}>Отчёт</Button> <Button type="primary" disabled={organization.status === 'archived'} title={organization.status === 'archived' ? 'Нельзя запускать программы в архивной организации' : undefined} onClick={() => { setStartError(undefined); setOpen(true); }}>Новая программа</Button> <Tag color={organization.status === 'active' ? 'green' : 'default'}>{organization.status}</Tag></>}>
         <Descriptions column={1} size="small">
           <Descriptions.Item label="Тип">{summary?.type_name ?? '—'}</Descriptions.Item>
           <Descriptions.Item label="KAM">{summary?.kam_name ?? '—'}</Descriptions.Item>
@@ -71,23 +72,35 @@ const OrganizationDetailPage = () => {
       <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>Программы, договоры и лента будут подключены на следующих этапах.</Typography.Paragraph>
       <Modal title="Новая программа" open={open} onCancel={() => setOpen(false)} onOk={async () => {
         if (step < 3) { setStep(step + 1); return; }
-        const created = await apiRequest<{ id: string }>(`/api/organizations/${id}/program-instances`, { method: 'POST', body: JSON.stringify(values) });
-        navigate(`/v2/programs/${created.id}`);
+        try {
+          const created = await apiRequest<{ id: string }>(`/api/organizations/${id}/program-instances`, { method: 'POST', body: JSON.stringify(values) });
+          navigate(`/v2/programs/${created.id}`);
+        } catch (caught) {
+          setStartError(caught instanceof ApiError ? caught.message : 'Не удалось запустить программу.');
+        }
       }} okText={step === 3 ? 'Создать' : 'Далее'}>
         <Steps current={step} size="small" items={[{ title: 'Направление' }, { title: 'Продукт' }, { title: 'Плейбук' }, { title: 'Окно' }]} style={{ marginBottom: 24 }} />
-        <WizardStep step={step} values={values} onChange={setValues} />
+        {startError && <Alert type="error" showIcon message={startError} style={{ marginBottom: 12 }} />}
+        <WizardStep organizationId={id!} step={step} values={values} onChange={setValues} />
       </Modal>
       <ContractsAndTeachers organizationId={id!} />
     </>
   );
 };
 
-const WizardStep = ({ step, values, onChange }: { step: number; values: Record<string, string>; onChange: (value: Record<string, string>) => void }) => {
-  const [options, setOptions] = useState<{ label: string; value: string }[]>([]);
-  const paths = ['/api/it-directions?limit=100', '/api/it-products?limit=100', '/api/management/playbooks', '/api/academic-windows'];
+const WizardStep = ({ organizationId, step, values, onChange }: { organizationId: string; step: number; values: Record<string, string>; onChange: (value: Record<string, string>) => void }) => {
+  const [options, setOptions] = useState<{ label: string; value: string; recommended?: boolean }[]>([]);
+  const [kams, setKams] = useState<{ label: string; value: string }[]>([]);
+  const paths = ['/api/it-directions?limit=100', '/api/it-products?limit=100', `/api/organizations/${organizationId}/available-playbooks`, '/api/academic-windows'];
   const keys = ['direction_id', 'product_id', 'playbook_template_id', 'academic_window_id'];
-  useEffect(() => { apiRequest<any>(paths[step]).then((data) => setOptions((data.items ?? data).filter((item: any) => step !== 2 || item.status === 'published').map((item: any) => ({ value: item.id, label: item.name ?? item.title ?? item.code })))); }, [step]);
-  return <Select style={{ width: '100%' }} placeholder="Выберите значение" options={options} value={values[keys[step]]} onChange={(value) => onChange({ ...values, [keys[step]]: value })} />;
+  useEffect(() => {
+    apiRequest<any>(paths[step]).then((data) => setOptions((data.items ?? data).map((item: any) => ({ value: item.id, recommended: item.recommended, label: `${item.name ?? item.title ?? item.code}${item.recommended ? ' · рекомендуется' : ''}` }))));
+    if (step === 3) apiRequest<any[]>(`/api/organizations/${organizationId}/eligible-kams`).then((data) => setKams(data.map((item) => ({ value: item.id, label: item.full_name }))));
+  }, [organizationId, step]);
+  return <>
+    <Select style={{ width: '100%' }} placeholder="Выберите значение" options={options} value={values[keys[step]]} onChange={(value) => onChange({ ...values, [keys[step]]: value })} />
+    {step === 3 && <Select allowClear style={{ width: '100%', marginTop: 12 }} placeholder="KAM: наследовать назначение организации" options={kams} value={values.kam_user_id} onChange={(value) => { const next = { ...values }; if (value) next.kam_user_id = value; else delete next.kam_user_id; onChange(next); }} />}
+  </>;
 };
 
 const ContractsAndTeachers = ({ organizationId }: { organizationId: string }) => {

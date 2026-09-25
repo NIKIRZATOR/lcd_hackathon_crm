@@ -104,11 +104,15 @@ class OrganizationService:
 
     def eligible_kams(self, organization_id: UUID, current_user: User) -> list[User]:
         self.get(organization_id, current_user)
+        if has_any_role(current_user, "KAM") and not (
+            is_admin(current_user) or has_any_role(current_user, "MANAGER")
+        ):
+            return [current_user]
         if is_admin(current_user):
             return list(self.db.scalars(select(User).join(User.roles).where(Role.name == "KAM", User.is_active.is_(True)).order_by(User.full_name)).all())
         if has_any_role(current_user, "MANAGER"):
             return list(self.db.scalars(select(User).where(User.id.in_(get_subordinate_kam_ids(self.db, current_user.id)), User.is_active.is_(True)).order_by(User.full_name)).all())
-        raise forbidden("Only MANAGER or ADMIN can reassign KAM")
+        raise forbidden("Only CRM roles can list eligible KAMs")
 
     def add_stakeholder(self, organization_id: UUID, payload: StakeholderCreate, current_user: User) -> Stakeholder:
         self.get(organization_id, current_user)
