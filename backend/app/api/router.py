@@ -1,4 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from sqlalchemy import text
+
+from app.core.database import engine
 
 from app.modules.analytics.router import router as analytics_router
 from app.modules.audit.router import router as audit_router
@@ -31,6 +34,17 @@ api_router = APIRouter()
 
 @api_router.get("/health")
 def health_check() -> dict[str, str]:
+    return {"status": "ok", "service": "backend"}
+
+
+@api_router.get("/ready")
+def readiness_check() -> dict[str, str]:
+    """Return success only when the process can reach its critical database."""
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="service is not ready") from exc
     return {"status": "ok", "service": "backend"}
 
 

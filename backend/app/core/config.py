@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     database_url: str = Field(
         default="postgresql+psycopg://rtk_eduflow:rtk_eduflow@localhost:5432/rtk_eduflow"
     )
+    db_pool_size: int = 5
+    db_max_overflow: int = 5
+    db_pool_timeout: int = 30
+    enable_diagnostic_headers: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     keycloak_url: str = "http://localhost:8080"
     keycloak_internal_url: str | None = None
