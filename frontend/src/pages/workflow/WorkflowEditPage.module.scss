@@ -1,28 +1,179 @@
-.page { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding-bottom: 24px; }
-.breadcrumbs { display: flex; align-items: center; gap: 8px; color: var(--ant-color-primary); font-size: 12px; }
-.breadcrumbs a { color: var(--ant-color-primary); }
-.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.header h1 { margin: 0 0 12px; color: var(--ant-color-text); font-size: 28px; }
-.contextTags { display: flex; flex-wrap: wrap; gap: 10px; }
-.contextTags :global(.ant-tag) { margin: 0; padding: 8px 12px; color: var(--ant-color-text-secondary); background: var(--ant-color-bg-container); border-color: var(--ant-color-border-secondary); border-radius: 8px; }
-.contextTags strong { color: var(--ant-color-text); }
-.editorLayout { display: grid; grid-template-columns: minmax(240px, 280px) minmax(0, 1fr); align-items: start; gap: 16px; }
-.stepListCard { position: sticky; top: 80px; border-color: var(--ant-color-border-secondary); }
-.stepList { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
-.stepRow { display: grid; grid-template-columns: 18px 28px minmax(0, 1fr) 18px; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 0 8px; border: 0; border-radius: 6px; color: var(--ant-color-text); background: transparent; text-align: left; cursor: pointer; touch-action: manipulation; }
-.stepRow:hover, .stepRowSelected { color: var(--ant-color-primary); background: var(--ant-color-primary-bg); }
-.stepRowDragging { position: relative; z-index: 1; opacity: 0.45; }
-.dragHandle { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 24px; padding: 0; border: 0; color: var(--ant-color-text-secondary); background: transparent; cursor: grab; }
-.dragHandle:hover { color: var(--ant-color-text); }
-.dragHandle:active { cursor: grabbing; }
-.stepNumber { color: var(--ant-color-text-secondary); font-size: 12px; text-align: right; }
-.stepName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stepAction { color: var(--ant-color-text-secondary); font-size: 13px; }
-.dragOverlay { display: grid; grid-template-columns: 18px 28px minmax(120px, 1fr); align-items: center; gap: 8px; min-width: 220px; min-height: 36px; padding: 0 8px; border: 1px solid var(--ant-color-border-secondary); border-radius: 6px; color: var(--ant-color-text); background: var(--ant-color-bg-container); box-shadow: var(--ant-box-shadow-secondary); }
-.dragOverlayHandle { color: var(--ant-color-text-secondary); }
-.formPanel { min-width: 0; }
-.formHeading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
-.formHeading h2 { margin: 0; color: var(--ant-color-text); font-size: 22px; }
-.formHeading > span { color: var(--ant-color-text-secondary); font-size: 12px; }
-@media (max-width: 1100px) { .contextTags { gap: 6px; } .contextTags :global(.ant-tag) { padding: 7px 9px; } }
-@media (max-width: 767px) { .header { flex-direction: column; } .editorLayout { grid-template-columns: 1fr; } .stepListCard { position: static; } .formHeading { align-items: flex-start; flex-direction: column; gap: 4px; } }
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding-bottom: 24px;
+}
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ant-color-primary);
+  font-size: 12px;
+}
+.breadcrumbs a {
+  color: var(--ant-color-primary);
+}
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.header h1 {
+  margin: 0 0 12px;
+  color: var(--ant-color-text);
+  font-size: 28px;
+}
+.contextTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.contextTags :global(.ant-tag) {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--ant-color-text-secondary);
+  background: var(--ant-color-bg-container);
+  border-color: var(--ant-color-border-secondary);
+  border-radius: 8px;
+}
+.contextTags strong {
+  color: var(--ant-color-text);
+}
+.editorLayout {
+  display: grid;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.stepListCard {
+  position: sticky;
+  top: 80px;
+  border-color: var(--ant-color-border-secondary);
+}
+.stepList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.stepRow {
+  display: grid;
+  grid-template-columns: 18px 28px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ant-color-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.stepRow:hover,
+.stepRowSelected {
+  color: var(--ant-color-primary);
+  background: var(--ant-color-primary-bg);
+}
+.stepRowDragging {
+  position: relative;
+  z-index: 1;
+  opacity: 0.45;
+}
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  color: var(--ant-color-text-secondary);
+  background: transparent;
+  cursor: grab;
+}
+.dragHandle:hover {
+  color: var(--ant-color-text);
+}
+.dragHandle:active {
+  cursor: grabbing;
+}
+.stepNumber {
+  color: var(--ant-color-text-secondary);
+  font-size: 12px;
+  text-align: right;
+}
+.stepName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stepAction {
+  color: var(--ant-color-text-secondary);
+  font-size: 13px;
+}
+.dragOverlay {
+  display: grid;
+  grid-template-columns: 18px 28px minmax(120px, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 6px;
+  color: var(--ant-color-text);
+  background: var(--ant-color-bg-container);
+  box-shadow: var(--ant-box-shadow-secondary);
+}
+.dragOverlayHandle {
+  color: var(--ant-color-text-secondary);
+}
+.formPanel {
+  min-width: 0;
+}
+.formHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.formHeading h2 {
+  margin: 0;
+  color: var(--ant-color-text);
+  font-size: 22px;
+}
+.formHeading > span {
+  color: var(--ant-color-text-secondary);
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .contextTags {
+    gap: 6px;
+  }
+  .contextTags :global(.ant-tag) {
+    padding: 7px 9px;
+  }
+}
+@media (max-width: 767px) {
+  .header {
+    flex-direction: column;
+  }
+  .editorLayout {
+    grid-template-columns: 1fr;
+  }
+  .stepListCard {
+    position: static;
+  }
+  .formHeading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}

@@ -32,6 +32,10 @@ export const appTheme: ThemeConfig = {
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     fontSize: 14,
 
+    fontSizeHeading1: 30,
+    lineHeightHeading1: 1.2,
+    fontWeightStrong: 700,
+
     controlHeight: 36,
   },
 

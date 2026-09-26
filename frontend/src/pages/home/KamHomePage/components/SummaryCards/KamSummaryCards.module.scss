@@ -1,0 +1,99 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.card {
+  min-width: 0;
+
+  border: 1px solid var(--ant-colorBorderSecondary);
+  border-radius: 8px;
+
+  box-shadow: none;
+
+  .cardBody {
+    padding: 14px 16px;
+  }
+}
+
+.icon {
+  display: flex;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+
+  width: 36px;
+  height: 36px;
+
+  font-size: 18px;
+
+  border-radius: 8px;
+}
+
+.primary {
+  color: #8c35ff;
+  background: #f2e8ff;
+}
+
+.critical {
+  color: #ff4d5e;
+  background: #fff0f2;
+}
+
+.calendar {
+  color: #625cff;
+  background: #eeedff;
+}
+
+.success {
+  color: #18a985;
+  background: #e8f7f2;
+}
+
+.content {
+  min-width: 0;
+  flex: 1;
+}
+
+.value {
+  display: block;
+
+  color: var(--ant-colorText);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.valueSuffix {
+  color: var(--ant-colorText);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.label {
+  display: block;
+
+  margin-top: 2px;
+
+  overflow: hidden;
+
+  color: var(--ant-colorTextSecondary);
+  font-size: 12px;
+  line-height: 16px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 576px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

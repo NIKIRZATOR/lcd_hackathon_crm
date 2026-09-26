@@ -41,7 +41,11 @@ type SelectedFilter<T> = {
 type FiltersProps<T extends Record<string, unknown>> = {
   fields: FilterField<T>[];
   initialValues: T;
+  resetValues: T;
   onApply: (values: T) => void;
+  onReset?: () => void;
+  applyButtonText?: string;
+  resetButtonText?: string;
   mobileVisibleTagsCount?: number;
   mobileModalTitle?: string;
 };
@@ -71,7 +75,11 @@ const getOptionLabel = (options: SelectProps['options'], value: string | number)
 const Filters = <T extends Record<string, unknown>>({
   fields,
   initialValues,
+  resetValues,
   onApply,
+  onReset,
+  applyButtonText = 'Применить',
+  resetButtonText = 'Сбросить',
   mobileVisibleTagsCount = DEFAULT_MOBILE_VISIBLE_TAGS_COUNT,
   mobileModalTitle = 'Фильтры',
 }: FiltersProps<T>) => {
@@ -102,11 +110,17 @@ const Filters = <T extends Record<string, unknown>>({
 
   const handleReset = () => {
     form.resetFields();
+    form.setFieldsValue(resetValues ?? initialValues);
 
-    setCurrentValues(initialValues);
+    setCurrentValues(resetValues ?? initialValues);
     modalInitialValuesRef.current = null;
 
-    onApply(initialValues);
+    if (onReset) {
+      onReset();
+      return;
+    }
+
+    onApply(resetValues ?? initialValues);
   };
 
   const handleOpenModal = () => {
@@ -222,6 +236,16 @@ const Filters = <T extends Record<string, unknown>>({
     '--filters-columns-count': Math.max(fields.length - 1, 1),
   } as CSSProperties;
 
+  const actions = (
+    <>
+      <Button onClick={handleReset}>{resetButtonText}</Button>
+
+      <Button type="primary" onClick={handleApply}>
+        {applyButtonText}
+      </Button>
+    </>
+  );
+
   return (
     <Form<T>
       form={form}
@@ -275,13 +299,7 @@ const Filters = <T extends Record<string, unknown>>({
           >
             <div className={styles.mobileModal__filters}>{renderFields()}</div>
 
-            <div className={styles.mobileModal__actions}>
-              <Button onClick={handleReset}>Сбросить</Button>
-
-              <Button type="primary" onClick={handleApply}>
-                Применить
-              </Button>
-            </div>
+            <div className={styles.mobileModal__actions}>{actions}</div>
           </Modal>
         </>
       ) : (
@@ -290,13 +308,7 @@ const Filters = <T extends Record<string, unknown>>({
             {renderFields()}
           </div>
 
-          <div className={styles.form__actions}>
-            <Button onClick={handleReset}>Сбросить</Button>
-
-            <Button type="primary" onClick={handleApply}>
-              Применить
-            </Button>
-          </div>
+          <div className={styles.form__actions}>{actions}</div>
         </>
       )}
     </Form>
