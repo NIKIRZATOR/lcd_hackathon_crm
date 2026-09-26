@@ -3,7 +3,6 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '../auth';
 import Layout from '../layout';
 import AnalyticsPage from '../pages/analytics/AnalyticsPage';
-import HomePage from '../pages/home/HomePage';
 import LoginPage from '../pages/login/LoginPage';
 import ProductsPage from '../pages/products/ProductsPage';
 import ProgramsPage from '../pages/programs/ProgramsPage';
@@ -15,16 +14,47 @@ import UniversityDetailPage from '../pages/universities/UniversityDetailPage';
 import WorkflowPage from '../pages/workflow/WorkflowPage';
 import WorkflowDetailPage from '../pages/workflow/WorkflowDetailPage';
 import WorkflowEditPage from '../pages/workflow/WorkflowEditPage';
+import V2Layout from '../v2/app/V2Layout';
+import OrganizationDetailPage from '../v2/pages/OrganizationDetailPage';
+import ManagementPage from '../v2/pages/ManagementPage';
+import NbaTodayPage from '../v2/pages/NbaTodayPage';
+import OrganizationsPage from '../v2/pages/OrganizationsPage';
+import ProgramDetailPage from '../v2/pages/ProgramDetailPage';
+import V2PlaceholderPage from '../v2/pages/V2PlaceholderPage';
+import WorkflowJournalPage from '../v2/pages/WorkflowJournalPage';
 import { allowedRoles } from './constants';
 import StartRoute from './StartRoute';
 
 const AppRoutes = () => {
   return (
     <Routes>
-      <Route path="/" element={<StartRoute />}>
-        <Route index element={<HomePage />} />
-      </Route>
+      <Route path="/" element={<StartRoute />} />
       <Route path="/login" element={<LoginPage />} />
+
+      <Route
+        element={
+          <ProtectedRoute allowedRoles={allowedRoles}>
+            <V2Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/v2">
+          <Route index element={<NbaTodayPage />} />
+          <Route path="organizations" element={<OrganizationsPage />} />
+          <Route path="organizations/:id" element={<OrganizationDetailPage />} />
+          <Route path="workflows" element={<WorkflowJournalPage />} />
+          <Route path="programs/:id" element={<ProgramDetailPage />} />
+          <Route path="reports" element={<V2PlaceholderPage title="Отчёты" description="Конструктор и очередь отчётов будут подключены на этапе Reports MVP." />} />
+          <Route
+            path="management"
+            element={
+              <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
+                <ManagementPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+      </Route>
 
       <Route
         element={

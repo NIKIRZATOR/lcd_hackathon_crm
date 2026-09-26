@@ -118,6 +118,7 @@ def test_upload_workflow_attachment_stores_object_metadata_attachment_and_audit(
         upload=FakeUpload(filename="contract.pdf", content_type="application/pdf", data=b"%PDF content"),
         uploaded_by=uuid4(),
         description="signed",
+        attachment_kind="contract",
         request_id="req-1",
     )
 
@@ -127,6 +128,7 @@ def test_upload_workflow_attachment_stores_object_metadata_attachment_and_audit(
     assert attachment.description == "signed"
     assert file_record.original_name == "contract.pdf"
     assert file_record.provider == "S3"
+    assert file_record.attachment_kind == "contract"
     assert file_record.bucket == "workflow-files"
     assert file_record.object_key.startswith(f"interactions/{stage_instance.interaction_id}/stages/{stage_instance.id}/")
     assert file_record.checksum

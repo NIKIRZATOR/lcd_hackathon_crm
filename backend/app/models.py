@@ -4,9 +4,13 @@ from app.modules.contacts.model import UniversityContact
 from app.modules.audit.model import AuditEvent
 from app.modules.documents.model import File
 from app.modules.imports.model import ImportArtifact, ImportJob, ImportMapping, ImportMappingField, ImportRowError
+from app.modules.integrations.model import IntegrationSignal, ProgramMetric
 from app.modules.interactions.model import InteractionContact, UniversityInteraction
 from app.modules.licenses.model import Contract, License
+from app.modules.nba.model import NbaItem, NbaRule
+from app.modules.organizations.model import OrgAssignment, Organization, OrganizationType, Stakeholder
 from app.modules.products.model import ITProduct, ProgramProduct, Vendor
+from app.modules.program_instances.model import AcademicWindow, ProgramInstance
 from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.reports.model import ReportArtifact, ReportJob
 from app.modules.universities.model import University
@@ -24,6 +28,9 @@ from app.modules.workflows.model import (
     WorkflowTransitionHistory,
     WorkflowVersion,
 )
+from app.modules.workflow_catalog.model import WorkflowPhase, WorkflowStageCatalog
+from app.modules.checklists.model import PlaybookChecklistItem, ProgramChecklistValue
+from app.modules.teachers.model import TeacherCarrier
 
 __all__ = [
     "File",
@@ -32,7 +39,9 @@ __all__ = [
     "ImportMapping",
     "ImportMappingField",
     "ImportRowError",
+    "IntegrationSignal",
     "AuditEvent",
+    "AcademicWindow",
     "ITDirection",
     "ITProduct",
     "ITProgram",
@@ -40,15 +49,23 @@ __all__ = [
     "Contract",
     "DataAccessScope",
     "ManagerMembership",
+    "OrgAssignment",
+    "Organization",
+    "OrganizationType",
     "ProgramProduct",
+    "ProgramInstance",
+    "ProgramMetric",
     "ResponsibleAssignmentHistory",
     "Role",
     "License",
+    "NbaItem",
+    "NbaRule",
     "ReportArtifact",
     "ReportJob",
     "University",
     "UniversityContact",
     "UniversityInteraction",
+    "Stakeholder",
     "User",
     "user_roles",
     "Vendor",
@@ -62,5 +79,10 @@ __all__ = [
     "WorkflowTransitionHistory",
     "WorkflowVersion",
     "WorkflowChangeRequest",
+    "WorkflowPhase",
+    "PlaybookChecklistItem",
+    "ProgramChecklistValue",
+    "WorkflowStageCatalog",
     "WorkflowMigrationJob",
+    "TeacherCarrier",
 ]

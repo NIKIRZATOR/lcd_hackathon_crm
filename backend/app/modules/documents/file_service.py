@@ -73,6 +73,7 @@ class FileService:
         upload: UploadFile,
         uploaded_by: UUID,
         description: str | None = None,
+        attachment_kind: str | None = None,
         request_id: str | None = None,
     ) -> WorkflowStageAttachment:
         instance = self._get_stage_instance(stage_instance_id)
@@ -108,6 +109,7 @@ class FileService:
                 provider="S3",
                 bucket=bucket,
                 object_key=object_key,
+                attachment_kind=attachment_kind,
                 uploaded_by=uploaded_by,
                 scan_status="NOT_SCANNED",
             )

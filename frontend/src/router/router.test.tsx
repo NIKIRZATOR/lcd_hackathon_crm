@@ -13,7 +13,19 @@ const authState = vi.hoisted(() => ({
 }));
 
 vi.mock('../auth', () => ({
-  ProtectedRoute: ({ children }: { children: React.ReactNode }) => children,
+  ProtectedRoute: ({
+    children,
+    allowedRoles,
+  }: {
+    children: React.ReactNode;
+    allowedRoles?: string[];
+  }) => {
+    const roles = authState.value.user?.roles ?? [];
+    if (allowedRoles && !roles.some((role) => allowedRoles.includes(role))) {
+      return <div>Denied by route guard</div>;
+    }
+    return children;
+  },
   useAuth: () => ({
     ...authState.value,
     login: vi.fn(),
@@ -39,8 +51,17 @@ vi.mock('../pages/login/LoginPage', () => ({
   default: () => <div>Login page</div>,
 }));
 
-vi.mock('../pages/home/HomePage', () => ({
-  default: () => <div>Dashboard home</div>,
+vi.mock('../v2/app/V2Layout', async () => {
+  const { Outlet } = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { default: () => <div data-testid="v2-layout"><Outlet /></div> };
+});
+
+vi.mock('../v2/pages/V2PlaceholderPage', () => ({
+  default: ({ title }: { title: string }) => <div>{title}</div>,
+}));
+
+vi.mock('../v2/pages/NbaTodayPage', () => ({
+  default: () => <div>Главная</div>,
 }));
 
 vi.mock('../pages/analytics/AnalyticsPage', () => ({
@@ -95,7 +116,7 @@ describe('AppRoutes start route', () => {
     expect(screen.queryByText('Dashboard home')).not.toBeInTheDocument();
   });
 
-  it('shows dashboard home on root route for authenticated users with a working role', () => {
+  it('redirects authenticated users with a working role to V2 home', async () => {
     authState.value = {
       authenticated: true,
       initialized: true,
@@ -104,8 +125,8 @@ describe('AppRoutes start route', () => {
 
     renderRoute('/');
 
-    expect(screen.getByTestId('app-layout')).toBeInTheDocument();
-    expect(screen.getByText('Dashboard home')).toBeInTheDocument();
+    expect(await screen.findByTestId('v2-layout')).toBeInTheDocument();
+    expect(screen.getByText('Главная')).toBeInTheDocument();
   });
 
   it('shows 403 on root route for authenticated users without a working role', () => {
@@ -118,12 +139,24 @@ describe('AppRoutes start route', () => {
     renderRoute('/');
 
     expect(screen.getByText('Нет доступа')).toBeInTheDocument();
-    expect(screen.queryByText('Dashboard home')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('v2-layout')).not.toBeInTheDocument();
   });
 
   it('redirects unknown routes to the root start route', async () => {
     renderRoute('/unknown');
 
     expect(await screen.findByText('Login page')).toBeInTheDocument();
+  });
+
+  it('denies KAM direct access to the management route', async () => {
+    authState.value = {
+      authenticated: true,
+      initialized: true,
+      user: { roles: ['KAM'] },
+    };
+
+    renderRoute('/v2/management');
+
+    expect(await screen.findByText('Denied by route guard')).toBeInTheDocument();
   });
 });

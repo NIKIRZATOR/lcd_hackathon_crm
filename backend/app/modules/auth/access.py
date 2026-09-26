@@ -13,6 +13,7 @@ from app.modules.users.model import DataAccessScope, ManagerMembership, User
 CRM_ROLES = ("KAM", "MANAGER", "ADMIN")
 CATALOG_WRITE_ROLES = ("MANAGER", "ADMIN")
 ADMIN_ROLES = ("ADMIN",)
+TEMPLATE_EDITOR_ROLES = ("MANAGER", "ADMIN")
 
 KAM_ALLOWED_INTERACTION_UPDATE_FIELDS = {
     "status",

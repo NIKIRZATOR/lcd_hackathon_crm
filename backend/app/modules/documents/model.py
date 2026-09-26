@@ -26,6 +26,7 @@ class File(UUIDPrimaryKeyMixin, TimestampCreateMixin, Base):
     provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
     bucket: Mapped[str | None] = mapped_column(String(255), nullable=True)
     object_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    attachment_kind: Mapped[str | None] = mapped_column(String(64), nullable=True)
     uploaded_by: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("users.id"),

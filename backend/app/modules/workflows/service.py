@@ -9,9 +9,14 @@ from sqlalchemy.orm import Session
 from app.common.repository import ListResult
 from app.modules.audit.model import AuditEvent
 from app.modules.audit.repository import AuditEventRepository
+from app.modules.checklists.model import PlaybookChecklistItem, ProgramChecklistValue
 from app.modules.documents.model import File
 from app.modules.interactions.model import UniversityInteraction
+from app.modules.licenses.model import Contract, License
+from app.modules.program_instances.model import ProgramInstance
+from app.modules.teachers.model import TeacherCarrier
 from app.modules.users.model import User
+from app.modules.workflow_catalog.model import WorkflowStageCatalog
 from app.modules.workflows.model import (
     WorkflowChangeRequest,
     WorkflowMigrationJob,
@@ -107,23 +112,42 @@ class WorkflowTemplateService:
     def get_template(self, template_id: UUID) -> WorkflowTemplate:
         template = self.repository.get(template_id)
         if template is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow template not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow template not found",
+            )
         return template
 
-    def create_template(self, payload: WorkflowTemplateCreate) -> WorkflowTemplate:
-        if payload.created_by is not None and self.db.get(User, payload.created_by) is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Template creator not found")
-        template = WorkflowTemplate(**payload.model_dump())
+    def create_template(
+        self, payload: WorkflowTemplateCreate, *, created_by: UUID | None = None
+    ) -> WorkflowTemplate:
+        if (
+            payload.created_by is not None
+            and self.db.get(User, payload.created_by) is None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Template creator not found",
+            )
+        template = WorkflowTemplate(**payload.model_dump(exclude={"created_by"}), created_by=created_by)
         self.repository.add(template)
         self.db.commit()
         self.db.refresh(template)
         return template
 
-    def update_template(self, template_id: UUID, payload: WorkflowTemplateUpdate) -> WorkflowTemplate:
+    def update_template(
+        self, template_id: UUID, payload: WorkflowTemplateUpdate
+    ) -> WorkflowTemplate:
         template = self.get_template(template_id)
-        if payload.created_by is not None and self.db.get(User, payload.created_by) is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Template creator not found")
-        for field, value in payload.model_dump(exclude_unset=True).items():
+        if (
+            payload.created_by is not None
+            and self.db.get(User, payload.created_by) is None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Template creator not found",
+            )
+        for field, value in payload.model_dump(exclude_unset=True, exclude={"created_by"}).items():
             setattr(template, field, value)
         self.db.commit()
         self.db.refresh(template)
@@ -170,7 +194,10 @@ class WorkflowVersionService:
             )
         )
         if existing_draft is not None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Workflow draft already exists")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Workflow draft already exists",
+            )
 
         source = self.version_repository.get_current_published(template_id)
         next_version_number = self._get_next_version_number(template_id)
@@ -194,7 +221,9 @@ class WorkflowVersionService:
                 event_metadata={
                     "workflow_template_id": str(template_id),
                     "version": draft.version,
-                    "supersedes_version_id": str(source.id) if source is not None else None,
+                    "supersedes_version_id": str(source.id)
+                    if source is not None
+                    else None,
                 },
                 request_id=request_id,
             )
@@ -213,25 +242,41 @@ class WorkflowVersionService:
     ) -> WorkflowVersion:
         version = self.db.get(WorkflowVersion, version_id)
         if version is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow version not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow version not found",
+            )
         if version.status != "DRAFT":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only draft workflow version can be published")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only draft workflow version can be published",
+            )
         stages = self.stage_repository.list_active_by_version(version.id)
         if not stages:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow version has no active stages")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow version has no active stages",
+            )
         transitions = self.transition_repository.list_by_version(version.id)
         self._validate_publish_graph(version, stages, transitions)
 
         now = datetime.now(timezone.utc)
-        current = self.version_repository.get_current_published(version.workflow_template_id)
+        current = self.version_repository.get_current_published(
+            version.workflow_template_id
+        )
         if current is not None:
             current.status = "ARCHIVED"
             current.archived_at = now
 
         version.status = "PUBLISHED"
         version.published_at = now
+        template = self._get_template(version.workflow_template_id)
+        template.status = "published"
+        template.is_active = True
         changes = self.detect_dangerous_changes(version.id)
-        approved_request = self.change_request_repository.get_approved_for_version(version.id)
+        approved_request = self.change_request_repository.get_approved_for_version(
+            version.id
+        )
         if changes.has_dangerous_changes and approved_request is None:
             raise workflow_error(
                 status_code=status.HTTP_409_CONFLICT,
@@ -251,11 +296,15 @@ class WorkflowVersionService:
                 event_metadata={
                     "workflow_template_id": str(version.workflow_template_id),
                     "version": version.version,
-                    "archived_version_id": str(current.id) if current is not None else None,
+                    "archived_version_id": str(current.id)
+                    if current is not None
+                    else None,
                     "has_dangerous_changes": changes.has_dangerous_changes,
                     "dangerous_change_count": len(changes.changes),
                     "active_interaction_count": changes.active_interaction_count,
-                    "change_request_id": str(approved_request.id) if approved_request is not None else None,
+                    "change_request_id": str(approved_request.id)
+                    if approved_request is not None
+                    else None,
                 },
                 request_id=request_id,
             )
@@ -275,7 +324,10 @@ class WorkflowVersionService:
         sort_order: str,
     ) -> ListResult[WorkflowChangeRequest]:
         return self.change_request_repository.list(
-            filters={"workflow_version_id": workflow_version_id, "status": status_value},
+            filters={
+                "workflow_version_id": workflow_version_id,
+                "status": status_value,
+            },
             limit=limit,
             offset=offset,
             sort_by=sort_by,
@@ -285,7 +337,10 @@ class WorkflowVersionService:
     def get_change_request(self, change_request_id: UUID) -> WorkflowChangeRequest:
         change_request = self.change_request_repository.get(change_request_id)
         if change_request is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow change request not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow change request not found",
+            )
         return change_request
 
     def create_change_request(
@@ -298,9 +353,15 @@ class WorkflowVersionService:
     ) -> WorkflowChangeRequest:
         version = self.db.get(WorkflowVersion, version_id)
         if version is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow version not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow version not found",
+            )
         if version.status != "DRAFT":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only draft workflow version can be reviewed")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only draft workflow version can be reviewed",
+            )
         changes = self.detect_dangerous_changes(version.id)
         change_request = WorkflowChangeRequest(
             workflow_version_id=version.id,
@@ -376,7 +437,10 @@ class WorkflowVersionService:
     ) -> WorkflowChangeRequest:
         change_request = self.get_change_request(change_request_id)
         if change_request.status != "PENDING":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only pending change request can be reviewed")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only pending change request can be reviewed",
+            )
         change_request.status = new_status
         change_request.reviewed_by = reviewed_by
         change_request.reviewed_at = datetime.now(timezone.utc)
@@ -388,7 +452,9 @@ class WorkflowVersionService:
                 entity_type="workflow_change_request",
                 entity_id=change_request.id,
                 reason=payload.review_comment,
-                event_metadata={"workflow_version_id": str(change_request.workflow_version_id)},
+                event_metadata={
+                    "workflow_version_id": str(change_request.workflow_version_id)
+                },
                 request_id=request_id,
             )
         )
@@ -402,8 +468,12 @@ class WorkflowVersionService:
         payload: WorkflowMigrationPreviewRequest,
     ) -> WorkflowMigrationPreviewRead:
         target_version, source_version = self._get_migration_versions(target_version_id)
-        active_interactions = self._list_active_interactions_by_version(source_version.id)
-        mappings = self._resolve_stage_mappings(source_version.id, target_version.id, payload.mappings, persist=False)
+        active_interactions = self._list_active_interactions_by_version(
+            source_version.id
+        )
+        mappings = self._resolve_stage_mappings(
+            source_version.id, target_version.id, payload.mappings, persist=False
+        )
         missing_stage_ids = []
         for interaction in active_interactions:
             source_stage_id = self._get_current_stage_id(interaction)
@@ -429,8 +499,14 @@ class WorkflowVersionService:
         target_version, source_version = self._get_migration_versions(target_version_id)
         if payload.change_request_id is not None:
             change_request = self.get_change_request(payload.change_request_id)
-            if change_request.workflow_version_id != target_version.id or change_request.status != "APPROVED":
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approved change request is required")
+            if (
+                change_request.workflow_version_id != target_version.id
+                or change_request.status != "APPROVED"
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Approved change request is required",
+                )
 
         preview = self.preview_migration(target_version_id, payload)
         if not preview.can_migrate:
@@ -438,7 +514,11 @@ class WorkflowVersionService:
                 status_code=status.HTTP_409_CONFLICT,
                 code="WORKFLOW_MIGRATION_MAPPING_REQUIRED",
                 message="Missing stage mappings block migration",
-                details={"missingStageInstanceIds": [str(stage_id) for stage_id in preview.missing_stage_mappings]},
+                details={
+                    "missingStageInstanceIds": [
+                        str(stage_id) for stage_id in preview.missing_stage_mappings
+                    ]
+                },
             )
 
         now = datetime.now(timezone.utc)
@@ -453,14 +533,20 @@ class WorkflowVersionService:
             migrated_interaction_count=0,
         )
         self.migration_job_repository.add(job)
-        mappings = self._resolve_stage_mappings(source_version.id, target_version.id, payload.mappings, persist=True)
+        mappings = self._resolve_stage_mappings(
+            source_version.id, target_version.id, payload.mappings, persist=True
+        )
         try:
-            for interaction in self._list_active_interactions_by_version(source_version.id, lock=True):
+            for interaction in self._list_active_interactions_by_version(
+                source_version.id, lock=True
+            ):
                 source_stage_id = self._get_current_stage_id(interaction)
                 target_stage = mappings.get(source_stage_id)
                 if target_stage is None:
                     raise RuntimeError("Missing stage mapping during migration")
-                self._migrate_interaction_runtime(interaction, target_version, target_stage)
+                self._migrate_interaction_runtime(
+                    interaction, target_version, target_stage
+                )
                 job.migrated_interaction_count += 1
 
             job.status = "COMPLETED"
@@ -489,10 +575,15 @@ class WorkflowVersionService:
         self.db.refresh(job)
         return job
 
-    def detect_dangerous_changes(self, version_id: UUID) -> WorkflowDangerousChangesRead:
+    def detect_dangerous_changes(
+        self, version_id: UUID
+    ) -> WorkflowDangerousChangesRead:
         version = self.db.get(WorkflowVersion, version_id)
         if version is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow version not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow version not found",
+            )
         if version.supersedes_version_id is None:
             return WorkflowDangerousChangesRead(
                 workflow_version_id=version.id,
@@ -502,7 +593,10 @@ class WorkflowVersionService:
             )
         source = self.db.get(WorkflowVersion, version.supersedes_version_id)
         if source is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Superseded workflow version not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Superseded workflow version not found",
+            )
         active_interaction_count = self._count_active_interactions(source.id)
         changes = self._build_dangerous_changes(
             draft_stages=self.stage_repository.list_active_by_version(version.id),
@@ -515,7 +609,9 @@ class WorkflowVersionService:
             workflow_version_id=version.id,
             supersedes_version_id=source.id,
             active_interaction_count=active_interaction_count,
-            has_dangerous_changes=any(change.severity in {"MEDIUM", "HIGH"} for change in changes),
+            has_dangerous_changes=any(
+                change.severity in {"MEDIUM", "HIGH"} for change in changes
+            ),
             changes=changes,
         )
 
@@ -595,8 +691,12 @@ class WorkflowVersionService:
             )
 
         draft_transition_keys = self._transition_keys(draft_transitions, draft_stages)
-        source_transition_keys = self._transition_keys(source_transitions, source_stages)
-        for from_stage_name, to_stage_name in source_transition_keys - draft_transition_keys:
+        source_transition_keys = self._transition_keys(
+            source_transitions, source_stages
+        )
+        for from_stage_name, to_stage_name in (
+            source_transition_keys - draft_transition_keys
+        ):
             changes.append(
                 WorkflowDangerousChangeRead(
                     change_type="TRANSITION_REMOVED",
@@ -607,7 +707,9 @@ class WorkflowVersionService:
                     details=active_details,
                 )
             )
-        for from_stage_name, to_stage_name in draft_transition_keys - source_transition_keys:
+        for from_stage_name, to_stage_name in (
+            draft_transition_keys - source_transition_keys
+        ):
             changes.append(
                 WorkflowDangerousChangeRead(
                     change_type="TRANSITION_ADDED",
@@ -621,7 +723,9 @@ class WorkflowVersionService:
 
         return changes
 
-    def _stage_flag_changes(self, source_stage: WorkflowStage, draft_stage: WorkflowStage) -> list[str]:
+    def _stage_flag_changes(
+        self, source_stage: WorkflowStage, draft_stage: WorkflowStage
+    ) -> list[str]:
         tracked_fields = (
             "is_initial",
             "is_final",
@@ -629,7 +733,11 @@ class WorkflowVersionService:
             "requires_comment",
             "requires_attachment",
         )
-        return [field for field in tracked_fields if getattr(source_stage, field) != getattr(draft_stage, field)]
+        return [
+            field
+            for field in tracked_fields
+            if getattr(source_stage, field) != getattr(draft_stage, field)
+        ]
 
     def _transition_keys(
         self,
@@ -640,18 +748,32 @@ class WorkflowVersionService:
         return {
             (stage_names[transition.from_stage_id], stage_names[transition.to_stage_id])
             for transition in transitions
-            if transition.from_stage_id in stage_names and transition.to_stage_id in stage_names
+            if transition.from_stage_id in stage_names
+            and transition.to_stage_id in stage_names
         }
 
-    def _get_migration_versions(self, target_version_id: UUID) -> tuple[WorkflowVersion, WorkflowVersion]:
+    def _get_migration_versions(
+        self, target_version_id: UUID
+    ) -> tuple[WorkflowVersion, WorkflowVersion]:
         target_version = self.db.get(WorkflowVersion, target_version_id)
         if target_version is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow version not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow version not found",
+            )
         if target_version.supersedes_version_id is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow version has no source version")
-        source_version = self.db.get(WorkflowVersion, target_version.supersedes_version_id)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow version has no source version",
+            )
+        source_version = self.db.get(
+            WorkflowVersion, target_version.supersedes_version_id
+        )
         if source_version is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Source workflow version not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Source workflow version not found",
+            )
         return target_version, source_version
 
     def _list_active_interactions_by_version(
@@ -687,7 +809,9 @@ class WorkflowVersionService:
             if target_stage is not None:
                 mappings[source_stage.id] = target_stage
 
-        for persisted in self.stage_mapping_repository.list_by_versions(source_version_id, target_version_id):
+        for persisted in self.stage_mapping_repository.list_by_versions(
+            source_version_id, target_version_id
+        ):
             target_stage = target_by_id.get(persisted.target_stage_id)
             if target_stage is not None:
                 mappings[persisted.source_stage_id] = target_stage
@@ -695,14 +819,19 @@ class WorkflowVersionService:
         for requested in requested_mappings:
             target_stage = target_by_id.get(requested.target_stage_id)
             if target_stage is None:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Target stage not found")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Target stage not found",
+                )
             mappings[requested.source_stage_id] = target_stage
             if not persist:
                 continue
             existing = next(
                 (
                     mapping
-                    for mapping in self.stage_mapping_repository.list_by_versions(source_version_id, target_version_id)
+                    for mapping in self.stage_mapping_repository.list_by_versions(
+                        source_version_id, target_version_id
+                    )
                     if mapping.source_stage_id == requested.source_stage_id
                 ),
                 None,
@@ -721,7 +850,9 @@ class WorkflowVersionService:
 
         return mappings
 
-    def _stage_mapping_reads(self, mappings: dict[UUID, WorkflowStage]) -> list[WorkflowStageMappingRead]:
+    def _stage_mapping_reads(
+        self, mappings: dict[UUID, WorkflowStage]
+    ) -> list[WorkflowStageMappingRead]:
         result: list[WorkflowStageMappingRead] = []
         for source_stage_id, target_stage in mappings.items():
             source_stage = self.db.get(WorkflowStage, source_stage_id)
@@ -740,7 +871,9 @@ class WorkflowVersionService:
     def _get_current_stage_id(self, interaction: UniversityInteraction) -> UUID | None:
         if interaction.current_stage_instance_id is None:
             return None
-        current_instance = self.db.get(WorkflowStageInstance, interaction.current_stage_instance_id)
+        current_instance = self.db.get(
+            WorkflowStageInstance, interaction.current_stage_instance_id
+        )
         if current_instance is None:
             return None
         return current_instance.workflow_stage_id
@@ -774,7 +907,9 @@ class WorkflowVersionService:
         current_instance = instances_by_stage_id[target_current_stage.id]
         current_instance.status = "IN_PROGRESS"
         current_instance.started_at = current_instance.started_at or now
-        current_instance.due_at = current_instance.due_at or WorkflowRuntimeService(self.db)._calculate_due_at(
+        current_instance.due_at = current_instance.due_at or WorkflowRuntimeService(
+            self.db
+        )._calculate_due_at(
             now,
             target_current_stage,
         )
@@ -785,16 +920,23 @@ class WorkflowVersionService:
     def _get_template(self, template_id: UUID) -> WorkflowTemplate:
         template = self.template_repository.get(template_id)
         if template is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow template not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow template not found",
+            )
         return template
 
     def _get_next_version_number(self, template_id: UUID) -> int:
         current_max = self.db.scalar(
-            select(func.max(WorkflowVersion.version)).where(WorkflowVersion.workflow_template_id == template_id)
+            select(func.max(WorkflowVersion.version)).where(
+                WorkflowVersion.workflow_template_id == template_id
+            )
         )
         return (current_max or 0) + 1
 
-    def _clone_version_structure(self, source: WorkflowVersion, draft: WorkflowVersion) -> None:
+    def _clone_version_structure(
+        self, source: WorkflowVersion, draft: WorkflowVersion
+    ) -> None:
         stage_map: dict[UUID, WorkflowStage] = {}
         for stage in self.stage_repository.list_active_by_version(source.id):
             cloned_stage = WorkflowStage(
@@ -806,16 +948,39 @@ class WorkflowVersionService:
                 is_initial=stage.is_initial,
                 is_final=stage.is_final,
                 is_optional=stage.is_optional,
+                semester_critical=stage.semester_critical,
                 default_duration_days=stage.default_duration_days,
                 requires_comment=stage.requires_comment,
                 requires_attachment=stage.requires_attachment,
                 is_active=stage.is_active,
+                stage_catalog_id=stage.stage_catalog_id,
             )
             self.stage_repository.add(cloned_stage)
             stage_map[stage.id] = cloned_stage
 
+        self.db.flush()
+        for source_stage_id, cloned_stage in stage_map.items():
+            for item in self.db.scalars(
+                select(PlaybookChecklistItem).where(
+                    PlaybookChecklistItem.workflow_stage_id == source_stage_id
+                )
+            ):
+                self.db.add(
+                    PlaybookChecklistItem(
+                        workflow_stage_id=cloned_stage.id,
+                        code=item.code,
+                        label=item.label,
+                        item_type=item.item_type,
+                        required=item.required,
+                        required_stakeholder_role=item.required_stakeholder_role,
+                        required_attachment_kind=item.required_attachment_kind,
+                    )
+                )
+
         source_transitions = self.db.scalars(
-            select(WorkflowTransition).where(WorkflowTransition.workflow_version_id == source.id)
+            select(WorkflowTransition).where(
+                WorkflowTransition.workflow_version_id == source.id
+            )
         ).all()
         for transition in source_transitions:
             from_stage = stage_map.get(transition.from_stage_id)
@@ -865,7 +1030,10 @@ class WorkflowVersionService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Workflow transition belongs to another version",
                 )
-            if transition.from_stage_id not in active_stage_ids or transition.to_stage_id not in active_stage_ids:
+            if (
+                transition.from_stage_id not in active_stage_ids
+                or transition.to_stage_id not in active_stage_ids
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Workflow transition references inactive or missing stage",
@@ -936,24 +1104,36 @@ class WorkflowStageService:
     def get_stage(self, stage_id: UUID) -> WorkflowStage:
         stage = self.repository.get(stage_id)
         if stage is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow stage not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Workflow stage not found"
+            )
         return stage
 
     def create_stage(self, payload: WorkflowStageCreate) -> WorkflowStage:
-        workflow_version_id = self._resolve_draft_version(payload.workflow_template_id, payload.workflow_version_id)
-        stage = WorkflowStage(**payload.model_dump(exclude={"workflow_version_id"}), workflow_version_id=workflow_version_id)
+        workflow_version_id = self._resolve_draft_version(
+            payload.workflow_template_id, payload.workflow_version_id
+        )
+        stage = WorkflowStage(
+            **payload.model_dump(exclude={"workflow_version_id"}),
+            workflow_version_id=workflow_version_id,
+        )
         self.repository.add(stage)
         self.db.commit()
         self.db.refresh(stage)
         return stage
 
-    def update_stage(self, stage_id: UUID, payload: WorkflowStageUpdate) -> WorkflowStage:
+    def update_stage(
+        self, stage_id: UUID, payload: WorkflowStageUpdate
+    ) -> WorkflowStage:
         stage = self.get_stage(stage_id)
         self._ensure_version_is_draft(stage.workflow_version_id)
         if payload.workflow_template_id is not None:
             self._validate_template(payload.workflow_template_id)
         if payload.workflow_version_id is not None:
-            self._validate_version(payload.workflow_template_id or stage.workflow_template_id, payload.workflow_version_id)
+            self._validate_version(
+                payload.workflow_template_id or stage.workflow_template_id,
+                payload.workflow_version_id,
+            )
         for field, value in payload.model_dump(exclude_unset=True).items():
             setattr(stage, field, value)
         self.db.commit()
@@ -962,9 +1142,14 @@ class WorkflowStageService:
 
     def _validate_template(self, template_id: UUID) -> None:
         if self.db.get(WorkflowTemplate, template_id) is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow template not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow template not found",
+            )
 
-    def _resolve_draft_version(self, template_id: UUID, version_id: UUID | None) -> UUID:
+    def _resolve_draft_version(
+        self, template_id: UUID, version_id: UUID | None
+    ) -> UUID:
         self._validate_template(template_id)
         if version_id is not None:
             self._validate_version(template_id, version_id)
@@ -978,21 +1163,33 @@ class WorkflowStageService:
             )
         )
         if draft is None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Create draft before editing workflow stages")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Create draft before editing workflow stages",
+            )
         return draft.id
 
     def _validate_version(self, template_id: UUID, version_id: UUID) -> WorkflowVersion:
         version = self.db.get(WorkflowVersion, version_id)
         if version is None or version.workflow_template_id != template_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow version not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow version not found",
+            )
         return version
 
     def _ensure_version_is_draft(self, version_id: UUID) -> None:
         version = self.db.get(WorkflowVersion, version_id)
         if version is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow version not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow version not found",
+            )
         if version.status != "DRAFT":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Published workflow version is immutable")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Published workflow version is immutable",
+            )
 
 
 class WorkflowTransitionService:
@@ -1030,12 +1227,21 @@ class WorkflowTransitionService:
     def get_transition(self, transition_id: UUID) -> WorkflowTransition:
         transition = self.repository.get(transition_id)
         if transition is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow transition not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow transition not found",
+            )
         return transition
 
-    def create_transition(self, payload: WorkflowTransitionCreate) -> WorkflowTransition:
-        workflow_version_id = self._resolve_draft_version(payload.workflow_template_id, payload.workflow_version_id)
-        payload = payload.model_copy(update={"workflow_version_id": workflow_version_id})
+    def create_transition(
+        self, payload: WorkflowTransitionCreate
+    ) -> WorkflowTransition:
+        workflow_version_id = self._resolve_draft_version(
+            payload.workflow_template_id, payload.workflow_version_id
+        )
+        payload = payload.model_copy(
+            update={"workflow_version_id": workflow_version_id}
+        )
         self._validate_transition_payload(payload)
         transition = WorkflowTransition(**payload.model_dump())
         self.repository.add(transition)
@@ -1051,13 +1257,19 @@ class WorkflowTransitionService:
         transition = self.get_transition(transition_id)
         self._ensure_version_is_draft(transition.workflow_version_id)
         merged = WorkflowTransitionCreate(
-            workflow_template_id=payload.workflow_template_id or transition.workflow_template_id,
-            workflow_version_id=payload.workflow_version_id or transition.workflow_version_id,
+            workflow_template_id=payload.workflow_template_id
+            or transition.workflow_template_id,
+            workflow_version_id=payload.workflow_version_id
+            or transition.workflow_version_id,
             from_stage_id=payload.from_stage_id or transition.from_stage_id,
             to_stage_id=payload.to_stage_id or transition.to_stage_id,
             name=payload.name if payload.name is not None else transition.name,
-            is_default=payload.is_default if payload.is_default is not None else transition.is_default,
-            condition_code=payload.condition_code if payload.condition_code is not None else transition.condition_code,
+            is_default=payload.is_default
+            if payload.is_default is not None
+            else transition.is_default,
+            condition_code=payload.condition_code
+            if payload.condition_code is not None
+            else transition.condition_code,
         )
         self._validate_transition_payload(merged)
         for field, value in payload.model_dump(exclude_unset=True).items():
@@ -1071,28 +1283,63 @@ class WorkflowTransitionService:
         from_stage = self.db.get(WorkflowStage, payload.from_stage_id)
         to_stage = self.db.get(WorkflowStage, payload.to_stage_id)
         if template is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow template not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow template not found",
+            )
         if from_stage is None or to_stage is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow stage not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow stage not found",
+            )
         if from_stage.workflow_template_id != payload.workflow_template_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="From stage belongs to another template")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="From stage belongs to another template",
+            )
         if to_stage.workflow_template_id != payload.workflow_template_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="To stage belongs to another template")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="To stage belongs to another template",
+            )
         if payload.workflow_version_id is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow version is required")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow version is required",
+            )
         version = self.db.get(WorkflowVersion, payload.workflow_version_id)
-        if version is None or version.workflow_template_id != payload.workflow_template_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow version not found")
+        if (
+            version is None
+            or version.workflow_template_id != payload.workflow_template_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow version not found",
+            )
         if version.status != "DRAFT":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Published workflow version is immutable")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Published workflow version is immutable",
+            )
         if from_stage.workflow_version_id != payload.workflow_version_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="From stage belongs to another version")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="From stage belongs to another version",
+            )
         if to_stage.workflow_version_id != payload.workflow_version_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="To stage belongs to another version")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="To stage belongs to another version",
+            )
 
-    def _resolve_draft_version(self, template_id: UUID, version_id: UUID | None) -> UUID:
+    def _resolve_draft_version(
+        self, template_id: UUID, version_id: UUID | None
+    ) -> UUID:
         if self.db.get(WorkflowTemplate, template_id) is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow template not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow template not found",
+            )
         if version_id is not None:
             self._ensure_version_is_draft(version_id, template_id)
             return version_id
@@ -1103,15 +1350,28 @@ class WorkflowTransitionService:
             )
         )
         if draft is None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Create draft before editing workflow transitions")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Create draft before editing workflow transitions",
+            )
         return draft.id
 
-    def _ensure_version_is_draft(self, version_id: UUID, template_id: UUID | None = None) -> None:
+    def _ensure_version_is_draft(
+        self, version_id: UUID, template_id: UUID | None = None
+    ) -> None:
         version = self.db.get(WorkflowVersion, version_id)
-        if version is None or (template_id is not None and version.workflow_template_id != template_id):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow version not found")
+        if version is None or (
+            template_id is not None and version.workflow_template_id != template_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow version not found",
+            )
         if version.status != "DRAFT":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Published workflow version is immutable")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Published workflow version is immutable",
+            )
 
 
 class WorkflowRuntimeService:
@@ -1123,7 +1383,9 @@ class WorkflowRuntimeService:
         self.history_repository = WorkflowTransitionHistoryRepository(db)
 
     def validate_template_has_stages(self, template_id: UUID) -> None:
-        version = WorkflowVersionService(self.db).get_current_published_version(template_id)
+        version = WorkflowVersionService(self.db).get_current_published_version(
+            template_id
+        )
         stages = self.stage_repository.list_active_by_version(version.id)
         if not stages:
             raise HTTPException(
@@ -1131,17 +1393,29 @@ class WorkflowRuntimeService:
                 detail="Workflow template has no active stages",
             )
 
-    def initialize_interaction_workflow(self, interaction: UniversityInteraction) -> None:
+    def initialize_interaction_workflow(
+        self, interaction: UniversityInteraction
+    ) -> None:
         if interaction.workflow_template_id is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow template is required")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow template is required",
+            )
         if interaction.workflow_version_id is None:
-            interaction.workflow_version_id = WorkflowVersionService(self.db).get_current_published_version(
-                interaction.workflow_template_id
-            ).id
+            interaction.workflow_version_id = (
+                WorkflowVersionService(self.db)
+                .get_current_published_version(interaction.workflow_template_id)
+                .id
+            )
 
-        stages = self.stage_repository.list_active_by_version(interaction.workflow_version_id)
+        stages = self.stage_repository.list_active_by_version(
+            interaction.workflow_version_id
+        )
         if not stages:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workflow template has no active stages")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow template has no active stages",
+            )
 
         now = datetime.now(timezone.utc)
         initial_stage = next((stage for stage in stages if stage.is_initial), stages[0])
@@ -1159,8 +1433,100 @@ class WorkflowRuntimeService:
             )
             self.instance_repository.add(instance)
             instances[stage.id] = instance
+            for checklist_item in self.db.scalars(
+                select(PlaybookChecklistItem).where(
+                    PlaybookChecklistItem.workflow_stage_id == stage.id
+                )
+            ):
+                self.db.add(
+                    ProgramChecklistValue(
+                        checklist_item_id=checklist_item.id,
+                        stage_instance_id=instance.id,
+                    )
+                )
 
         interaction.current_stage_instance_id = instances[initial_stage.id].id
+
+    def initialize_program_workflow(
+        self, program: ProgramInstance, *, responsible_user_id: UUID | None = None
+    ) -> None:
+        program.workflow_version_id = (
+            WorkflowVersionService(self.db)
+            .get_current_published_version(program.playbook_template_id)
+            .id
+        )
+        stages = self.stage_repository.list_active_by_version(
+            program.workflow_version_id
+        )
+        if not stages:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow template has no active stages",
+            )
+        now = datetime.now(timezone.utc)
+        initial = next((stage for stage in stages if stage.is_initial), stages[0])
+        if initial.stage_catalog_id is not None:
+            catalog = self.db.get(WorkflowStageCatalog, initial.stage_catalog_id)
+            program.current_stage_code = catalog.code if catalog is not None else None
+        for stage in stages:
+            instance = WorkflowStageInstance(
+                program_instance_id=program.id,
+                workflow_stage_id=stage.id,
+                responsible_user_id=responsible_user_id or program.kam_user_id,
+                status="IN_PROGRESS" if stage.id == initial.id else "NOT_STARTED",
+                started_at=now if stage.id == initial.id else None,
+                due_at=self._calculate_due_at(now, stage)
+                if stage.id == initial.id
+                else None,
+            )
+            self.db.add(instance)
+            self.db.flush()
+            if stage.id == initial.id:
+                program.current_stage_instance_id = instance.id
+            for item in self.db.scalars(
+                select(PlaybookChecklistItem).where(
+                    PlaybookChecklistItem.workflow_stage_id == stage.id
+                )
+            ):
+                self.db.add(
+                    ProgramChecklistValue(
+                        checklist_item_id=item.id, stage_instance_id=instance.id
+                    )
+                )
+
+    def list_available_program_transitions(
+        self, program: ProgramInstance
+    ) -> list[WorkflowAvailableTransitionRead]:
+        if (
+            program.workflow_version_id is None
+            or program.current_stage_instance_id is None
+        ):
+            return []
+        current = self.db.get(WorkflowStageInstance, program.current_stage_instance_id)
+        if current is None or current.status not in {
+            "IN_PROGRESS",
+            "WAITING",
+            "BLOCKED",
+        }:
+            return []
+        stage = self.db.get(WorkflowStage, current.workflow_stage_id)
+        if stage is None:
+            return []
+        transitions = self.transition_repository.list_from_stage(
+            version_id=program.workflow_version_id, from_stage_id=stage.id
+        )
+        return [
+            WorkflowAvailableTransitionRead(
+                **WorkflowTransitionRead.model_validate(item).model_dump(),
+                transition_kind=self._classify_transition(
+                    stage, target, len(transitions) > 1
+                ),
+                to_stage=WorkflowStageRead.model_validate(target),
+            )
+            for item in transitions
+            if (target := self.db.get(WorkflowStage, item.to_stage_id)) is not None
+            and target.is_active
+        ]
 
     def list_stage_instances(
         self,
@@ -1183,12 +1549,23 @@ class WorkflowRuntimeService:
     def get_current_stage_instance(self, interaction_id: UUID) -> WorkflowStageInstance:
         interaction = self.db.get(UniversityInteraction, interaction_id)
         if interaction is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University interaction not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="University interaction not found",
+            )
         if interaction.current_stage_instance_id is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Interaction has no current stage")
-        instance = self.db.get(WorkflowStageInstance, interaction.current_stage_instance_id)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Interaction has no current stage",
+            )
+        instance = self.db.get(
+            WorkflowStageInstance, interaction.current_stage_instance_id
+        )
         if instance is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current stage instance not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current stage instance not found",
+            )
         return instance
 
     def update_stage_instance_status(
@@ -1198,7 +1575,10 @@ class WorkflowRuntimeService:
     ) -> WorkflowStageInstance:
         instance = self.instance_repository.get(stage_instance_id)
         if instance is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow stage instance not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow stage instance not found",
+            )
         instance.status = payload.status
         self.db.commit()
         self.db.refresh(instance)
@@ -1221,17 +1601,31 @@ class WorkflowRuntimeService:
             sort_order=sort_order,
         )
 
-    def list_available_transitions(self, interaction_id: UUID) -> list[WorkflowAvailableTransitionRead]:
+    def list_available_transitions(
+        self, interaction_id: UUID
+    ) -> list[WorkflowAvailableTransitionRead]:
         interaction = self.db.get(UniversityInteraction, interaction_id)
         if interaction is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University interaction not found")
-        if interaction.workflow_template_id is None or interaction.workflow_version_id is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Interaction workflow is not initialized")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="University interaction not found",
+            )
+        if (
+            interaction.workflow_template_id is None
+            or interaction.workflow_version_id is None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Interaction workflow is not initialized",
+            )
 
         current_instance = self.get_current_stage_instance(interaction_id)
         current_stage = self.db.get(WorkflowStage, current_instance.workflow_stage_id)
         if current_stage is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current workflow stage not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current workflow stage not found",
+            )
         if current_instance.status not in {"IN_PROGRESS", "WAITING", "BLOCKED"}:
             return []
 
@@ -1248,7 +1642,9 @@ class WorkflowRuntimeService:
             result.append(
                 WorkflowAvailableTransitionRead(
                     **WorkflowTransitionRead.model_validate(transition).model_dump(),
-                    transition_kind=self._classify_transition(current_stage, target_stage, is_branch),
+                    transition_kind=self._classify_transition(
+                        current_stage, target_stage, is_branch
+                    ),
                     to_stage=WorkflowStageRead.model_validate(target_stage),
                 )
             )
@@ -1261,9 +1657,13 @@ class WorkflowRuntimeService:
         *,
         request_id: str | None = None,
     ) -> WorkflowTransitionResult:
-        return TransitionService(self.db).execute_transition(interaction_id, payload, request_id=request_id)
+        return TransitionService(self.db).execute_transition(
+            interaction_id, payload, request_id=request_id
+        )
 
-    def _calculate_due_at(self, started_at: datetime, stage: WorkflowStage) -> datetime | None:
+    def _calculate_due_at(
+        self, started_at: datetime, stage: WorkflowStage
+    ) -> datetime | None:
         if stage.default_duration_days is None:
             return None
         return started_at + timedelta(days=stage.default_duration_days)
@@ -1297,7 +1697,9 @@ class TransitionService:
         *,
         request_id: str | None = None,
     ) -> WorkflowTransitionResult:
-        interaction = self.db.get(UniversityInteraction, interaction_id, with_for_update=True)
+        interaction = self.db.get(
+            UniversityInteraction, interaction_id, with_for_update=True
+        )
         if interaction is None:
             raise workflow_error(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1311,7 +1713,10 @@ class TransitionService:
                 message="Interaction is already terminal",
                 details={"interactionStatus": interaction.status},
             )
-        if interaction.workflow_template_id is None or interaction.current_stage_instance_id is None:
+        if (
+            interaction.workflow_template_id is None
+            or interaction.current_stage_instance_id is None
+        ):
             raise workflow_error(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 code="WORKFLOW_NOT_INITIALIZED",
@@ -1344,7 +1749,9 @@ class TransitionService:
                 code="WORKFLOW_CURRENT_STAGE_CHANGED",
                 message="Current stage changed",
                 details={
-                    "expectedCurrentStageInstanceId": str(payload.expected_current_stage_instance_id),
+                    "expectedCurrentStageInstanceId": str(
+                        payload.expected_current_stage_instance_id
+                    ),
                     "actualCurrentStageInstanceId": str(current_instance.id),
                 },
             )
@@ -1409,7 +1816,9 @@ class TransitionService:
 
             next_instance.status = "IN_PROGRESS"
             next_instance.started_at = next_instance.started_at or now
-            next_instance.due_at = next_instance.due_at or self._calculate_due_at(now, next_stage)
+            next_instance.due_at = next_instance.due_at or self._calculate_due_at(
+                now, next_stage
+            )
 
             history = WorkflowTransitionHistory(
                 interaction_id=interaction.id,
@@ -1455,34 +1864,288 @@ class TransitionService:
             current_stage_instance_id=interaction.current_stage_instance_id,
         )
 
+    def execute_program_transition(
+        self,
+        program: ProgramInstance,
+        payload: WorkflowTransitionExecute,
+        *,
+        request_id: str | None = None,
+    ) -> dict:
+        if (
+            program.status in {"completed", "cancelled"}
+            or program.workflow_version_id is None
+            or program.current_stage_instance_id is None
+        ):
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_NOT_INITIALIZED",
+                message="Program workflow is not active",
+            )
+        current = self.db.get(
+            WorkflowStageInstance,
+            program.current_stage_instance_id,
+            with_for_update=True,
+        )
+        if current is None:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_CURRENT_STAGE_NOT_FOUND",
+                message="Current stage instance not found",
+            )
+        if (
+            payload.expected_current_stage_instance_id
+            and payload.expected_current_stage_instance_id != current.id
+        ):
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_CURRENT_STAGE_CHANGED",
+                message="Current stage changed",
+            )
+        stage = self.db.get(WorkflowStage, current.workflow_stage_id)
+        if stage is None or current.status not in {"IN_PROGRESS", "WAITING", "BLOCKED"}:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_CURRENT_STAGE_NOT_ACTIVE",
+                message="Current stage is not active",
+            )
+        if payload.skip_current and not stage.is_optional:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_STAGE_NOT_OPTIONAL",
+                message="Only optional stages can be skipped",
+                details={"currentStageId": str(stage.id)},
+            )
+
+        if stage.is_final:
+            self._validate_stage_requirements(stage, current, payload)
+            now = datetime.now(timezone.utc)
+            current.status = "SKIPPED" if payload.skip_current else "COMPLETED"
+            current.completed_at = None if payload.skip_current else now
+            current.skipped_at = now if payload.skip_current else None
+            history = WorkflowTransitionHistory(
+                program_instance_id=program.id,
+                from_stage_instance_id=current.id,
+                to_stage_instance_id=None,
+                transition_id=None,
+                performed_by=self._get_performed_by(payload),
+                comment=payload.comment,
+                performed_at=now,
+            )
+            self.history_repository.add(history)
+            program.status = "completed"
+            program.completed_at = now
+            program.current_stage_instance_id = None
+            program.current_stage_code = None
+            self.audit_repository.add(
+                AuditEvent(
+                    actor_user_id=self._get_performed_by(payload),
+                    action="workflow.program_completed",
+                    entity_type="program_instance",
+                    entity_id=program.id,
+                    reason=payload.comment,
+                    event_metadata={"final_stage_instance_id": str(current.id)},
+                    request_id=request_id,
+                )
+            )
+            self.db.flush()
+            return {
+                "program_instance_id": str(program.id),
+                "current_stage_instance_id": None,
+                "transition_history_id": str(history.id),
+                "status": program.status,
+            }
+
+        if payload.transition_id is None:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_TRANSITION_REQUIRED",
+                message="Transition is required for a non-final stage",
+            )
+        transition = self.transition_repository.get_allowed_transition(
+            transition_id=payload.transition_id,
+            template_id=program.playbook_template_id,
+            version_id=program.workflow_version_id,
+            from_stage_id=stage.id,
+        )
+        if transition is None:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_TRANSITION_NOT_ALLOWED",
+                message="Transition is not allowed",
+            )
+        self._validate_stage_requirements(stage, current, payload)
+        next_instance = self.db.scalar(
+            select(WorkflowStageInstance)
+            .where(
+                WorkflowStageInstance.program_instance_id == program.id,
+                WorkflowStageInstance.workflow_stage_id == transition.to_stage_id,
+            )
+            .with_for_update()
+        )
+        next_stage = self.db.get(WorkflowStage, transition.to_stage_id)
+        if next_instance is None or next_stage is None:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_TARGET_STAGE_INSTANCE_NOT_FOUND",
+                message="Target stage instance not found",
+            )
+        now = datetime.now(timezone.utc)
+        current.status = "SKIPPED" if payload.skip_current else "COMPLETED"
+        current.completed_at = None if payload.skip_current else now
+        current.skipped_at = now if payload.skip_current else None
+        next_instance.status = "IN_PROGRESS"
+        next_instance.started_at = next_instance.started_at or now
+        next_instance.due_at = next_instance.due_at or self._calculate_due_at(
+            now, next_stage
+        )
+        history = WorkflowTransitionHistory(
+            program_instance_id=program.id,
+            from_stage_instance_id=current.id,
+            to_stage_instance_id=next_instance.id,
+            transition_id=transition.id,
+            performed_by=self._get_performed_by(payload),
+            comment=payload.comment,
+            performed_at=now,
+        )
+        self.history_repository.add(history)
+        program.current_stage_instance_id = next_instance.id
+        self.audit_repository.add(
+            AuditEvent(
+                actor_user_id=self._get_performed_by(payload),
+                action="workflow.transition",
+                entity_type="program_instance",
+                entity_id=program.id,
+                reason=payload.comment,
+                event_metadata={"transition_id": str(transition.id)},
+                request_id=request_id,
+            )
+        )
+        self.db.flush()
+        return {
+            "program_instance_id": str(program.id),
+            "current_stage_instance_id": str(next_instance.id),
+            "transition_history_id": str(history.id),
+        }
+
     def _validate_stage_requirements(
         self,
         stage: WorkflowStage,
         instance: WorkflowStageInstance,
         payload: WorkflowTransitionExecute,
     ) -> None:
+        reasons: list[dict[str, object]] = []
         if stage.requires_comment and not (payload.comment and payload.comment.strip()):
-            raise workflow_error(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                code="WORKFLOW_STAGE_REQUIRES_COMMENT",
-                message="Current stage requires comment",
-                details={"currentStageId": str(stage.id), "currentStageInstanceId": str(instance.id)},
-            )
+            reasons.append({"code": "missing_comment", "message": "Current stage requires comment"})
         if stage.requires_attachment and self._count_stage_attachments(instance.id) == 0:
+            reasons.append({"code": "missing_attachment", "message": "Current stage requires attachment"})
+        missing_query = (
+            select(PlaybookChecklistItem)
+            .outerjoin(
+                ProgramChecklistValue,
+                (ProgramChecklistValue.checklist_item_id == PlaybookChecklistItem.id)
+                & (ProgramChecklistValue.stage_instance_id == instance.id),
+            )
+            .where(
+                PlaybookChecklistItem.workflow_stage_id == stage.id,
+                PlaybookChecklistItem.required.is_(True),
+                (ProgramChecklistValue.id.is_(None)) | (ProgramChecklistValue.is_done.is_(False)),
+            )
+        )
+        missing_count = self.db.scalar(select(func.count()).select_from(missing_query.subquery())) or 0
+        missing_items = self.db.execute(missing_query).scalars().all() if missing_count else []
+        if missing_count:
+            reasons.append(
+                {
+                    "code": "missing_required_checklist",
+                    "message": "Required checklist items are incomplete",
+                    "item_ids": [str(item.id) for item in missing_items],
+                    "missing_count": missing_count,
+                }
+            )
+        missing_roles = sorted(
+            {
+                item.required_stakeholder_role
+                for item in missing_items
+                if item.item_type == "stakeholder_role" and item.required_stakeholder_role
+            }
+        )
+        if missing_roles:
+            reasons.append(
+                {
+                    "code": "missing_stakeholder_role",
+                    "message": "Required stakeholder roles are missing",
+                    "roles": missing_roles,
+                }
+            )
+        reasons.extend(self._canonical_entity_reasons(stage, instance))
+        if reasons:
+            first_code = {
+                "missing_comment": "WORKFLOW_STAGE_REQUIRES_COMMENT",
+                "missing_attachment": "WORKFLOW_STAGE_REQUIRES_ATTACHMENT",
+                "missing_required_checklist": "WORKFLOW_CHECKLIST_INCOMPLETE",
+            }.get(str(reasons[0]["code"]), "WORKFLOW_STAGE_BLOCKED")
             raise workflow_error(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                code="WORKFLOW_STAGE_REQUIRES_ATTACHMENT",
-                message="Current stage requires attachment",
-                details={"currentStageId": str(stage.id), "currentStageInstanceId": str(instance.id)},
+                code=first_code,
+                message="Current stage requirements are not satisfied",
+                details={
+                    "currentStageId": str(stage.id),
+                    "currentStageInstanceId": str(instance.id),
+                    "reasons": reasons,
+                },
             )
-        performed_by = self._get_performed_by(payload)
-        if self.db.get(User, performed_by) is None:
-            raise workflow_error(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                code="WORKFLOW_PERFORMER_NOT_FOUND",
-                message="Transition performer not found",
-                details={"performedBy": str(performed_by)},
-            )
+
+    def _canonical_entity_reasons(
+        self, stage: WorkflowStage, instance: WorkflowStageInstance
+    ) -> list[dict[str, object]]:
+        if instance.program_instance_id is None or stage.stage_catalog_id is None:
+            return []
+        catalog = self.db.get(WorkflowStageCatalog, stage.stage_catalog_id)
+        program = self.db.get(ProgramInstance, instance.program_instance_id)
+        if catalog is None or program is None:
+            return []
+        code = catalog.code
+        reasons: list[dict[str, object]] = []
+        if code == "sign_contract":
+            contract = self.db.scalar(select(Contract).where(
+                Contract.organization_id == program.organization_id,
+                Contract.number.is_not(None),
+                (Contract.signed_on.is_not(None)) | (Contract.signed_at.is_not(None)),
+                Contract.attachment_id.is_not(None),
+            ))
+            if contract is None:
+                reasons.append({"code": "missing_contract", "message": "Signed framework contract is required"})
+        elif code in {"sign_license", "transfer_access"}:
+            license_record = self.db.scalar(select(License).where(
+                License.program_instance_id == program.id,
+                License.license_number.is_not(None),
+                License.valid_until.is_not(None),
+                License.attachment_id.is_not(None),
+            ))
+            if license_record is None:
+                reasons.append({"code": "missing_license", "message": "Signed program license is required"})
+            elif code == "transfer_access" and license_record.transfer_status != "transferred":
+                reasons.append({"code": "missing_transfer", "message": "License transfer must be marked transferred"})
+            elif code == "transfer_access" and not license_record.product_access:
+                reasons.append({"code": "missing_product_access", "message": "Product access details are required"})
+        elif code == "train_teacher":
+            teacher = self.db.scalar(select(TeacherCarrier).where(
+                TeacherCarrier.program_instance_id == program.id,
+                TeacherCarrier.product_id == program.product_id,
+                TeacherCarrier.trained_on.is_not(None),
+                TeacherCarrier.status.in_(["trained", "active"]),
+            ))
+            if teacher is None:
+                reasons.append({"code": "missing_teacher_training", "message": "A trained teacher for this product is required"})
+        elif code == "confirm_teacher":
+            teacher = self.db.scalar(select(TeacherCarrier).where(
+                TeacherCarrier.program_instance_id == program.id,
+                TeacherCarrier.product_id == program.product_id,
+                TeacherCarrier.status != "left",
+            ))
+            if teacher is None:
+                reasons.append({"code": "missing_teacher", "message": "An active teacher for this product is required"})
+        return reasons
 
     def _get_performed_by(self, payload: WorkflowTransitionExecute) -> UUID:
         if payload.performed_by is None:
@@ -1493,18 +2156,27 @@ class TransitionService:
             )
         return payload.performed_by
 
-    def _get_stage_instance(self, interaction_id: UUID, stage_id: UUID) -> WorkflowStageInstance:
-        statement = select(WorkflowStageInstance).where(
-            WorkflowStageInstance.interaction_id == interaction_id,
-            WorkflowStageInstance.workflow_stage_id == stage_id,
-        ).with_for_update()
+    def _get_stage_instance(
+        self, interaction_id: UUID, stage_id: UUID
+    ) -> WorkflowStageInstance:
+        statement = (
+            select(WorkflowStageInstance)
+            .where(
+                WorkflowStageInstance.interaction_id == interaction_id,
+                WorkflowStageInstance.workflow_stage_id == stage_id,
+            )
+            .with_for_update()
+        )
         instance = self.db.scalar(statement)
         if instance is None:
             raise workflow_error(
                 status_code=status.HTTP_409_CONFLICT,
                 code="WORKFLOW_TARGET_STAGE_INSTANCE_NOT_FOUND",
                 message="Target stage instance not found",
-                details={"targetStageId": str(stage_id), "interactionId": str(interaction_id)},
+                details={
+                    "targetStageId": str(stage_id),
+                    "interactionId": str(interaction_id),
+                },
             )
         return instance
 
@@ -1521,7 +2193,9 @@ class TransitionService:
         )
         return self.db.scalar(statement) or 0
 
-    def _calculate_due_at(self, started_at: datetime, stage: WorkflowStage) -> datetime | None:
+    def _calculate_due_at(
+        self, started_at: datetime, stage: WorkflowStage
+    ) -> datetime | None:
         if stage.default_duration_days is None:
             return None
         return started_at + timedelta(days=stage.default_duration_days)

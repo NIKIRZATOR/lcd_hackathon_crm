@@ -66,6 +66,7 @@ class WorkflowStageBase(BaseModel):
     is_initial: bool = False
     is_final: bool = False
     is_optional: bool = False
+    semester_critical: bool = False
     default_duration_days: int | None = None
     requires_comment: bool = False
     requires_attachment: bool = False
@@ -85,6 +86,7 @@ class WorkflowStageUpdate(BaseModel):
     is_initial: bool | None = None
     is_final: bool | None = None
     is_optional: bool | None = None
+    semester_critical: bool | None = None
     default_duration_days: int | None = None
     requires_comment: bool | None = None
     requires_attachment: bool | None = None
@@ -97,6 +99,33 @@ class WorkflowStageRead(WorkflowStageBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+
+
+class WorkflowChecklistItemBase(BaseModel):
+    code: str
+    label: str
+    item_type: Literal["checkbox", "file", "date", "stakeholder_role", "number", "text"]
+    required: bool = True
+    required_stakeholder_role: str | None = None
+    required_attachment_kind: str | None = None
+
+
+class WorkflowChecklistItemCreate(WorkflowChecklistItemBase):
+    pass
+
+
+class WorkflowChecklistItemUpdate(BaseModel):
+    code: str | None = None
+    label: str | None = None
+    item_type: Literal["checkbox", "file", "date", "stakeholder_role", "number", "text"] | None = None
+    required: bool | None = None
+    required_stakeholder_role: str | None = None
+    required_attachment_kind: str | None = None
+
+
+class WorkflowChecklistItemRead(WorkflowChecklistItemBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
 
 
 class WorkflowTransitionBase(BaseModel):
@@ -246,6 +275,20 @@ class WorkflowStageInstanceStatusUpdate(BaseModel):
     status: StageStatus
 
 
+class WorkflowStageCommentCreate(BaseModel):
+    text: str
+
+
+class WorkflowStageCommentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    stage_instance_id: UUID
+    author_user_id: UUID
+    text: str
+    created_at: datetime
+
+
 class WorkflowTransitionHistoryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -262,7 +305,7 @@ class WorkflowTransitionHistoryRead(BaseModel):
 
 
 class WorkflowTransitionExecute(BaseModel):
-    transition_id: UUID
+    transition_id: UUID | None = None
     performed_by: UUID | None = None
     comment: str | None = None
     skip_current: bool = False

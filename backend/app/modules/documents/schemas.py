@@ -37,4 +37,5 @@ class WorkflowAttachmentRead(BaseModel):
     extension: str | None = Field(default=None, description="Проверенное расширение файла без точки.")
     size_bytes: int | None = Field(default=None, description="Размер файла в байтах.")
     checksum: str | None = Field(default=None, description="SHA-256 checksum загруженного binary content.")
-    scan_status: str = Field(description="Статус antivirus scan. В Stage 3 upload получает `NOT_SCANNED`.")
+    scan_status: str = Field(description="Статус antivirus scan.")
+    attachment_kind: str | None = Field(default=None, description="Business kind of the attachment.")
