@@ -24,7 +24,7 @@ const DocumentationImageView = ({ pageId, imageId, alt }: { pageId: string; imag
 };
 
 const Markdown = ({ value, query, pageId }: { value: string; query: string; pageId: string }) => <article className={styles.article}>{value.split('\n').map((line, index) => {
-  const image = line.match(/^!\[([^\]]*)\]\(doc-image:\/\/([^\)]+)\)$/);
+  const image = line.match(/^!\[([^\]]*)\]\(doc-image:\/\/([^)]+)\)$/);
   if (image) return <DocumentationImageView key={index} pageId={pageId} imageId={image[2]} alt={image[1]} />;
   if (line.startsWith('### ')) return <Typography.Title key={index} level={5}><Highlight value={line.slice(4)} query={query} /></Typography.Title>;
   if (line.startsWith('## ')) return <Typography.Title key={index} level={4}><Highlight value={line.slice(3)} query={query} /></Typography.Title>;
@@ -44,7 +44,11 @@ const DocumentationDrawer = ({ open, onClose }: { open: boolean; onClose: () => 
   const [sectionForm] = Form.useForm();
   const isAdmin = Boolean(user?.roles.includes('ADMIN'));
   const load = useCallback(async () => { setLoading(true); setError(undefined); try { const [loadedPages, routePage] = await Promise.all([apiRequest<DocPage[]>('/api/documentation/pages'), apiRequest<DocPage | null>(`/api/documentation/pages/for-route?route=${encodeURIComponent(location.pathname)}`)]); setPages(loadedPages); setSelected(routePage ?? loadedPages[0]); } catch { setError('Не удалось загрузить документацию.'); } finally { setLoading(false); } }, [location.pathname]);
-  useEffect(() => { if (open) void load(); }, [load, open]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load, open]);
   const visiblePages = useMemo(() => search.trim() ? pages.filter((page) => `${page.title} ${page.content_markdown}`.toLowerCase().includes(search.toLowerCase())) : pages, [pages, search]);
   const sections = useMemo(() => [
     { title: 'Главная', route: '/v2', icon: <QuestionCircleOutlined /> },
