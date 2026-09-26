@@ -3,6 +3,7 @@
 from app.modules.contacts.model import UniversityContact
 from app.modules.audit.model import AuditEvent
 from app.modules.documents.model import File
+from app.modules.documentation.model import DocumentationImage, DocumentationPage, DocumentationRequest
 from app.modules.imports.model import ImportArtifact, ImportJob, ImportMapping, ImportMappingField, ImportRowError
 from app.modules.integrations.model import IntegrationSignal, ProgramMetric
 from app.modules.interactions.model import InteractionContact, UniversityInteraction
@@ -34,6 +35,9 @@ from app.modules.teachers.model import TeacherCarrier
 
 __all__ = [
     "File",
+    "DocumentationPage",
+    "DocumentationRequest",
+    "DocumentationImage",
     "ImportArtifact",
     "ImportJob",
     "ImportMapping",

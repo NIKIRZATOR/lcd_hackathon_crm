@@ -5,6 +5,7 @@ import {
   MenuOutlined,
   SettingOutlined,
   ApartmentOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import type { ReactNode } from 'react';
@@ -13,6 +14,7 @@ import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../auth';
+import DocumentationDrawer from '../documentation/DocumentationDrawer';
 
 const { Content, Header, Sider } = Layout;
 const { useBreakpoint } = Grid;
@@ -37,6 +39,7 @@ const V2Layout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [documentationOpen, setDocumentationOpen] = useState(false);
   const screens = useBreakpoint();
   const isMobile = !screens.md;
 
@@ -72,6 +75,7 @@ const V2Layout = () => {
             <Tag color="purple">CRM V2</Tag>
           </Space>
           <Space>
+            <Button type="text" aria-label="Документация" icon={<QuestionCircleOutlined />} onClick={() => setDocumentationOpen(true)} />
             <Typography.Text>{user?.full_name ?? user?.username}</Typography.Text>
             {user?.roles.map((role) => <Tag key={role}>{role}</Tag>)}
             <Button type="link" onClick={() => void logout()}>Выйти</Button>
@@ -82,6 +86,7 @@ const V2Layout = () => {
       <Drawer open={isMobile && mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} placement="left" closable={false} styles={{ body: { padding: 0 } }}>
         {menu}
       </Drawer>
+      <DocumentationDrawer open={documentationOpen} onClose={() => setDocumentationOpen(false)} />
     </Layout>
   );
 };
