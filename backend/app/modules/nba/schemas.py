@@ -14,4 +14,6 @@ class NbaItemRead(BaseModel):
     product_name: str | None
     reason: str
     action: str
+    priority: str
+    action_target: str | None
     due_at: datetime | None

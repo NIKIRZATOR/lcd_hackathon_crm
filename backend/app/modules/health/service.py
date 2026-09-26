@@ -41,7 +41,11 @@ class HealthService:
             for license_record in licenses
         ):
             score -= 10
-        teacher = self.db.scalar(select(TeacherCarrier).where(TeacherCarrier.program_instance_id == program.id, TeacherCarrier.status == "active"))
+        teacher = self.db.scalar(
+            select(TeacherCarrier)
+            .where(TeacherCarrier.program_instance_id == program.id)
+            .order_by(TeacherCarrier.updated_at.desc())
+        )
         carrier_required = program.current_stage_code in {
             "train_teacher", "confirm_teacher", "curriculum", "start_classes", "classes_running", "period_results"
         }

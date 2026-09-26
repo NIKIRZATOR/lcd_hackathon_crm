@@ -2,7 +2,7 @@ import { Alert, Button, Card, Checkbox, DatePicker, Descriptions, Input, InputNu
 import type { UploadProps } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError, apiRequest } from '../../api/client';
 
@@ -22,6 +22,7 @@ type NbaItem = { id: string; program_instance_id: string | null; action: string;
 
 const ProgramDetailPage = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const [program, setProgram] = useState<ProgramInstance | null>(null);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [checklist, setChecklist] = useState<Checklist[]>([]);
@@ -79,6 +80,7 @@ const ProgramDetailPage = () => {
   };
 
   useEffect(() => { void load().catch(() => setMessage('Не удалось загрузить workflow программы.')); }, [id]);
+  useEffect(() => { const target = searchParams.get('focus'); if (target) document.getElementById(target === 'date' || target === 'stakeholder' ? 'checklist' : target)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, [searchParams, selectedStageId]);
 
   const closeStage = async (skipCurrent = false) => {
     if (!id || !isViewingCurrentStage || (!selectedTransition && !currentStage?.is_final) || !workflow?.current_stage_instance_id) return;
@@ -148,14 +150,14 @@ const ProgramDetailPage = () => {
         <Descriptions size="small" column={1}><Descriptions.Item label="SLA / due">{currentStage?.due_at?.slice(0, 10) ?? 'Не задано'}</Descriptions.Item><Descriptions.Item label="Статус">{currentStage?.status ?? '—'}</Descriptions.Item></Descriptions>
         {!isViewingCurrentStage && <Alert type="info" showIcon message="Просмотр закрытого этапа: комментарии и файлы доступны только для чтения." />}
         <Typography.Title level={5}>Checklist</Typography.Title>
-        <List dataSource={checklist} locale={{ emptyText: 'Для этапа нет checklist' }} renderItem={(item) => <List.Item><ChecklistInput item={item} disabled={!isViewingCurrentStage} stakeholders={stakeholders} attachments={attachments} onSave={async (payload) => { await apiRequest(`/api/stage-instances/checklist/${item.id}`, { method: 'PATCH', body: JSON.stringify(payload) }); if (selectedStage) await loadStage(selectedStage.id); }} /></List.Item>} />
+        <div id="checklist"><List dataSource={checklist} locale={{ emptyText: 'Для этапа нет checklist' }} renderItem={(item) => <List.Item><ChecklistInput item={item} disabled={!isViewingCurrentStage} stakeholders={stakeholders} attachments={attachments} onSave={async (payload) => { await apiRequest(`/api/stage-instances/checklist/${item.id}`, { method: 'PATCH', body: JSON.stringify(payload) }); if (selectedStage) await loadStage(selectedStage.id); }} /></List.Item>} /></div>
         {missingRequired > 0 && <Alert type="warning" showIcon message={`Не выполнено обязательных пунктов: ${missingRequired}`} />}
         <Typography.Title level={5}>Комментарии</Typography.Title>
         <List size="small" dataSource={comments} locale={{ emptyText: 'Комментариев пока нет' }} renderItem={(item) => <List.Item>{item.text}</List.Item>} />
         <Input.TextArea disabled={!isViewingCurrentStage} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Комментарий к переходу" rows={2} />
-        <Typography.Title level={5}>Файлы</Typography.Title>
+        <div id="attachments"><Typography.Title level={5}>Файлы</Typography.Title>
         <List size="small" dataSource={attachments} locale={{ emptyText: 'Файлов пока нет' }} renderItem={(item) => <List.Item>{item.original_name}{item.attachment_kind ? ` · ${item.attachment_kind}` : ''}</List.Item>} />
-        <Space><Select style={{ width: 240 }} value={attachmentKind || undefined} placeholder="Вид вложения" options={[...new Set(checklist.filter((item) => item.item_type === 'file').map((item) => item.required_attachment_kind).filter(Boolean) as string[])].map((value) => ({ value, label: value }))} onChange={setAttachmentKind} allowClear /><Upload {...uploadProps} disabled={!isViewingCurrentStage}><Button disabled={!isViewingCurrentStage}>Приложить файл</Button></Upload></Space>
+        <Space><Select style={{ width: 240 }} value={attachmentKind || undefined} placeholder="Вид вложения" options={[...new Set(checklist.filter((item) => item.item_type === 'file').map((item) => item.required_attachment_kind).filter(Boolean) as string[])].map((value) => ({ value, label: value }))} onChange={setAttachmentKind} allowClear /><Upload {...uploadProps} disabled={!isViewingCurrentStage}><Button disabled={!isViewingCurrentStage}>Приложить файл</Button></Upload></Space></div>
         {isViewingCurrentStage && workflow.available_transitions.length > 0 && <div style={{ marginTop: 20 }}><Select style={{ minWidth: 260 }} options={workflow.available_transitions.map((item) => ({ value: item.id, label: item.name ?? item.to_stage_name }))} value={selectedTransition} onChange={setSelectedTransition} /><Button type="primary" disabled={missingRequired > 0 || !selectedTransition} style={{ marginLeft: 8 }} onClick={() => void closeStage()}>Закрыть и перейти к «{transition?.to_stage_name ?? 'следующему этапу'}»</Button>{currentStage?.is_optional && <Button style={{ marginLeft: 8 }} onClick={() => void closeStage(true)}>Пропустить</Button>}</div>}
         {isViewingCurrentStage && currentStage?.is_final && workflow.available_transitions.length === 0 && <Button type="primary" disabled={missingRequired > 0} style={{ marginTop: 20 }} onClick={() => void closeStage()}>Завершить программу</Button>}
         <Typography.Title level={5}>История переходов</Typography.Title>

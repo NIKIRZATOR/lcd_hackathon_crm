@@ -54,13 +54,13 @@ def make_program(stage_id=None):
     )
 
 
-def test_health_is_yellow_without_license_and_teacher() -> None:
+def test_early_stage_without_license_and_teacher_is_green() -> None:
     program = make_program()
 
     result = HealthService(FakeDb(program)).recompute(program.id)
 
-    assert result.health_score == 70
-    assert result.health_band == "yellow"
+    assert result.health_score == 100
+    assert result.health_band == "green"
 
 
 def test_healthy_license_and_teacher_make_program_green() -> None:
@@ -87,5 +87,27 @@ def test_overdue_stage_makes_health_red() -> None:
 
     result = HealthService(FakeDb(program, stage)).recompute(program.id)
 
+    assert result.health_score == 85
+    assert result.health_band == "green"
+
+
+def test_large_overdue_and_expired_license_combines_penalties() -> None:
+    stage = WorkflowStageInstance(id=uuid4(), due_at=datetime.now(timezone.utc) - timedelta(days=8))
+    program = make_program(stage.id)
+    license_record = License(valid_until=datetime.now(timezone.utc) - timedelta(days=1))
+
+    result = HealthService(FakeDb(program, stage, licenses=[license_record])).recompute(program.id)
+
     assert result.health_score == 45
     assert result.health_band == "red"
+
+
+def test_teacher_left_on_classes_running_is_penalized() -> None:
+    program = make_program()
+    program.current_stage_code = "classes_running"
+    teacher = TeacherCarrier(status="left")
+
+    result = HealthService(FakeDb(program, teacher=teacher)).recompute(program.id)
+
+    assert result.health_score == 60
+    assert result.health_band == "yellow"

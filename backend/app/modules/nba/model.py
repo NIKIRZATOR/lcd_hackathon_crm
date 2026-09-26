@@ -47,6 +47,8 @@ class NbaItem(ModelBase):
     severity: Mapped[str] = mapped_column(String(16), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     action: Mapped[str] = mapped_column(String(255), nullable=False)
+    priority: Mapped[str] = mapped_column(String(2), nullable=False, default="P4")
+    action_target: Mapped[str | None] = mapped_column(String(128), nullable=True)
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
