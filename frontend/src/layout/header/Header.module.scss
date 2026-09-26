@@ -1,18 +1,14 @@
 @use '../../styles/mixins' as *;
 
 .header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-
   height: 72px;
   padding: 0 24px;
+  background: var(--ant-color-bg-container);
 
   display: flex;
   align-items: center;
   justify-content: space-between;
 
-  background: var(--ant-color-bg-container);
   border-bottom: 1px solid var(--ant-color-border-secondary);
 
   @include sm {
@@ -21,166 +17,67 @@
 }
 
 .left {
-  min-width: 0;
-
   display: flex;
   align-items: center;
-  gap: 32px;
-
-  @include sm {
-    gap: 12px;
-  }
-}
-
-.right {
-  flex-shrink: 0;
-
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.logoLink,
-.drawerLogo {
-  flex-shrink: 0;
-
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  text-decoration: none;
-
-  user-select: none;
-}
-
-.logoMain {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1;
-
-  color: var(--ant-color-primary);
-}
-
-.logoAccent {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1;
-
-  color: var(--ant-orange);
-}
-
-.navigation {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.navigationButton {
-  position: relative;
-
-  height: 40px;
-  padding: 0 14px;
-
-  font-weight: 500;
-  color: var(--ant-color-text-secondary);
-
-  transition:
-    color 0.2s,
-    background-color 0.2s;
-
-  &:hover {
-    color: var(--ant-color-primary) !important;
-    background: var(--ant-color-primary-bg) !important;
-  }
-}
-
-.navigationButtonActive {
-  color: var(--ant-color-primary);
-
-  &::after {
-    content: '';
-
-    position: absolute;
-    right: 14px;
-    bottom: -16px;
-    left: 14px;
-
-    height: 2px;
-
-    background: var(--ant-color-primary);
-    border-radius: 2px 2px 0 0;
-  }
+  gap: 12px;
 }
 
 .menuButton {
-  flex-shrink: 0;
-
-  font-size: 20px;
-  color: var(--ant-color-primary);
-}
-
-.notification {
   font-size: 22px;
-  color: var(--ant-color-primary);
 }
 
-.user {
+.logoLink {
   display: flex;
-  align-items: center;
-  gap: 10px;
-
-  padding: 4px 6px;
+  gap: 6px;
 
   cursor: pointer;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
   user-select: none;
 
-  border-radius: var(--ant-border-radius);
-
-  transition: background-color 0.2s;
-
-  &:hover {
-    background: var(--ant-color-bg-text-hover);
-  }
-}
-
-.avatar {
-  flex-shrink: 0;
-
-  background-color: var(--ant-color-primary);
-}
-
-.userInfo {
-  min-width: 0;
-
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-
-  @include xs {
+  @include sm {
     display: none;
   }
 }
 
+.logoMain {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ant-color-primary);
+}
+
+.logoAccent {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ant-orange);
+}
+
+.notification {
+  font-size: 24px;
+}
+
+.divider {
+  height: 32px;
+  margin: 0;
+}
+
+.user {
+  cursor: pointer;
+}
+
+.avatar {
+  background-color: var(--ant-color-primary);
+}
+
 .username {
-  max-width: 180px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 
-  overflow: hidden;
-
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 18px;
-  color: var(--ant-color-text);
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.role {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--ant-color-text-secondary);
-}
-
-.mobileMenu {
-  border-inline-end: 0 !important;
+  @include xs {
+    display: none;
+  }
 }
