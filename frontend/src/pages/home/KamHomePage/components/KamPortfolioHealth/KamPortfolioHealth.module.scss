@@ -1,0 +1,147 @@
+.card {
+  min-width: 0;
+
+  border: 1px solid var(--ant-colorBorderSecondary);
+  border-radius: 8px;
+
+  box-shadow: none;
+}
+
+.cardBody {
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  margin-bottom: 20px;
+}
+
+.icon {
+  display: flex;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+
+  width: 36px;
+  height: 36px;
+
+  color: var(--ant-colorPrimary);
+  font-size: 18px;
+
+  background: rgb(119 0 255 / 8%);
+  border-radius: 8px;
+}
+
+.headerContent {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.title {
+  color: var(--ant-colorText);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+
+  white-space: nowrap;
+}
+
+.infoIcon {
+  flex-shrink: 0;
+
+  color: var(--ant-colorTextSecondary);
+  font-size: 14px;
+
+  cursor: help;
+}
+
+.reportsButton {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  height: auto;
+  padding: 0;
+
+  color: var(--ant-colorPrimary);
+  font-size: 12px;
+  line-height: 18px;
+
+  &:hover {
+    color: var(--ant-colorPrimaryHover) !important;
+    background: transparent !important;
+  }
+}
+
+.healthList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.healthRow {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 20px;
+  gap: 12px;
+  align-items: center;
+}
+
+.label {
+  color: var(--ant-colorText);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.count {
+  color: var(--ant-colorText);
+  font-size: 13px;
+  line-height: 18px;
+  text-align: right;
+}
+
+.progressTrack {
+  height: 8px;
+  overflow: hidden;
+
+  background: var(--ant-colorFillSecondary);
+  border-radius: 999px;
+}
+
+.progressFill {
+  height: 100%;
+
+  border-radius: inherit;
+}
+
+.green {
+  background: #56b89a;
+}
+
+.yellow {
+  background: #ffd366;
+}
+
+.red {
+  background: #e5484d;
+}
+
+.summary {
+  margin-top: 20px;
+  padding: 12px 14px;
+
+  background: rgb(119 0 255 / 4%);
+  border-radius: 6px;
+}
+
+.summaryText {
+  color: var(--ant-colorTextSecondary);
+  font-size: 12px;
+  line-height: 18px;
+}

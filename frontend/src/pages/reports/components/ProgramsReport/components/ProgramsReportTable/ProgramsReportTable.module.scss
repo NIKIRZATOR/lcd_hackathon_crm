@@ -1,0 +1,24 @@
+.implementation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+}
+
+.progress {
+  flex: 1;
+
+  min-width: 60px;
+  max-width: 110px;
+
+  margin: 0;
+}
+
+.implementationValue {
+  flex-shrink: 0;
+
+  color: var(--ant-color-text-secondary);
+
+  white-space: nowrap;
+}
