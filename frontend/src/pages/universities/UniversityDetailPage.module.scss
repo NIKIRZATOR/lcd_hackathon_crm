@@ -1,3 +1,9 @@
+.loader {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 160px);
+}
+
 .page {
   display: flex;
   flex-direction: column;
@@ -29,10 +35,20 @@
   line-height: 1;
 }
 
-.breadcrumbCurrent {
+.breadcrumbCurrent,
+.breadcrumbLink {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.breadcrumbLink {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ant-color-primary);
+  font: inherit;
+  cursor: pointer;
 }
 
 .hero {
@@ -194,22 +210,23 @@
   list-style: none;
 }
 
+.scoreCompact {
+  padding: 8px;
+}
+
 @media (max-width: 800px) {
   .hero {
-    position: relative;
-    flex-direction: column;
-    padding-right: 96px;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
   }
-  .score {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    max-width: none;
-    padding: 0;
-    background: transparent;
-    border: 0;
+  .logo {
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+    border-radius: 12px;
+    font-size: 15px;
   }
-  .scoreText { display: none; }
-  .score :global(.ant-progress) { width: 64px !important; height: 64px !important; }
-  .identity { flex-direction: column; }
+  .owners { width: 100%; }
+  .owners :global(.ant-btn) { flex: 1 1 140px; }
 }

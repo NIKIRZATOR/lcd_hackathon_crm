@@ -6,6 +6,7 @@ import styles from './WorkflowSteps.module.scss';
 export type WorkflowStep = {
   id: string | number;
   title: string;
+  phase?: string;
   disabled?: boolean;
 };
 
@@ -13,6 +14,7 @@ type WorkflowStepsProps = {
   steps: WorkflowStep[];
   currentStep: number;
   selectedStep?: number;
+  horizontal?: boolean;
   onStepChange?: (index: number, step: WorkflowStep) => void;
 };
 
@@ -44,12 +46,12 @@ const getStepStatus = (index: number, currentStep: number): StepMarkerStatus => 
   return 'wait';
 };
 
-const WorkflowSteps = ({ steps, currentStep, selectedStep = currentStep, onStepChange }: WorkflowStepsProps) => {
+const WorkflowSteps = ({ steps, currentStep, selectedStep = currentStep, horizontal = false, onStepChange }: WorkflowStepsProps) => {
   const { token } = theme.useToken();
 
   return (
     <div
-      className={styles.workflowSteps}
+      className={`${styles.workflowSteps} ${horizontal ? styles.horizontal : ''}`}
       style={{
         '--steps-primary': token.colorPrimary,
         '--steps-text': token.colorText,
@@ -65,9 +67,12 @@ const WorkflowSteps = ({ steps, currentStep, selectedStep = currentStep, onStepC
         const isClickable = Boolean(onStepChange) && !step.disabled;
         const isSelected = index === selectedStep;
 
+        const phaseLabel = step.phase && step.phase !== steps[index - 1]?.phase ? step.phase : '';
+
         return (
+          <div key={String(step.id)} className={styles.stepWrap}>
+          {phaseLabel && <div className={styles.phase}>{phaseLabel}</div>}
           <button
-            key={String(step.id)}
             type="button"
             className={[
               styles.stepRow,
@@ -91,6 +96,7 @@ const WorkflowSteps = ({ steps, currentStep, selectedStep = currentStep, onStepC
               {step.title}
             </span>
           </button>
+          </div>
         );
       })}
     </div>

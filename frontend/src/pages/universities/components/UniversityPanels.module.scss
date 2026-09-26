@@ -80,11 +80,71 @@ span.chip {
   overflow: hidden;
 }
 
+.card :global(table) {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.card :global(col.ant-table-expand-icon-col),
+.card :global(th.ant-table-row-expand-icon-cell),
+.card :global(td.ant-table-row-expand-icon-cell) {
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  padding: 0 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.card :global(.ant-table-row-expand-icon) {
+  float: none !important;
+  margin: 0 !important;
+  vertical-align: middle;
+}
+
+.iconCell {
+  width: 76px;
+  white-space: nowrap;
+}
+
+.contractNumber {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.feed {
+  padding: 8px 8px 8px 16px;
+}
+
+.feed :global(.ant-list-item) {
+  padding-inline: 8px 4px;
+}
+
 .card :global(.ant-table-cell) {
   padding: 14px 12px;
   white-space: normal;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   line-height: 1.4;
+  vertical-align: top;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.hiddenToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ant-color-text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .card :global(.ant-table-thead > tr > th) {

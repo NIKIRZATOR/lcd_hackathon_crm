@@ -1,3 +1,9 @@
+.loader {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 160px);
+}
+
 .page {
   display: flex;
   flex-direction: column;
@@ -41,7 +47,7 @@
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -130,9 +136,32 @@
   border-radius: var(--ant-border-radius-lg);
 }
 
+.tableCard :global(table) {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.tableCard :global(col.ant-table-expand-icon-col),
+.tableCard :global(th.ant-table-row-expand-icon-cell),
+.tableCard :global(td.ant-table-row-expand-icon-cell) {
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  padding: 0 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.tableCard :global(.ant-table-row-expand-icon) {
+  float: none !important;
+  margin: 0 !important;
+  vertical-align: middle;
+}
+
 .tableCard :global(.ant-table-cell) {
   white-space: normal;
   overflow-wrap: anywhere;
+  vertical-align: top;
 }
 
 .tableCard :global(.ant-table-thead > tr > th.ant-table-cell) {
@@ -150,6 +179,10 @@
 
 .clickableRow {
   cursor: pointer;
+}
+
+.archivedRow {
+  opacity: 0.55;
 }
 
 .statusDot {
@@ -259,7 +292,6 @@
 @media (max-width: 991px) {
   .filtersRow { align-items: stretch; }
   .resetButton { width: 100%; margin-left: 0; }
-  .tableCard :global(.ant-table table) { table-layout: fixed; }
   .tableCard :global(.ant-table-cell) { padding-inline: 8px; }
   .universityCell,
   .managerCell { width: 100%; gap: 6px; }

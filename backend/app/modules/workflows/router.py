@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from typing import Annotated
@@ -520,6 +521,45 @@ def create_stage_comment(
     _ensure_can_access_stage_instance(db, current_user, stage_instance_id)
     comment = WorkflowStageComment(stage_instance_id=stage_instance_id, author_user_id=current_user.id, text=payload.text)
     db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+
+def _own_comment(db: Session, current_user: User, stage_instance_id: UUID, comment_id: UUID) -> WorkflowStageComment:
+    _ensure_can_access_stage_instance(db, current_user, stage_instance_id)
+    comment = db.get(WorkflowStageComment, comment_id)
+    if comment is None or comment.deleted_at is not None or comment.stage_instance_id != stage_instance_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.author_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the author can change this comment")
+    return comment
+
+
+@router.patch("/stage-instances/{stage_instance_id}/comments/{comment_id}", response_model=WorkflowStageCommentRead)
+def update_stage_comment(
+    stage_instance_id: UUID,
+    comment_id: UUID,
+    payload: WorkflowStageCommentCreate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    comment = _own_comment(db, current_user, stage_instance_id, comment_id)
+    comment.text = payload.text.strip()
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+
+@router.delete("/stage-instances/{stage_instance_id}/comments/{comment_id}", response_model=WorkflowStageCommentRead)
+def delete_stage_comment(
+    stage_instance_id: UUID,
+    comment_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    comment = _own_comment(db, current_user, stage_instance_id, comment_id)
+    comment.deleted_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(comment)
     return comment

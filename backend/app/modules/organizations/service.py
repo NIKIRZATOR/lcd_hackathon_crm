@@ -87,6 +87,8 @@ class OrganizationService:
         for assignment in self.db.scalars(select(OrgAssignment).where(OrgAssignment.organization_id == organization_id, OrgAssignment.status == "active")):
             assignment.status, assignment.ended_at = "ended", now
         assignment = self._assign(organization_id, payload.kam_user_id, current_user.id, now)
+        for program in self.db.scalars(select(ProgramInstance).where(ProgramInstance.organization_id == organization_id, ProgramInstance.status.not_in(["completed", "cancelled"]))):
+            program.kam_user_id = payload.kam_user_id
         self.db.add(AuditEvent(actor_user_id=current_user.id, action="organization.kam_reassigned", entity_type="organization", entity_id=organization_id, reason=payload.reason, event_metadata={"new_kam_user_id": str(payload.kam_user_id)}))
         self.db.commit()
         self.db.refresh(assignment)

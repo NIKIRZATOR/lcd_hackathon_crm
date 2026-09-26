@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 
 import { apiRequest } from '../../api/client';
-import type { StageTone } from '../universities/universityCard';
+import { emptyActionText, filledCount, filledPhase, isGapProgram, sampleJournal } from './workflowBackendFieldGaps';
 import {
   addWorkflowStageComment as addMockComment,
   addWorkflowStageFile as addMockFile,
@@ -68,7 +68,7 @@ export type UniversityWorkflowRow = {
   program: string;
   product: string;
   stage: string;
-  tone: StageTone;
+  tone: 'danger' | 'progress' | 'warning' | 'success' | 'neutral';
   nextStep: string;
   due: string;
   owner: string;
@@ -82,7 +82,6 @@ const liveItems: WorkflowItem[] = [];
 const liveDetails = new Map<string, WorkflowDetailMock>();
 const liveActivity = new Map<string, Map<number, StageActivity>>();
 const rowsByUniversity = new Map<string, UniversityWorkflowRow[]>();
-let listLoaded = false;
 
 const text = (value?: string | null) => value?.trim() || dash;
 
@@ -103,50 +102,10 @@ export const workflowStatusFromApi = (
   return 'active';
 };
 
-const toneOf = (status: WorkflowStatus): StageTone => {
-  if (status === 'overdue') return 'danger';
-  if (status === 'attention') return 'warning';
-  if (status === 'completed') return 'success';
-  return 'progress';
-};
-
-const journalItem = (row: JournalRow): WorkflowItem => ({
-  id: row.id,
-  university: text(row.organization_name),
-  universityShort: text(row.organization_name),
-  program: text(row.direction_name),
-  product: text(row.product_name),
-  stage: text(row.current_stage_name),
-  responsible: text(row.kam_name),
-  deadline: isoDate(row.due_at),
-  status: workflowStatusFromApi(null, row.due_at, row.health_band),
-  progress: row.health_score ?? -1,
-});
-
 export const universityWorkflowRows = (universityId: number | string) => {
   const key = String(universityId);
   return rowsByUniversity.has(key) ? rowsByUniversity.get(key) ?? [] : undefined;
 };
-
-export const setUniversityWorkflowRows = (universityId: string, rows: UniversityWorkflowRow[]) => {
-  rowsByUniversity.set(universityId, rows);
-};
-
-export const loadWorkflows = async () => {
-  const rows = await apiRequest<JournalRow[]>('/api/workflow-journal?preset=all');
-  liveItems.splice(0, liveItems.length, ...rows.map(journalItem));
-  listLoaded = true;
-  return liveItems;
-};
-
-export const listWorkflows = (): WorkflowItem[] => (listLoaded ? liveItems : []);
-
-export const summarizeWorkflows = (items: readonly WorkflowItem[] = listWorkflows()) => ({
-  active: items.filter((item) => item.status === 'active').length,
-  attention: items.filter((item) => item.status === 'attention').length,
-  completed: items.filter((item) => item.status === 'completed').length,
-  overdue: items.filter((item) => item.status === 'overdue').length,
-});
 
 const emptyActivity = (): StageActivity => ({ files: [], comments: [] });
 
@@ -324,33 +283,288 @@ export const loadWorkflowDetail = async (id: string | number): Promise<WorkflowD
 
 export const getWorkflow = (id: string | number) => liveDetails.get(String(id)) ?? getWorkflowDetailMock(Number(id));
 
-export const workflowRowFromProgram = (
-  program: {
-    id: string;
-    direction_name: string;
-    product_name: string;
-    status: string;
-    kam_name: string | null;
-    health_band: string | null;
-    started_at?: string | null;
-    current_stage_code?: string | null;
-  },
-  stageName?: string | null,
-  dueAt?: string | null,
-): UniversityWorkflowRow => {
-  const status = workflowStatusFromApi(program.status, dueAt, program.health_band);
-  const due = isoDate(dueAt);
+export type JournalPreset = 'all' | 'overdue' | 'semester' | 'renewal' | 'lms_silence';
+
+export type JournalProgram = {
+  id: string;
+  organization: string;
+  direction: string;
+  product: string;
+  playbook: string;
+  stage: string;
+  due: string;
+  healthScore: number | null;
+  healthBand: 'green' | 'yellow' | 'red' | null;
+  kam: string;
+  students: number;
+  applications: number;
+};
+
+export type DeskStage = {
+  id: string;
+  code: string;
+  name: string;
+  phase: string;
+  status: string;
+  dueAt: string | null;
+  optional: boolean;
+  final: boolean;
+};
+
+export type DeskChecklistItem = {
+  id: string;
+  code: string;
+  label: string;
+  required: boolean;
+  done: boolean;
+  itemType: string;
+  role: string | null;
+  attachmentKind: string | null;
+  valueText: string | null;
+  valueDate: string | null;
+  stakeholderId: string | null;
+  attachmentId: string | null;
+};
+
+export type DeskFile = { id: string; fileId: string; name: string; kind: string | null; sizeLabel: string };
+export type DeskComment = { id: string; text: string; createdAt: string; authorId: string };
+
+export type ProgramDesk = {
+  id: string;
+  organizationId: string;
+  organization: string;
+  direction: string;
+  product: string;
+  playbook: string;
+  windowTitle: string;
+  kam: string;
+  status: string;
+  healthScore: number | null;
+  healthBand: 'green' | 'yellow' | 'red' | null;
+  students: number;
+  stageCode: string | null;
+  stages: DeskStage[];
+  currentStageId: string | null;
+  transitions: Array<{ id: string; name: string; toStageName: string }>;
+  banner: string;
+  bannerTone: 'info' | 'warning' | 'success';
+  people: Array<{ id: string; name: string; role: string; roleCode: string }>;
+  license: string;
+};
+
+const bandOf = (score: number | null, band?: string | null): JournalProgram['healthBand'] => {
+  if (band === 'green' || band === 'yellow' || band === 'red') return band;
+  if (score == null) return null;
+  if (score >= 75) return 'green';
+  if (score >= 50) return 'yellow';
+  return 'red';
+};
+
+const shortNameByOrganization = async () => {
+  const page = await apiRequest<{ items: Array<{ name: string; short_name: string | null }> }>('/api/organizations?limit=100&offset=0').catch(() => ({ items: [] }));
+  return new Map(page.items.map((item) => [item.name.trim().toLowerCase().replace(/ё/g, 'е'), item.short_name?.trim() || item.name]));
+};
+
+export const loadJournal = async (preset: JournalPreset): Promise<JournalProgram[]> => {
+  const [rows, shortNames] = await Promise.all([
+    apiRequest<Array<JournalRow & { playbook_name?: string; students_count?: number | null; applications_count?: number | null }>>(`/api/workflow-journal?preset=${preset}`),
+    shortNameByOrganization(),
+  ]);
+  if (rows.length === 0 && preset === 'all') {
+    return sampleJournal().map((row) => ({ ...row, organization: row.organization.includes('Южный') ? 'ЮФУ' : 'СПбПУ', healthScore: row.healthScore }));
+  }
+  return rows.map((row) => ({
+    id: row.id,
+    organization: shortNames.get(row.organization_name.trim().toLowerCase().replace(/ё/g, 'е')) || text(row.organization_name),
+    direction: text(row.direction_name),
+    product: text(row.product_name),
+    playbook: text(row.playbook_name),
+    stage: text(row.current_stage_name),
+    due: isoDate(row.due_at),
+    healthScore: row.health_score,
+    healthBand: bandOf(row.health_score, row.health_band),
+    kam: text(row.kam_name),
+    students: filledCount(row.id, row.students_count, 0),
+    applications: filledCount(row.id, row.applications_count, 7),
+  }));
+};
+
+const gapDesk = (row: ReturnType<typeof sampleJournal>[number]): ProgramDesk => ({
+  id: row.id,
+  organizationId: 'gap-org',
+  organization: row.organization,
+  direction: row.direction,
+  product: row.product,
+  playbook: row.playbook,
+  windowTitle: 'Осень 2026',
+  kam: row.kam,
+  status: 'active',
+  healthScore: row.healthScore,
+  healthBand: row.healthBand,
+  students: row.students,
+  stageCode: 'first_meeting',
+  currentStageId: 'gap-stage-find_contact',
+  banner: 'Первая встреча просрочена на 6 дней',
+  bannerTone: 'warning',
+  people: [{ id: 'gap-person-1', name: 'Иван Петров', role: 'Проректор', roleCode: 'vice_rector' }],
+  license: 'ЛЦ-1042 · передаётся',
+  transitions: [],
+  stages: [
+    ['find_contact', 'Поиск контакта', 'Старт'],
+    ['first_meeting', 'Первая встреча', 'Старт'],
+    ['identify_need', 'Потребность', 'Договор'],
+    ['document_package', 'Пакет документов', 'Договор'],
+    ['sign_contract', 'Подписание договора', 'Договор'],
+    ['sign_license', 'Подписание лицензии', 'Лицензия'],
+    ['transfer_access', 'Передача и доступ', 'Лицензия'],
+    ['train_teacher', 'Обучение преподавателя', 'Преподаватель'],
+    ['confirm_teacher', 'Подтверждение преподавателя', 'Преподаватель'],
+    ['curriculum', 'Учебный план', 'Занятия'],
+    ['start_classes', 'Старт занятий', 'Занятия'],
+    ['classes_running', 'Ведение занятий', 'Занятия'],
+    ['period_results', 'Итоги периода', 'Итог'],
+  ].map(([code, name, phase], index) => ({
+    id: `gap-stage-${code}`,
+    code,
+    name,
+    phase,
+    status: index === 0 ? 'active' : 'pending',
+    dueAt: index === 0 ? row.due : null,
+    optional: code === 'document_package',
+    final: code === 'period_results',
+  })),
+});
+
+export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
+  const sample = sampleJournal().find((row) => row.id === id);
+  if (isGapProgram(id) && sample) return gapDesk(sample);
+
+  const [program, workflow, nba, metrics, license] = await Promise.all([
+    apiRequest<{
+      organization_id: string;
+      direction_name: string;
+      product_name: string;
+      playbook_name: string;
+      academic_window_title: string | null;
+      kam_name: string | null;
+      status: string;
+      health_score: number | null;
+      health_band: string | null;
+      current_stage_code: string | null;
+    }>(`/api/program-instances/${id}`),
+    apiRequest<{
+      stages: Array<ApiStage & { phase_name?: string; code?: string }>;
+      current_stage_instance_id: string | null;
+      available_transitions?: Array<{ id: string; name: string; to_stage_name: string }>;
+    }>(`/api/program-instances/${id}/workflow`),
+    apiRequest<Array<{ program_instance_id: string | null; reason: string; severity: string }>>('/api/nba/today').catch(() => []),
+    apiRequest<{ students_count: number } | null>(`/api/integrations/program-instances/${id}/metrics`).catch(() => null),
+    apiRequest<{ license_number: string | null; transfer_status: string } | null>(`/api/program-instances/${id}/license`).catch(() => null),
+  ]);
+  const organization = await apiRequest<{ name: string }>(`/api/organizations/${program.organization_id}`);
+  const people = await apiRequest<Array<{ id: string; full_name: string; role_code: string; is_active: boolean }>>(`/api/organizations/${program.organization_id}/stakeholders`).catch(() => []);
+  const action = nba.find((item) => item.program_instance_id === id);
+  const students = filledCount(id, metrics?.students_count, 0);
 
   return {
-    id: program.id,
-    program: text(program.direction_name),
-    product: text(program.product_name),
-    stage: text(stageName || program.current_stage_code),
-    tone: toneOf(status),
-    nextStep: dash,
-    due: due ? dayjs(due).locale('ru').format('D MMM YYYY') : dash,
-    owner: text(program.kam_name),
-    status,
-    at: isoDate(program.started_at),
+    id,
+    organizationId: program.organization_id,
+    organization: organization.name,
+    direction: program.direction_name,
+    product: program.product_name,
+    playbook: program.playbook_name,
+    windowTitle: program.academic_window_title?.trim() || 'Окно не выбрано',
+    kam: program.kam_name?.trim() || 'KAM не назначен',
+    status: program.status,
+    healthScore: program.health_score,
+    healthBand: bandOf(program.health_score, program.health_band),
+    students,
+    stageCode: program.current_stage_code,
+    currentStageId: workflow.current_stage_instance_id,
+    banner: action?.reason || (students > 0 && program.current_stage_code === 'classes_running' ? `LMS: ${students} студентов. Подтвердить ведение занятий?` : emptyActionText),
+    bannerTone: action ? (action.severity === 'critical' ? 'warning' : 'info') : students > 0 && program.current_stage_code === 'classes_running' ? 'success' : 'info',
+    people: people.filter((person) => person.is_active !== false).map((person) => ({ id: (person as { id?: string }).id || person.full_name, name: person.full_name, role: person.role_code, roleCode: person.role_code })),
+    license: license ? `${license.license_number || 'Номер не указан'} · ${license.transfer_status}` : 'Лицензия не заведена',
+    transitions: (workflow.available_transitions ?? []).map((item) => ({ id: item.id, name: item.name, toStageName: item.to_stage_name })),
+    stages: workflow.stages.map((stage) => ({
+      id: stage.id,
+      code: stage.code || stage.name,
+      name: stage.name,
+      phase: filledPhase(stage.phase_name),
+      status: stage.status,
+      dueAt: stage.due_at,
+      optional: stage.is_optional,
+      final: stage.is_final,
+    })),
   };
 };
+
+export const loadStageFacts = async (stageId: string) => {
+  const [checklist, comments, files] = await Promise.all([
+    apiRequest<Array<{ id: string; code?: string; label: string; required: boolean; is_done: boolean; item_type: string; required_stakeholder_role?: string | null; required_attachment_kind?: string | null; value_text?: string | null; value_date?: string | null; stakeholder_id?: string | null; attachment_id?: string | null }>>(`/api/stage-instances/${stageId}/checklist`).catch(() => []),
+    apiRequest<Array<{ id: string; text: string; created_at: string; author_user_id: string }>>(`/api/workflows/stage-instances/${stageId}/comments`).catch(() => []),
+    apiRequest<Array<{ id: string; file_id: string; original_name: string; attachment_kind?: string | null; size_bytes?: number }>>(`/api/workflows/stage-instances/${stageId}/attachments`).catch(() => []),
+  ]);
+  return {
+    checklist: checklist.map((item): DeskChecklistItem => ({
+      id: item.id,
+      code: item.code || item.id,
+      label: item.label,
+      required: item.required,
+      done: item.is_done,
+      itemType: item.item_type,
+      role: item.required_stakeholder_role ?? null,
+      attachmentKind: item.required_attachment_kind ?? null,
+      valueText: item.value_text ?? null,
+      valueDate: item.value_date ?? null,
+      stakeholderId: item.stakeholder_id ?? null,
+      attachmentId: item.attachment_id ?? null,
+    })),
+    comments: comments.map((item): DeskComment => ({ id: item.id, text: item.text, createdAt: item.created_at, authorId: item.author_user_id })),
+    files: files.map((item): DeskFile => ({
+      id: item.id,
+      fileId: item.file_id,
+      name: item.original_name,
+      kind: item.attachment_kind ?? null,
+      sizeLabel: typeof item.size_bytes === 'number' ? `${Math.max(item.size_bytes / 1024 / 1024, 0.1).toFixed(1)} МБ` : '',
+    })),
+  };
+};
+
+export const saveChecklistItem = (valueId: string, payload: Record<string, unknown>) => apiRequest(`/api/stage-instances/checklist/${valueId}`, {
+  method: 'PATCH',
+  body: JSON.stringify(payload),
+});
+
+export const addStageComment = (stageId: string, textValue: string) => apiRequest(`/api/workflows/stage-instances/${stageId}/comments`, {
+  method: 'POST',
+  body: JSON.stringify({ text: textValue }),
+});
+
+export const uploadStageFile = (stageId: string, file: File, kind?: string | null) => {
+  const body = new FormData();
+  body.append('file', file);
+  if (kind) body.append('attachment_kind', kind);
+  return apiRequest<{ id: string; file_id: string; original_name: string; attachment_kind?: string | null }>(`/api/workflows/stage-instances/${stageId}/attachments`, { method: 'POST', body });
+};
+
+export const deleteStageFile = (attachmentId: string) => apiRequest(`/api/workflows/attachments/${attachmentId}`, { method: 'DELETE' });
+
+export const updateStageComment = (stageId: string, commentId: string, textValue: string) => apiRequest(`/api/workflows/stage-instances/${stageId}/comments/${commentId}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ text: textValue }),
+});
+
+export const deleteStageComment = (stageId: string, commentId: string) => apiRequest(`/api/workflows/stage-instances/${stageId}/comments/${commentId}`, { method: 'DELETE' });
+
+export const moveProgram = (programId: string, payload: { transitionId?: string; comment?: string; stageId?: string; skip?: boolean }) => apiRequest(`/api/program-instances/${programId}/transition`, {
+  method: 'POST',
+  body: JSON.stringify({
+    transition_id: payload.transitionId ?? null,
+    comment: payload.comment ?? null,
+    expected_current_stage_instance_id: payload.stageId ?? null,
+    skip_current: payload.skip ?? false,
+  }),
+});
+
+export const syncProgram = (programId: string) => apiRequest<{ mapped: number; unmatched: number }>(`/api/integrations/program-instances/${programId}/sync`, { method: 'POST' });

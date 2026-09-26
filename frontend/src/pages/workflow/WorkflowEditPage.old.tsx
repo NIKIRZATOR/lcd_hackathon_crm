@@ -1,3 +1,4 @@
+// Архив редактора этапов. Экран КАМа его не открывает: состав пути меняет руководитель в «Управлении».
 import { PlusOutlined } from '@ant-design/icons';
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';

@@ -1,380 +1,350 @@
-import {
-  ArrowRightOutlined,
-  CalendarOutlined,
-  DownloadOutlined,
-  EditOutlined,
-  FilePdfOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  SendOutlined,
-  UserOutlined,
-} from '@ant-design/icons';
-import {
-  Avatar,
-  Button,
-  Card,
-  Checkbox,
-  Empty,
-  Input,
-  List,
-  Modal,
-  Space,
-  Spin,
-  Tag,
-  Tooltip,
-  Upload,
-  message,
-} from 'antd';
+import { DeleteOutlined, EditOutlined, SendOutlined } from '@ant-design/icons';
+import { Alert, Avatar, Button, Card, Empty, Input, List, Popconfirm, Space, Spin, Tag, Tooltip, message } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { advanceWorkflowStage, addWorkflowStageComment, addWorkflowStageFile, getWorkflowStageActivity, loadWorkflowDetail, moveWorkflowToStage } from './api';
-import type { WorkflowDetailMock } from './types';
-import { transitionToNextStage, transitionToStage, type StageTransition } from './stageTransition';
-import type { WorkflowChecklistItem } from './types';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage, workflowFileTypeLabel } from './workflowFiles';
+import { ApiError } from '../../api/client';
+import { useAuth } from '../../auth';
+import PageLayout from '../../components/pageLayout/PageLayout';
+import HealthMark from '../universities/components/HealthMark';
+import {
+  addStageComment,
+  deleteStageComment,
+  deleteStageFile,
+  loadProgramDesk,
+  loadStageFacts,
+  moveProgram,
+  saveChecklistItem,
+  syncProgram,
+  updateStageComment,
+  uploadStageFile,
+  type DeskChecklistItem,
+  type DeskComment,
+  type DeskFile,
+  type ProgramDesk,
+} from './api';
+import StageWorkspace from './components/StageWorkspace';
 import WorkflowSteps from './components/WorkflowSteps';
+import { stageBlueprints, stageCodeOf } from './stageBlueprints';
+import { emptyActionText } from './workflowBackendFieldGaps';
+
 
 import styles from './WorkflowDetailPage.module.scss';
 
-const getInitials = (value: string) => value.replaceAll('.', '').split(' ').map((part) => part[0]).join('').slice(0, 2);
+const overdueDays = (due: string | null) => {
+  if (!due || !dayjs(due).isValid()) return 0;
+  return Math.max(dayjs().startOf('day').diff(dayjs(due), 'day'), 0);
+};
 
-const formatDate = (value: string) => (value && dayjs(value).isValid() ? dayjs(value).format('D MMMM YYYY') : '—');
+const errorText = (error: unknown) => {
+  if (!(error instanceof ApiError)) return 'Не удалось сохранить';
+  const payload = error.payload as { message?: string; detail?: string | { message?: string } } | undefined;
+  if (typeof payload?.detail === 'string') return payload.detail;
+  if (payload?.detail && typeof payload.detail === 'object' && payload.detail.message) return payload.detail.message;
+  return payload?.message || error.message;
+};
 
 const WorkflowDetailPage = () => {
-  const { id } = useParams();
-  const [detail, setDetail] = useState<WorkflowDetailMock | undefined>();
-  const [isLoading, setIsLoading] = useState(true);
-  const workflowId = detail?.item.id ?? id ?? '';
-  const [viewedStageId, setViewedStageId] = useState<number | null>(null);
+  const { id = '' } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const seesKam = user?.roles.some((role) => role === 'MANAGER' || role === 'ADMIN') ?? false;
+  const [desk, setDesk] = useState<ProgramDesk | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedId, setSelectedId] = useState<string>('');
+  const [checklist, setChecklist] = useState<DeskChecklistItem[]>([]);
+  const [comments, setComments] = useState<DeskComment[]>([]);
+  const [files, setFiles] = useState<DeskFile[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    if (!id) return;
+    setLoading(true);
+    loadProgramDesk(id)
+      .then((loaded) => {
+        setDesk(loaded);
+        setSelectedId((current) => current || loaded.currentStageId || loaded.stages[0]?.id || '');
+        setError('');
+      })
+      .catch(() => setError('Не удалось открыть программу'))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (!id) return undefined;
-    let cancelled = false;
-    setIsLoading(true);
-
-    loadWorkflowDetail(id)
-      .then((loaded) => {
-        if (!cancelled) setDetail(loaded);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      const modal = document.querySelector('.ant-modal-wrap');
+      if (modal instanceof HTMLElement && getComputedStyle(modal).display !== 'none') return;
+      navigate('/v2/workflows');
     };
-  }, [id]);
-  // Мок меняется вне React. Счётчик перечитывает карточку, когда id этапа тот же
-  // или когда добавились комментарий и файл.
-  const [, setStageRevision] = useState(0);
-  const [checklistByStage, setChecklistByStage] = useState<Record<number, WorkflowChecklistItem[]>>(() => (
-    detail?.stepConfigs.reduce<Record<number, WorkflowChecklistItem[]>>((result, config) => {
-      result[config.id] = config.checklistItems.map((label, index) => ({ id: index + 1, label, completed: false }));
-      return result;
-    }, {}) ?? {}
-  ));
-  const [commentText, setCommentText] = useState('');
-  const [transitionComment, setTransitionComment] = useState('');
-  const [pendingTransition, setPendingTransition] = useState<(StageTransition & { mode: 'next' | 'set' }) | null>(null);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navigate]);
 
-  const viewedStage = detail?.stages.find((stage) => stage.id === viewedStageId)
-    ?? detail?.stages.find((stage) => stage.state === 'current')
-    ?? detail?.stages.at(-1);
-  const viewedStageIndex = detail && viewedStage ? detail.stages.findIndex((stage) => stage.id === viewedStage.id) : -1;
-  const currentStageIndex = detail?.stages.findIndex((stage) => stage.state === 'current') ?? -1;
-  const stepConfigs = detail?.stepConfigs ?? [];
-  const selectedConfig = stepConfigs.find((step) => step.id === viewedStage?.id);
-  const checklist = viewedStage
-    ? checklistByStage[viewedStage.id]
-      ?? detail?.checklistByStage?.[viewedStage.id]
-      ?? selectedConfig?.checklistItems.map((label, index) => ({ id: index + 1, label, completed: false }))
-      ?? []
-    : [];
-  const stageActivity = detail && viewedStage
-    ? getWorkflowStageActivity(workflowId, viewedStage.id, detail.currentStageId)
-    : { files: [], comments: [] };
-  const { files, comments } = stageActivity;
-
-  if (isLoading) return <Spin size="large" />;
-
-  if (!detail || !viewedStage || viewedStageIndex < 0) {
-    return <Empty description="Workflow не найден" />;
-  }
-
-  const updateChecklist = (item: WorkflowChecklistItem, completed: boolean) => {
-    setChecklistByStage((current) => ({
-      ...current,
-      [viewedStage.id]: checklist.map((entry) => entry.id === item.id ? { ...entry, completed } : entry),
-    }));
-    message.success(completed ? 'Задача отмечена выполненной' : 'Задача возвращена в работу');
-  };
-
-  const handleAddComment = () => {
-    const text = commentText.trim();
-    if (!text) return;
-
-    addWorkflowStageComment(workflowId, viewedStage.id, detail.currentStageId, {
-      author: detail.item.responsible,
-      text,
-      createdAt: dayjs().format('D MMMM YYYY, HH:mm'),
-    });
-    setCommentText('');
-    setStageRevision((revision) => revision + 1);
-    message.success('Комментарий добавлен');
-  };
-
-  const handleBeforeUpload = (file: File) => {
-    if (!isAllowedWorkflowFile(file.name)) {
-      message.error(workflowFileRejectionMessage);
-      return Upload.LIST_IGNORE;
-    }
-
-    addWorkflowStageFile(workflowId, viewedStage.id, detail.currentStageId, {
-      name: file.name,
-      type: workflowFileTypeLabel(file.name),
-      size: `${(file.size / 1024 / 1024).toFixed(1)} МБ`,
-      uploadedAt: dayjs().format('DD.MM.YYYY, HH:mm'),
-    });
-    setStageRevision((revision) => revision + 1);
-    message.success(`Файл ${file.name} добавлен`);
-    return false;
-  };
-
-  const handleDownloadHistory = () => {
-    const history = detail.stages.flatMap((stage) => (
-      getWorkflowStageActivity(workflowId, stage.id, detail.currentStageId).comments.map(
-        (comment) => `${stage.name} — ${comment.createdAt} — ${comment.author}: ${comment.text}`,
-      )
-    )).join('\n');
-    const blob = new Blob([history], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `workflow-${detail.item.id}-history.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleNextStage = () => {
-    const preview = transitionToNextStage(stepConfigs, detail.item.stage, detail.item.status, detail.item.progress);
-
-    if (!preview) {
-      message.error('Не удалось перейти на следующий этап');
+  useEffect(() => {
+    const stage = desk?.stages.find((item) => item.id === selectedId);
+    if (!selectedId || selectedId.startsWith('gap-')) {
+      const code = stageCodeOf(stage?.code, stage?.name);
+      const blueprint = stageBlueprints[code];
+      setChecklist((blueprint?.facts ?? []).map((fact) => ({
+        id: `local-${selectedId}-${fact.code}`,
+        code: fact.code,
+        label: fact.label,
+        required: true,
+        done: false,
+        itemType: fact.itemType,
+        role: fact.role ?? null,
+        attachmentKind: fact.attachmentKind ?? null,
+        valueText: null,
+        valueDate: null,
+        stakeholderId: null,
+        attachmentId: null,
+      })));
+      setComments([]);
+      setFiles([]);
       return;
     }
+    loadStageFacts(selectedId).then((facts) => {
+      const code = stageCodeOf(stage?.code, stage?.name);
+      const blueprint = stageBlueprints[code];
+      const visible = facts.checklist.length > 0 || !blueprint ? facts.checklist : blueprint.facts.map((fact) => ({
+        id: `local-${selectedId}-${fact.code}`,
+        code: fact.code,
+        label: fact.label,
+        required: true,
+        done: false,
+        itemType: fact.itemType,
+        role: fact.role ?? null,
+        attachmentKind: fact.attachmentKind ?? null,
+        valueText: null,
+        valueDate: null,
+        stakeholderId: null,
+        attachmentId: null,
+      }));
+      setChecklist(visible);
+      setComments(facts.comments);
+      setFiles(facts.files);
+    }).catch(() => setError('Не удалось прочитать этап'));
+  }, [desk?.stages, selectedId]);
 
-    if (!preview.changed) {
-      message.success('Workflow уже завершён');
-      return;
-    }
+  if (loading && !desk) return <PageLayout><div className={styles.loader}><Spin size="large" /></div></PageLayout>;
+  if (!desk) return <PageLayout><Empty description={error || 'Программа не найдена'} /></PageLayout>;
 
-    setTransitionComment('');
-    setPendingTransition({ ...preview, mode: 'next' });
+  const currentIndex = Math.max(desk.stages.findIndex((stage) => stage.id === desk.currentStageId), 0);
+  const selectedIndex = Math.max(desk.stages.findIndex((stage) => stage.id === selectedId), 0);
+  const selected = desk.stages[selectedIndex];
+  const next = desk.stages[selectedIndex + 1];
+  const previous = desk.stages[selectedIndex - 1];
+  const isCurrent = selected?.id === desk.currentStageId;
+  const readOnly = false;
+  const missing = checklist.filter((item) => item.required && !item.done).map((item) => item.label);
+  const sameName = (left?: string, right?: string) => (left ?? '').trim().toLowerCase() === (right ?? '').trim().toLowerCase();
+  const forward = desk.transitions.find((item) => sameName(item.toStageName, next?.name))
+    ?? (!selected?.final && desk.transitions.length === 1 ? desk.transitions[0] : undefined);
+  const backward = desk.transitions.find((item) => sameName(item.toStageName, previous?.name));
+  const canClose = Boolean(isCurrent && missing.length === 0 && (selected?.final || forward));
+  const late = overdueDays(selected?.dueAt ?? null);
+
+  const refreshFacts = async () => {
+    if (!selected || selected.id.startsWith('gap-')) return;
+    const facts = await loadStageFacts(selected.id);
+    setChecklist(facts.checklist);
+    setComments(facts.comments);
+    setFiles(facts.files);
   };
 
-  const handleMakeCurrent = () => {
-    const preview = transitionToStage(stepConfigs, detail.item.stage, detail.item.status, detail.item.progress, viewedStage.id);
-
-    if (!preview) {
-      message.error('Не удалось сменить этап');
-      return;
+  const changeItem = async (item: DeskChecklistItem, patch: Record<string, unknown>) => {
+    if (readOnly) return;
+    setChecklist((items) => items.map((entry) => entry.id === item.id ? {
+      ...entry,
+      done: Boolean(patch.is_done),
+      valueText: (patch.value_text as string | undefined) ?? entry.valueText,
+      valueDate: (patch.value_date as string | null | undefined) ?? entry.valueDate,
+      stakeholderId: (patch.stakeholder_id as string | undefined) ?? entry.stakeholderId,
+      attachmentId: (patch.attachment_id as string | undefined) ?? entry.attachmentId,
+    } : entry));
+    const typedText = typeof patch.value_text === 'string' ? patch.value_text.trim() : null;
+    const needsLongText = item.code === 'meeting_protocol' || item.label.includes('40');
+    if (typedText !== null && needsLongText && typedText.length < 40) return;
+    if (patch.defer || item.id.startsWith('local-') || item.id.startsWith('gap-')) return;
+    try {
+      await saveChecklistItem(item.id, patch);
+    } catch (reason) {
+      message.error(errorText(reason));
+      if (item.itemType !== 'text') await refreshFacts();
     }
-
-    if (!preview.changed) {
-      message.info('Этот этап уже текущий');
-      return;
-    }
-
-    setTransitionComment('');
-    setPendingTransition({ ...preview, mode: 'set' });
   };
 
-  const closeTransition = () => {
-    setPendingTransition(null);
-    setTransitionComment('');
+  const sendComment = async () => {
+    const textValue = (drafts[selected.id] ?? '').trim();
+    if (!textValue || readOnly) return;
+    setBusy(true);
+    try {
+      await addStageComment(selected.id, textValue);
+      setDrafts((currentDrafts) => ({ ...currentDrafts, [selected.id]: '' }));
+      await refreshFacts();
+    } catch (reason) {
+      message.error(errorText(reason));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const confirmTransition = () => {
-    if (!pendingTransition) return;
-
-    const transition = pendingTransition.mode === 'set'
-      ? moveWorkflowToStage(workflowId, pendingTransition.stageId)
-      : advanceWorkflowStage(workflowId);
-
-    if (!transition?.changed) {
-      message.error(pendingTransition.mode === 'set' ? 'Не удалось сменить этап' : 'Не удалось перейти на следующий этап');
-      closeTransition();
+  const go = async (transitionId: string | undefined, skip = false) => {
+    if (desk.id.startsWith('gap-')) {
+      message.info('Это демо-программа из файла для бэкенда');
       return;
     }
-
-    const text = transitionComment.trim();
-    if (text) {
-      addWorkflowStageComment(workflowId, transition.stageId, transition.stageId, {
-        author: detail.item.responsible,
-        text,
-        createdAt: dayjs().format('D MMMM YYYY, HH:mm'),
-      });
+    setBusy(true);
+    try {
+      await moveProgram(desk.id, { transitionId, comment: drafts[selected.id], stageId: desk.currentStageId ?? undefined, skip });
+      setDrafts((currentDrafts) => ({ ...currentDrafts, [selected.id]: '' }));
+      const reloaded = await loadProgramDesk(desk.id);
+      setDesk(reloaded);
+      setSelectedId(reloaded.currentStageId || reloaded.stages[0]?.id || '');
+    } catch (reason) {
+      message.error(errorText(reason));
+    } finally {
+      setBusy(false);
     }
-
-    const mode = pendingTransition.mode;
-    closeTransition();
-    setViewedStageId(transition.stageId);
-    setStageRevision((revision) => revision + 1);
-    message.success(
-      transition.completed
-        ? 'Workflow завершён'
-        : mode === 'set'
-          ? `Текущий этап — «${transition.stageName}»`
-          : `Переход на этап «${transition.stageName}» выполнен`,
-    );
   };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.breadcrumbs}>
-        <Link to="/v2/workflows">Воркфлоу</Link>
-        <span className={styles.breadcrumbSeparator}>›</span>
-        <span className={styles.breadcrumbCurrent}>
-          {detail.item.universityShort} {detail.item.program}
-        </span>
-      </div>
-
-      <header className={styles.heading}>
+    <PageLayout>
+      <div className={styles.page}>
+        <div className={styles.breadcrumbs}>
+          <Link to="/v2/workflows">Воркфлоу</Link>
+          <span className={styles.breadcrumbSeparator}>›</span>
+          <Link to={`/v2/organizations/${desk.organizationId}?section=programs`}>{desk.organization}</Link>
+          <span className={styles.breadcrumbSeparator}>›</span>
+          <span className={styles.breadcrumbCurrent}>{desk.direction} · {desk.product}</span>
+        </div>
+        <div className={styles.programHeading}>
+          <h1>{desk.direction} · {desk.product}</h1>
+          <p>{desk.organization} · {desk.playbook}</p>
+        </div>
+        {error && <Alert type="error" showIcon message={error} />}
         <div className={styles.contextTags}>
-          <Tag icon={<UserOutlined />}>
-            Университет: <strong>{detail.item.universityShort}</strong>
-          </Tag>
-          <Tag>
-            ИТ-программа: <strong>{detail.item.program}</strong>
-          </Tag>
-          <Tag>
-            ИТ-продукт: <strong>{detail.item.product}</strong>
-          </Tag>
-          <Tag icon={<CalendarOutlined />}>
-            Период: <strong>{detail.item.deadline && dayjs(detail.item.deadline).isValid() ? dayjs(detail.item.deadline).year() : '—'}</strong>
-          </Tag>
-          <Tag>
-            Ответственный: <strong>{detail.item.responsible}</strong>
-          </Tag>
+          <Tag>Окно: {desk.windowTitle}</Tag>
+          <HealthMark score={desk.healthScore} band={desk.healthBand} empty="Нет оценки" />
+          {seesKam && <Tag>KAM: {desk.kam}</Tag>}
+          <Button onClick={() => void syncProgram(desk.id).then(() => load()).catch((reason) => message.error(errorText(reason)))}>Синхронизировать</Button>
         </div>
-      </header>
-
         <div className={styles.layout}>
-          <Card className={styles.stageCard} title="Этапы">
+          <Card className={styles.stageCard} title="Путь">
             <WorkflowSteps
-              steps={detail.stages.map((stage) => ({ id: stage.id, title: stage.name }))}
-              currentStep={currentStageIndex === -1 ? detail.stages.length : currentStageIndex}
-              selectedStep={viewedStageIndex}
-              onStepChange={(_index, step) => {
-                setViewedStageId(Number(step.id));
-                setCommentText('');
-              }}
+              steps={desk.stages.map((stage) => ({ id: stage.id, title: stage.name, phase: stage.phase }))}
+              currentStep={currentIndex}
+              selectedStep={selectedIndex}
+              onStepChange={(index) => setSelectedId(desk.stages[index].id)}
             />
-            <Link className={styles.editStagesButton} to={`/v2/workflows/${detail.item.id}/edit`}>
-              <Button block icon={<EditOutlined />}>Редактировать этапы</Button>
-            </Link>
           </Card>
-
-          <main className={styles.content}>
-            <Card className={styles.stageOverview}>
-              <div className={styles.stageHeading}>
-                <div>
-                  <h2>{String(viewedStageIndex + 1).padStart(2, '0')} · {viewedStage.name}</h2>
-                </div>
-                <div className={styles.stageActions}>
-                  <Tag className={`${styles.stageStatus} ${styles[`stageStatus${viewedStage.state[0].toUpperCase()}${viewedStage.state.slice(1)}`]}`}>
-                    {viewedStage.state === 'completed' ? 'Завершено' : viewedStage.state === 'current' ? 'Текущий этап' : 'Следующий этап'}
+          <div className={styles.content}>
+            {desk.banner !== emptyActionText && <Alert type={desk.bannerTone === 'success' ? 'success' : desk.bannerTone === 'warning' ? 'warning' : 'info'} showIcon message={desk.banner} />}
+            {selected && (
+              <Card className={styles.sectionCard}>
+                <div className={styles.stageHeading}>
+                  <h2>{selected.name}</h2>
+                  <Tag className={isCurrent ? styles.stageStatusCurrent : readOnly ? styles.stageStatusCompleted : styles.stageStatusUpcoming}>
+                    {late > 0 ? `Просрочен на ${late} дн.` : isCurrent ? 'Текущий' : selected.status === 'completed' ? 'Пройден' : 'Впереди'}
                   </Tag>
-                  {viewedStage.state !== 'current' && (
-                    <Button onClick={handleMakeCurrent}>Сделать текущим</Button>
-                  )}
                 </div>
-              </div>
-              <div className={styles.metaGrid}>
-                <div className={styles.metaTile}>
-                  <span className={styles.metaLabel}>Ответственный</span>
-                  <Space><Avatar size="small">{getInitials(detail.item.responsible)}</Avatar><strong>{detail.item.responsible}</strong></Space>
-                </div>
-                <div className={styles.metaTile}>
-                  <span className={styles.metaLabel}>Срок</span>
-                  <strong><CalendarOutlined /> {formatDate(detail.item.deadline)}</strong>
-                </div>
-              </div>
-              {selectedConfig?.description && (
-                <div className={styles.stageDescription}>
-                  <p>{selectedConfig.description}</p>
-                </div>
-              )}
-            </Card>
-
-            <Card className={styles.sectionCard} title="Чек-лист" extra={<span>{checklist.filter((item) => item.completed).length} / {checklist.length}</span>}>
-              <List
-                dataSource={checklist}
-                renderItem={(item) => (
-                  <List.Item>
-                    <Checkbox checked={item.completed} onChange={(event) => updateChecklist(item, event.target.checked)}>{item.label}</Checkbox>
-                    <span className={styles.itemDate}>{item.date ?? '—'}</span>
-                  </List.Item>
-                )}
-              />
-            </Card>
-
-            <Card className={styles.sectionCard} title="Файлы" extra={<span>{files.length} {files.length === 1 ? 'файл' : 'файла'}</span>}>
-              <List
-                dataSource={files}
-                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Файлов пока нет" /> }}
-                renderItem={(file) => (
-                  <List.Item actions={[<Button key="download" type="text" icon={<DownloadOutlined />} onClick={() => message.info(`Скачивание ${file.name}`)} />, <Button key="more" type="text" icon={<MoreOutlined />} />]}>
-                    <List.Item.Meta avatar={<Avatar shape="square" className={styles.fileIcon} icon={<FilePdfOutlined />} />} title={file.name} description={`${file.type} · ${file.size} · ${file.uploadedAt}`} />
-                  </List.Item>
-                )}
-              />
-              <Upload accept=".png,.jpeg,.jpg,.pdf,.zip,.gz,.gzip,.rar,.doc,.docx,.xls,.xlsx" beforeUpload={handleBeforeUpload} showUploadList={false}>
-                <Button className={styles.addFileButton} type="dashed" icon={<PlusOutlined />}>Добавить файл</Button>
-              </Upload>
-            </Card>
-
-            <Card className={styles.sectionCard} title="Комментарии">
-              <div className={styles.commentComposer}>
-                <Avatar>{getInitials(detail.item.responsible)}</Avatar>
-                <Input value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Добавить комментарий..." onPressEnter={handleAddComment} />
-                <Tooltip title="Добавить комментарий">
-                  <Button className={styles.commentSubmit} aria-label="Добавить комментарий" type="primary" icon={<SendOutlined />} onClick={handleAddComment} disabled={!commentText.trim()} />
-                </Tooltip>
-              </div>
-              {comments.length > 0 && (
-                <List
-                  dataSource={comments}
-                  renderItem={(comment) => <List.Item><List.Item.Meta avatar={<Avatar>{getInitials(comment.author)}</Avatar>} title={<Space>{comment.author}<span className={styles.commentDate}>{comment.createdAt}</span></Space>} description={comment.text} /></List.Item>}
+                <p className={styles.subtitle}>Срок: {selected.dueAt && dayjs(selected.dueAt).isValid() ? dayjs(selected.dueAt).format('D MMMM YYYY') : 'не задан'}</p>
+                <StageWorkspace
+                  stageCode={selected.code}
+                  stageName={selected.name}
+                  items={checklist}
+                  files={files}
+                  people={desk.people}
+                  organizationId={desk.organizationId}
+                  students={desk.students}
+                  license={desk.license}
+                  readOnly={readOnly}
+                  onChange={(item, patch) => void changeItem(item, patch)}
+                  onUpload={async (file, kind) => {
+                    const uploaded = await uploadStageFile(selected.id, file, kind);
+                    const saved = {
+                      id: uploaded.id,
+                      fileId: uploaded.file_id,
+                      name: uploaded.original_name || file.name,
+                      kind: uploaded.attachment_kind ?? kind ?? null,
+                      sizeLabel: '',
+                    };
+                    setFiles((current) => [...current.filter((item) => item.id !== saved.id), saved]);
+                    return saved;
+                  }}
+                  onDeleteFile={async (file) => {
+                    await deleteStageFile(file.id);
+                    await refreshFacts();
+                  }}
+                  onPersonAdded={(person) => setDesk((current) => current ? { ...current, people: [...current.people, person] } : current)}
                 />
-              )}
-            </Card>
-
-            <div className={styles.footerActions}>
-              <Button icon={<DownloadOutlined />} onClick={handleDownloadHistory}><span className={styles.actionLabelLong}>Скачать историю взаимодействий</span><span className={styles.actionLabelShort}>Скачать</span></Button>
-              <Button type="primary" icon={<ArrowRightOutlined />} iconPosition="end" onClick={handleNextStage}><span className={styles.actionLabelLong}>Перейти к следующему этапу</span><span className={styles.actionLabelShort}>Следующий этап</span></Button>
-            </div>
-          </main>
+                <div className={styles.commentComposer}>
+                  <Avatar>{(user?.full_name || 'Я').slice(0, 1)}</Avatar>
+                  <Input
+                    value={drafts[selected.id] ?? ''}
+                    disabled={readOnly}
+                    placeholder="Добавить комментарий..."
+                    onChange={(event) => setDrafts((currentDrafts) => ({ ...currentDrafts, [selected.id]: event.target.value }))}
+                    onPressEnter={() => void sendComment()}
+                  />
+                  <Tooltip title="Добавить комментарий">
+                    <Button className={styles.commentSubmit} aria-label="Добавить комментарий" type="primary" icon={<SendOutlined />} disabled={readOnly || !(drafts[selected.id] ?? '').trim()} loading={busy} onClick={() => void sendComment()} />
+                  </Tooltip>
+                </div>
+                {comments.length > 0 && (
+                  <List
+                    dataSource={comments}
+                    renderItem={(comment) => {
+                      const mine = comment.authorId === user?.id;
+                      const editing = editingCommentId === comment.id;
+                      return (
+                        <List.Item
+                          actions={mine && !editing ? [
+                            <Button key="edit" type="text" icon={<EditOutlined />} aria-label="Изменить" onClick={() => { setEditingCommentId(comment.id); setEditingText(comment.text); }} />,
+                            <Popconfirm key="delete" title="Удалить комментарий?" okText="Удалить" cancelText="Оставить" onConfirm={() => void deleteStageComment(selected.id, comment.id).then(refreshFacts)}>
+                              <Button type="text" danger icon={<DeleteOutlined />} aria-label="Удалить" />
+                            </Popconfirm>,
+                          ] : undefined}
+                        >
+                          <List.Item.Meta
+                            avatar={<Avatar>{mine ? (user?.full_name || 'Я').slice(0, 1) : 'К'}</Avatar>}
+                            title={<Space>{mine ? 'Вы' : 'Коллега'}<span className={styles.commentDate}>{dayjs(comment.createdAt).isValid() ? dayjs(comment.createdAt).format('D MMMM YYYY, HH:mm') : comment.createdAt}</span></Space>}
+                            description={editing ? (
+                              <Input
+                                value={editingText}
+                                autoFocus
+                                onChange={(event) => setEditingText(event.target.value)}
+                                onPressEnter={() => void updateStageComment(selected.id, comment.id, editingText.trim()).then(() => { setEditingCommentId(null); return refreshFacts(); })}
+                              />
+                            ) : comment.text}
+                          />
+                        </List.Item>
+                      );
+                    }}
+                  />
+                )}
+                {missing.length > 0 && isCurrent && <p className={styles.blockReason}>Закрытие заблокировано: {missing.join(', ')}</p>}
+                <div className={styles.footerActions}>
+                  {backward && isCurrent && <Button disabled={!(drafts[selected.id] ?? '').trim()} loading={busy} onClick={() => void go(backward.id)}>Вернуть к «{previous?.name}»</Button>}
+                  {selected.optional && isCurrent && <Button loading={busy} onClick={() => void go(forward?.id, true)}>Пропустить</Button>}
+                  <Button type="primary" disabled={!canClose} loading={busy} onClick={() => void go(forward?.id)}>
+                    {selected.final ? 'Завершить программу' : next ? `Закрыть и перейти к «${next.name}»` : 'Закрыть этап'}
+                  </Button>
+                </div>
+              </Card>
+            )}
+          </div>
         </div>
-      <Modal
-        open={pendingTransition !== null}
-        title={pendingTransition?.mode === 'set' ? `Текущий этап — «${pendingTransition.stageName}»` : pendingTransition?.completed ? 'Завершение workflow' : `Переход на этап «${pendingTransition?.stageName ?? ''}»`}
-        okText={pendingTransition?.mode === 'set' ? 'Сделать текущим' : pendingTransition?.completed ? 'Завершить' : 'Перейти'}
-        cancelText="Отмена"
-        onOk={confirmTransition}
-        onCancel={closeTransition}
-      >
-        <Input.TextArea
-          value={transitionComment}
-          onChange={(event) => setTransitionComment(event.target.value)}
-          placeholder="Комментарий к переходу"
-          autoSize={{ minRows: 3, maxRows: 6 }}
-          maxLength={1000}
-        />
-      </Modal>
-    </div>
+      </div>
+    </PageLayout>
   );
 };
 

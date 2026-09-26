@@ -2,7 +2,8 @@ import { DownloadOutlined, InboxOutlined } from '@ant-design/icons';
 import { Alert, Button, Modal, Select, Table, Upload, message } from 'antd';
 import { useState } from 'react';
 
-import { applyCatalog, catalogFields, downloadCatalogTemplate, previewCatalog, readCatalogRows, suggestCatalogMapping } from '../catalogImport';
+import { catalogTargets, importUniversityCatalog } from '../api';
+import { catalogFields, downloadCatalogTemplate, previewCatalog, readCatalogRows, suggestCatalogMapping } from '../catalogImport';
 import type { CatalogField, CatalogMapping, CatalogPreviewRow } from '../catalogImport';
 
 type CatalogImportModalProps = {
@@ -12,12 +13,14 @@ type CatalogImportModalProps = {
 };
 
 const CatalogImportModal = ({ open, onClose, onApplied }: CatalogImportModalProps) => {
+  const [file, setFile] = useState<File | null>(null);
   const [header, setHeader] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<CatalogMapping | null>(null);
   const [preview, setPreview] = useState<CatalogPreviewRow[]>([]);
 
   const reset = () => {
+    setFile(null);
     setHeader([]);
     setRows([]);
     setMapping(null);
@@ -33,6 +36,7 @@ const CatalogImportModal = ({ open, onClose, onApplied }: CatalogImportModalProp
     const table = await readCatalogRows(await file.arrayBuffer());
     const nextHeader = (table[0] ?? []).map((cell) => String(cell ?? ''));
     const nextMapping = suggestCatalogMapping(nextHeader);
+    setFile(file);
     setHeader(nextHeader);
     setRows(table);
     setMapping(nextMapping);
@@ -47,15 +51,24 @@ const CatalogImportModal = ({ open, onClose, onApplied }: CatalogImportModalProp
     setPreview(previewCatalog(rows, next));
   };
 
-  const apply = () => {
-    if (!mapping || mapping.name == null) {
+  const apply = async () => {
+    if (!file || !mapping || mapping.name == null) {
       message.error('Укажите колонку «Название ВУЗа»');
       return;
     }
-    const result = applyCatalog(rows, mapping);
-    message.success(`Каталог обновлён: ${result.updated} изменено, ${result.created} добавлено`);
-    onApplied();
-    close();
+    const fields = catalogFields.flatMap((field) => {
+      const index = mapping[field.key];
+      if (index == null || !header[index]) return [];
+      return [{ source_column: header[index], target_field: catalogTargets[field.key], required: field.required }];
+    });
+    try {
+      const result = await importUniversityCatalog(file, fields);
+      message.success(`Каталог обновлён: ${result.update_count} изменено, ${result.create_count} добавлено`);
+      onApplied();
+      close();
+    } catch (reason) {
+      message.error(reason instanceof Error ? reason.message : 'Не удалось загрузить каталог');
+    }
   };
 
   return (

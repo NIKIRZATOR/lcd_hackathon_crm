@@ -1,144 +1,112 @@
-import { EditOutlined } from '@ant-design/icons';
-import { Button, DatePicker, Empty, Form, Grid, InputNumber, Modal, Progress, Spin, Tabs, Tag, message } from 'antd';
-import dayjs from 'dayjs';
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Alert, Button, Empty, Grid, Modal, Progress, Select, Spin, Tag, message } from 'antd';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
+import { useAuth } from '../../auth';
 import PageLayout from '../../components/pageLayout/PageLayout';
-import { DocumentsPanel, HistoryPanel, InteractionsPanel, ProgramsPanel, StreamsPanel, TasksPanel, TeachersPanel } from './components/UniversityPanels';
-import UniversityOverview from './components/UniversityOverview';
-import UniversityPeopleModal from './components/UniversityPeopleModal';
+import { assignOrganizationKam, listEligibleKams, loadUniversityCard, syncOrganizationPrograms } from './api';
+import HealthMark from './components/HealthMark';
+import ProgramMasterModal from './components/ProgramMasterModal';
 import UniversityTabBar from './components/UniversityTabBar';
-import { findUniversity, listUniversityWorkflows, loadUniversity, rememberUniversity } from './api';
-import { PeriodContext } from './period';
-import type { Period } from './period';
-import { buildUniversitySections } from './sectionData';
-
-import { universityTypeLabels, type UniversityType } from './types';
-import { buildUniversityCard, getUniversityScore, levelByScore, saveUniversityScore } from './universityCard';
+import UniversityWorkspace from './components/UniversityWorkspace';
+import type { UniversityCard } from './screenModel';
+import { healthBandOf } from './screenModel';
 
 import styles from './UniversityDetailPage.module.scss';
 
-const initials = (name: string) =>
-  name
-    .split(' ')
-    .map((part) => part[0])
-    .filter(Boolean)
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+const sections = [
+  { key: 'programs', label: 'Программы' },
+  { key: 'people', label: 'Люди' },
+  { key: 'contracts', label: 'Договоры и лицензии' },
+  { key: 'teachers', label: 'Преподаватели' },
+  { key: 'documents', label: 'Документы' },
+  { key: 'feed', label: 'Лента' },
+];
 
-const { useBreakpoint } = Grid;
+const initials = (value: string) => value.split(' ').map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase();
+
+const healthNote = (score: number | null) => {
+  if (score == null) return { label: 'Нет программ', note: 'Здоровье появится после первого захода' };
+  if (score >= 75) return { label: 'Высокий уровень', note: 'Худшая живая программа в зелёной зоне' };
+  if (score >= 50) return { label: 'Нужно внимание', note: 'Худшая живая программа желтеет' };
+  return { label: 'Критично', note: 'Худшая живая программа красная' };
+};
 
 const UniversityDetailPage = () => {
+  const { id = '' } = useParams();
   const navigate = useNavigate();
-  const screens = useBreakpoint();
-  const compactScore = screens.md === false;
-  const { id } = useParams();
-  const [university, setUniversity] = useState(() => (id ? findUniversity(id) : undefined));
-  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+  const compactScore = !Grid.useBreakpoint().lg;
+  const seesKam = user?.roles.some((role) => role === 'MANAGER' || role === 'ADMIN') ?? false;
+  const [params, setParams] = useSearchParams();
+  const section = sections.some((item) => item.key === params.get('section')) ? params.get('section') ?? 'programs' : 'programs';
+  const [card, setCard] = useState<UniversityCard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [masterOpen, setMasterOpen] = useState(false);
+  const [kamOpen, setKamOpen] = useState(false);
+  const [kams, setKams] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [kamUserId, setKamUserId] = useState<string>();
+  const [assigning, setAssigning] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
-  useEffect(() => {
-    if (!id) return undefined;
-    let cancelled = false;
-    setIsLoading(true);
-
-    loadUniversity(id)
-      .then((item) => {
-        if (!cancelled) setUniversity(item);
-      })
-      .catch(() => {
-        if (!cancelled) setUniversity(undefined);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+  const reload = useCallback(() => {
+    if (!id) return;
+    setLoading(true);
+    loadUniversityCard(id)
+      .then((loaded) => { setCard(loaded); setError(''); })
+      .catch(() => setError('Не удалось открыть вуз'))
+      .finally(() => setLoading(false));
   }, [id]);
-  const card = useMemo(() => (university ? buildUniversityCard(university) : undefined), [university]);
-  const sections = useMemo(() => (university ? buildUniversitySections(university) : undefined), [university]);
-  const interactions = university ? listUniversityWorkflows(university.id).map((row) => ({
-    id: String(row.id),
-    program: row.program,
-    product: row.product,
-    stage: row.stage,
-    tone: row.tone,
-    nextStep: row.nextStep,
-    due: row.due,
-    owner: row.owner,
-    at: row.at,
-  })) : [];
-  const [score, setScore] = useState(() => (university && card ? getUniversityScore(university.id, card.score) : 0));
+
+  useEffect(() => { reload(); }, [reload]);
 
   useEffect(() => {
-    if (!university || !card) return;
-    if (typeof university.healthScore === 'number' || typeof university.id === 'number') {
-      setScore(getUniversityScore(university.id, card.score));
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || masterOpen) return;
+      const modal = document.querySelector('.ant-modal-wrap');
+      if (modal instanceof HTMLElement && getComputedStyle(modal).display !== 'none') return;
+      if (section !== 'programs') {
+        setParams({ section: 'programs' }, { replace: true });
+        return;
+      }
+      navigate('/v2/organizations');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [masterOpen, navigate, section, setParams]);
+
+  const sync = async () => {
+    if (!card) return;
+    const programIds = card.programs.filter((program) => program.status === 'active' || program.status === 'paused' || program.status === 'draft').map((program) => program.id);
+    if (programIds.length === 0) {
+      message.info('Синхронизировать нечего: на площадке нет живых программ');
+      return;
     }
-  }, [card, university]);
+    setSyncing(true);
+    try {
+      const result = await syncOrganizationPrograms(programIds);
+      message.success(`Сигналы: сопоставлено ${result.mapped}, без площадки ${result.unmatched}`);
+      reload();
+    } catch {
+      message.error('Синхронизация не прошла');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
-  const [tab, setTab] = useState('overview');
-  const [period, setPeriod] = useState<Period>(null);
-  const [peopleOpen, setPeopleOpen] = useState(false);
-  const [scoreOpen, setScoreOpen] = useState(false);
-  const [form] = Form.useForm<{ score: number }>();
-
-  if (isLoading) {
-    return (
-      <PageLayout>
-        <Spin size="large" />
-      </PageLayout>
-    );
+  if (loading && !card) {
+    return <PageLayout><div className={styles.loader}><Spin size="large" /></div></PageLayout>;
   }
 
-  if (!university || !card || !sections) {
-    return (
-      <PageLayout>
-        <Empty description="Вуз не найден" />
-      </PageLayout>
-    );
+  if (!card) {
+    return <PageLayout><Empty description={error || 'Вуз не найден'} /></PageLayout>;
   }
 
-  const typeLabel = university.type && university.type !== '—'
-    ? universityTypeLabels[university.type as UniversityType] ?? university.type
-    : '';
-  const scoreKnown = typeof university.healthScore === 'number' || typeof university.id === 'number';
-
-  const level = levelByScore(score);
-  const scoreColor = score >= 75 ? '#16844f' : score >= 50 ? '#d48806' : '#dc3c48';
-  const tabs = [
-    { key: 'overview', label: 'Обзор' },
-    { key: 'interactions', label: 'Взаимодействия' },
-    { key: 'programs', label: 'Программы и продукты' },
-    { key: 'teachers', label: 'Преподаватели' },
-    { key: 'streams', label: 'Потоки' },
-    { key: 'documents', label: 'Документы' },
-    { key: 'tasks', label: 'Задачи и встречи' },
-    { key: 'history', label: 'История' },
-  ];
-
-  const openScore = () => {
-    form.setFieldsValue({ score });
-    setScoreOpen(true);
-  };
-
-  const savePeople = (manager: string, responsibles: { name: string; role: string }[]) => {
-    if (!university) return;
-    const nextUniversity = { ...university, manager: manager || '—', responsibles };
-    rememberUniversity(nextUniversity);
-    setUniversity(nextUniversity);
-    setPeopleOpen(false);
-    message.success('Ответственные обновлены');
-  };
-
-  const saveScore = ({ score: nextScore }: { score: number }) => {
-    saveUniversityScore(university.id, nextScore);
-    setScore(nextScore);
-    setScoreOpen(false);
-  };
+  const note = healthNote(card.healthScore);
+  const band = card.healthBand ?? healthBandOf(card.healthScore, null);
+  const scoreColor = band === 'green' ? '#16844f' : band === 'yellow' ? '#d48806' : band === 'red' ? '#dc3c48' : '#8c8c8c';
+  const archived = card.status === 'archived';
 
   return (
     <PageLayout>
@@ -146,121 +114,93 @@ const UniversityDetailPage = () => {
         <div className={styles.breadcrumbs}>
           <Link to="/v2/organizations">Вузы</Link>
           <span className={styles.breadcrumbSeparator}>›</span>
-          <span className={styles.breadcrumbCurrent}>{university.shortName}</span>
+          {section === 'programs' ? <span className={styles.breadcrumbCurrent}>{card.shortName}</span> : (
+            <>
+              <button type="button" className={styles.breadcrumbLink} onClick={() => setParams({ section: 'programs' }, { replace: true })}>{card.shortName}</button>
+              <span className={styles.breadcrumbSeparator}>›</span>
+              <span className={styles.breadcrumbCurrent}>{sections.find((item) => item.key === section)?.label}</span>
+            </>
+          )}
         </div>
-
+        {error && <Alert type="error" showIcon message={error} />}
         <section className={styles.hero}>
           <div className={styles.identity}>
-            <span className={styles.logo}>{initials(university.shortName)}</span>
+            <div className={styles.logo} aria-hidden>{initials(card.shortName)}</div>
             <div className={styles.identityBody}>
-              <h1>{university.shortName}</h1>
-              <p>
-                {[
-                  typeLabel,
-                  university.profile !== '—' ? university.profile : '',
-                  university.city && university.city !== '—' ? university.city : '',
-                  card.site !== '—' ? card.site : '',
-                ].filter(Boolean).join(' · ') || '—'}
-              </p>
-              {university.catalog?.comment && <p className={styles.comment}>{university.catalog.comment}</p>}
+              <h1>{card.shortName}</h1>
+              <p>{[card.typeName, card.region, card.city].filter(Boolean).join(' · ')}</p>
+              {card.comment && <p className={styles.comment}>{card.comment}</p>}
               <div className={styles.tags}>
-                {typeLabel && <Tag>{typeLabel}</Tag>}
-                {university.profile && university.profile !== '—' && <Tag>{university.profile}</Tag>}
-                {university.product && university.product !== '—' && <Tag>{university.product}</Tag>}
-                <Tag>{card.partnership}</Tag>
+                <Tag>{card.typeName}</Tag>
+                {seesKam && <Tag>KAM: {card.kamName}</Tag>}
+                <HealthMark score={card.healthScore} band={card.healthBand} />
+                {archived && <Tag>Архив</Tag>}
               </div>
               <div className={styles.owners}>
-                <span className={styles.owner}>
-                  <span className={styles.avatar}>{initials(card.rtkManager.name)}</span>
-                  <span><small>{card.rtkManager.role}</small><strong>{card.rtkManager.name}</strong></span>
-                </span>
-                {card.universityOwners.map((person) => (
-                  <span key={person.name} className={styles.owner}>
-                    <span className={styles.avatar}>{initials(person.name)}</span>
-                    <span><small>{person.role}</small><strong>{person.name}</strong></span>
-                  </span>
-                ))}
-                <Button type="link" className={styles.peopleButton} onClick={() => setPeopleOpen(true)}>Изменить</Button>
+                <Button type="primary" disabled={archived} onClick={() => setMasterOpen(true)}>+ программа</Button>
+                {seesKam && <Button onClick={() => {
+                  setKamOpen(true);
+                  listEligibleKams(card.id).then(setKams).catch(() => message.error('Не удалось загрузить менеджеров команды'));
+                }}>Сменить KAM</Button>}
+                <Button loading={syncing} onClick={() => void sync()}>Синхронизировать</Button>
+                <Button onClick={() => navigate(`/v2/reports?organization=${card.id}`)}>Отчёт по вузу</Button>
               </div>
             </div>
           </div>
-
-          <div className={styles.score}>
-            {!scoreKnown ? (
-              <div className={styles.scoreText}><strong>—</strong><span>Здоровье не посчитано</span></div>
-            ) : compactScore ? (
-              <button type="button" className={styles.scoreButton} aria-label="Изменить уровень сотрудничества" onClick={openScore}>
-                <Progress type="circle" percent={score} size={64} strokeColor={scoreColor} format={(value) => value} />
-              </button>
-            ) : (
-              <>
-                <Progress type="circle" percent={score} size={84} strokeColor={scoreColor} format={(value) => value} />
-                <div className={styles.scoreText}>
-                  <strong>{level.label}</strong>
-                  <span>{level.note}</span>
-                  <Button type="text" size="small" icon={<EditOutlined />} onClick={openScore}>Изменить</Button>
-                </div>
-              </>
+          {(card.healthScore != null || !compactScore) && <div className={`${styles.score} ${compactScore ? styles.scoreCompact : ''}`}>
+            {card.healthScore == null ? null : (
+              <Progress type="circle" percent={card.healthScore} size={compactScore ? 64 : 84} strokeColor={scoreColor} format={(value) => value} />
             )}
-          </div>
+            {!compactScore && (
+              <div className={styles.scoreText}>
+                <strong>{note.label}</strong>
+                <span>{note.note}</span>
+              </div>
+            )}
+          </div>}
         </section>
-
-        <div className={styles.periodRow}>
-          <DatePicker.RangePicker
-            placeholder={['Период с', 'Период по']}
-            format="DD.MM.YYYY"
-            value={period ? [dayjs(period[0]), dayjs(period[1])] : null}
-            onChange={(values) => {
-              if (!values?.[0] || !values[1]) {
-                setPeriod(null);
-                return;
-              }
-              setPeriod([values[0].format('YYYY-MM-DD'), values[1].format('YYYY-MM-DD')]);
-            }}
+        <UniversityTabBar items={sections} activeKey={section} onChange={(key) => setParams({ section: key }, { replace: true })} />
+        <UniversityWorkspace card={card} section={section} onChanged={reload} />
+        <Modal
+          open={kamOpen}
+          title="Ответственный KAM"
+          okText="Назначить"
+          cancelText="Отмена"
+          confirmLoading={assigning}
+          okButtonProps={{ disabled: !kamUserId }}
+          onCancel={() => setKamOpen(false)}
+          onOk={() => {
+            if (!kamUserId) return;
+            setAssigning(true);
+            assignOrganizationKam(card.id, kamUserId)
+              .then(() => {
+                message.success('KAM назначен. Живые программы площадки перешли к нему, этапы не сброшены.');
+                setKamOpen(false);
+                reload();
+              })
+              .catch(() => message.error('Не удалось назначить KAM'))
+              .finally(() => setAssigning(false));
+          }}
+        >
+          <Select
+            showSearch
+            optionFilterProp="label"
+            placeholder="Менеджер команды"
+            style={{ width: '100%' }}
+            value={kamUserId}
+            options={kams.map((item) => ({ value: item.id, label: item.full_name }))}
+            onChange={setKamUserId}
+            notFoundContent="В команде нет доступных KAM"
           />
-        </div>
-
-        <PeriodContext.Provider value={period}>
-        <Tabs
-          className={styles.tabs}
-          activeKey={tab}
-          onChange={setTab}
-          renderTabBar={() => <UniversityTabBar items={tabs} activeKey={tab} onChange={setTab} />}
-          items={[
-            { key: 'overview', label: 'Обзор', children: <UniversityOverview card={card} interactions={interactions} programs={university.programs} streams={university.streams} onOpenTab={setTab} onOpenInteraction={(interactionId) => navigate(`/v2/workflows/${interactionId}`)} /> },
-            { key: 'interactions', label: 'Взаимодействия', children: <InteractionsPanel university={university} /> },
-            { key: 'programs', label: 'Программы и продукты', children: <ProgramsPanel sections={sections} /> },
-            { key: 'teachers', label: 'Преподаватели', children: <TeachersPanel sections={sections} /> },
-            { key: 'streams', label: 'Потоки', children: <StreamsPanel sections={sections} /> },
-            { key: 'documents', label: 'Документы', children: <DocumentsPanel sections={sections} /> },
-            { key: 'tasks', label: 'Задачи и встречи', children: <TasksPanel sections={sections} /> },
-            { key: 'history', label: 'История', children: <HistoryPanel sections={sections} /> },
-          ]}
+        </Modal>
+        <ProgramMasterModal
+          open={masterOpen}
+          organizationId={card.id}
+          programs={card.programs}
+          onClose={() => setMasterOpen(false)}
+          onCreated={(programId) => navigate(`/v2/workflows/${programId}`)}
         />
-        </PeriodContext.Provider>
       </div>
-
-      <UniversityPeopleModal
-        open={peopleOpen}
-        manager={university.manager === 'Не назначен' ? '' : university.manager}
-        responsibles={university.responsibles ?? card.universityOwners.map((person) => ({ name: person.name, role: 'Ответственный от вуза' }))}
-        onClose={() => setPeopleOpen(false)}
-        onSave={savePeople}
-      />
-      <Modal
-        open={scoreOpen}
-        title="Уровень сотрудничества"
-        okText="Сохранить"
-        cancelText="Отмена"
-        onCancel={() => setScoreOpen(false)}
-        onOk={() => form.submit()}
-      >
-        <Form form={form} layout="vertical" onFinish={saveScore}>
-          <Form.Item name="score" label="Оценка, 0–100" rules={[{ required: true, message: 'Укажите оценку' }]}>
-            <InputNumber min={0} max={100} style={{ width: '100%' }} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </PageLayout>
   );
 };

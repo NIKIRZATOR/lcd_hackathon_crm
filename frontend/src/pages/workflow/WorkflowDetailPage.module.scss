@@ -1,3 +1,47 @@
+.loader {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 160px);
+}
+
+.programHeading h1 {
+  margin: 0;
+  font-size: clamp(22px, 2vw, 30px);
+  line-height: 1.2;
+}
+
+.programHeading p {
+  margin: 6px 0 0;
+  color: var(--ant-color-text-secondary);
+}
+
+.subtitle { margin: 0 0 12px; color: var(--ant-color-text-secondary); line-height: 1.5; }
+.facts { display: flex; flex-direction: column; gap: 14px; margin: 8px 0 16px; }
+.fact { display: flex; flex-direction: column; gap: 8px; }
+.factRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 16px 18px;
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+  line-height: 1.45;
+}
+
+.contextTags :global(.ant-tag) {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  line-height: 20px;
+}
+.fileList { margin-top: 8px; }
+.requiredItem { color: #c24155; }
+.requiredMark { margin-left: 8px; color: #c24155; font-size: 12px; }
+.blockReason { margin: 12px 0 0; color: #c24155; }
+
 .page {
   display: flex;
   flex-direction: column;
@@ -43,7 +87,8 @@
 .contextTags {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
 }
 
 .contextTags :global(.ant-tag) {
@@ -78,6 +123,7 @@
 .stageCard {
   position: sticky;
   top: 80px;
+  max-width: 100%;
 }
 
 .stageCard :global(.ant-card-head) {
@@ -90,6 +136,7 @@
 }
 
 .stageCard :global(.ant-card-body) {
+  min-width: 0;
   padding: 8px;
 }
 
@@ -174,7 +221,7 @@
 .sectionCard :global(.ant-card-head-title) { font-size: 16px; }
 .sectionCard :global(.ant-list-item) { padding-inline: 0; }
 .sectionCard :global(.ant-list-item-action-split) { display: none; }
-.sectionCard :global(.ant-upload) { display: block; width: 100%; }
+.sectionCard :global(.ant-upload) { display: inline-block; }
 .itemDate, .commentDate { color: var(--ant-color-text-secondary); font-size: 12px; }
 .fileIcon { color: #e5484d; background: #ffebec; }
 .addFileButton { width: 100%; margin-top: 12px; }

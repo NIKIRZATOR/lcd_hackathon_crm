@@ -1,3 +1,52 @@
+.loader {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 160px);
+}
+
+.presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.preset, .presetActive {
+  padding: 8px 14px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.presetActive { color: var(--ant-color-primary); background: #efe5ff; border-color: transparent; }
+.filtersRow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.search { width: min(280px, 100%); }
+.filter { min-width: 150px; }
+.tableCard {
+  overflow: hidden;
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+}
+.tableCard :global(table) { width: 100%; table-layout: fixed; }
+.tableCard :global(col.ant-table-expand-icon-col),
+.tableCard :global(th.ant-table-row-expand-icon-cell),
+.tableCard :global(td.ant-table-row-expand-icon-cell) {
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  padding: 0 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+.tableCard :global(.ant-table-row-expand-icon) {
+  float: none !important;
+  margin: 0 !important;
+  vertical-align: middle;
+}
+.tableCard :global(.ant-table-cell) { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+.clickableRow { cursor: pointer; }
+.mobileDetails { display: grid; gap: 8px; }
+.mobileDetails div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; }
+.mobileDetails span { color: var(--ant-color-text-secondary); }
+
 .page {
   display: flex;
   flex-direction: column;
@@ -52,9 +101,9 @@
   font-size: 18px;
 }
 
-.metricIconActive { color: #0a9f61; background: #e4f9ef; }
-.metricIconAttention { color: #ef9700; background: #fff0d6; }
-.metricIconCompleted { color: #3f73f6; background: #e6edff; }
+.metricIconPrograms { color: #3f73f6; background: #e6edff; }
+.metricIconAttention { color: #dc3c48; background: #ffe8ea; }
+.metricIconRenewal { color: #dc8700; background: #fff2db; }
 .metricIconOverdue { color: #f04450; background: #ffe5e7; }
 
 .metricLabel {

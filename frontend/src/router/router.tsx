@@ -13,7 +13,7 @@ import UniversitiesPage from '../pages/universities/UniversitiesPage';
 import UniversityDetailPage from '../pages/universities/UniversityDetailPage';
 import WorkflowPage from '../pages/workflow/WorkflowPage';
 import WorkflowDetailPage from '../pages/workflow/WorkflowDetailPage';
-import WorkflowEditPage from '../pages/workflow/WorkflowEditPage';
+
 import V2Layout from '../v2/app/V2Layout';
 import ManagementPage from '../v2/pages/ManagementPage';
 import NbaTodayPage from '../v2/pages/NbaTodayPage';
@@ -41,7 +41,6 @@ const AppRoutes = () => {
           <Route path="organizations/:id" element={<UniversityDetailPage />} />
           <Route path="workflows" element={<WorkflowPage />} />
           <Route path="workflows/:id" element={<WorkflowDetailPage />} />
-          <Route path="workflows/:id/edit" element={<WorkflowEditPage />} />
           <Route path="programs/:id" element={<ProgramDetailPage />} />
           <Route path="reports" element={<V2PlaceholderPage title="Отчёты" description="Конструктор и очередь отчётов будут подключены на этапе Reports MVP." />} />
           <Route
@@ -66,7 +65,6 @@ const AppRoutes = () => {
         <Route path="/universities/:id" element={<UniversityDetailPage />} />
         <Route path="/workflow" element={<WorkflowPage />} />
         <Route path="/workflow/:id" element={<WorkflowDetailPage />} />
-        <Route path="/workflow/:id/edit" element={<WorkflowEditPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/programs" element={<ProgramsPage />} />
         <Route path="/products" element={<ProductsPage />} />
