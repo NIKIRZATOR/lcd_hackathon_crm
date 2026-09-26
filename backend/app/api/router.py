@@ -6,6 +6,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.cohorts.router import router as cohorts_router
 from app.modules.contacts.router import router as contacts_router
 from app.modules.documents.router import router as documents_router
+from app.modules.documentation.router import router as documentation_router
 from app.modules.integrations.router import router as integrations_router
 from app.modules.imports.router import router as imports_router
 from app.modules.interactions.router import router as interactions_router
@@ -39,6 +40,7 @@ api_router.include_router(auth_router)
 api_router.include_router(cohorts_router)
 api_router.include_router(contacts_router)
 api_router.include_router(documents_router)
+api_router.include_router(documentation_router)
 api_router.include_router(integrations_router)
 api_router.include_router(imports_router)
 api_router.include_router(interactions_router)
