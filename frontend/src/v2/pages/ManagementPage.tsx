@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Checkbox, Input, InputNumber, List, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { apiRequest } from '../../api/client';
 
@@ -29,12 +29,17 @@ const ManagementPage = () => {
   const [factType, setFactType] = useState<ChecklistItem['item_type']>('text');
   const [factKind, setFactKind] = useState('');
 
-  const load = async () => {
-    const [loadedStages, loadedPlaybooks] = await Promise.all([
-      apiRequest<CatalogStage[]>('/api/management/stages'), apiRequest<Playbook[]>('/api/management/playbooks'),
-    ]);
-    setCatalogStages(loadedStages); setPlaybooks(loadedPlaybooks);
-  };
+  const load = useCallback(async () => {
+    try {
+      const [loadedStages, loadedPlaybooks] = await Promise.all([
+        apiRequest<CatalogStage[]>('/api/management/stages'), apiRequest<Playbook[]>('/api/management/playbooks'),
+      ]);
+      setCatalogStages(loadedStages);
+      setPlaybooks(loadedPlaybooks);
+    } catch {
+      setError('Не удалось загрузить управление.');
+    }
+  }, []);
 
   const loadDraft = async (template: Playbook) => {
     setError(undefined); setSelected(template);
@@ -47,7 +52,7 @@ const ManagementPage = () => {
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Не удалось открыть черновик.'); }
   };
 
-  useEffect(() => { void load().catch(() => setError('Не удалось загрузить управление.')); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const createTemplate = async () => {
     if (!newName.trim()) {

@@ -1,7 +1,7 @@
 import { Alert, Button, Card, Checkbox, DatePicker, Descriptions, Input, InputNumber, List, Select, Space, Spin, Tag, Typography, Upload } from 'antd';
 import type { UploadProps } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError, apiRequest } from '../../api/client';
@@ -48,7 +48,7 @@ const ProgramDetailPage = () => {
 
   useEffect(() => { localStorage.setItem(`program:${id}:transition-comment`, comment); }, [comment, id]);
 
-  const loadStage = async (stageId: string) => {
+  const loadStage = useCallback(async (stageId: string) => {
     const [loadedChecklist, loadedComments, loadedAttachments] = await Promise.all([
       apiRequest<Checklist[]>(`/api/stage-instances/${stageId}/checklist`),
       apiRequest<Comment[]>(`/api/workflows/stage-instances/${stageId}/comments`),
@@ -58,28 +58,32 @@ const ProgramDetailPage = () => {
     setChecklist(loadedChecklist);
     setComments(loadedComments);
     setAttachments(loadedAttachments);
-  };
+  }, []);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!id) return;
-    const [loadedProgram, loadedWorkflow, loadedMetrics, loadedLicense, loadedTeachers, loadedNba] = await Promise.all([
-      apiRequest<ProgramInstance>(`/api/program-instances/${id}`),
-      apiRequest<Workflow>(`/api/program-instances/${id}/workflow`),
-      apiRequest<ProgramMetric | null>(`/api/integrations/program-instances/${id}/metrics`),
-      apiRequest<License | null>(`/api/program-instances/${id}/license`),
-      apiRequest<Teacher[]>(`/api/program-instances/${id}/teachers`),
-      apiRequest<NbaItem[]>('/api/nba/today'),
-    ]);
-    setProgram(loadedProgram); setWorkflow(loadedWorkflow); setMetrics(loadedMetrics);
-    setLicense(loadedLicense); setTeachers(loadedTeachers); setNba(loadedNba.find((item) => item.program_instance_id === id));
-    setStakeholders(await apiRequest<Stakeholder[]>(`/api/organizations/${loadedProgram.organization_id}/stakeholders`));
-    setSelectedTransition(loadedWorkflow.available_transitions[0]?.id);
-    if (loadedWorkflow.current_stage_instance_id) {
-      await loadStage(loadedWorkflow.current_stage_instance_id);
+    try {
+      const [loadedProgram, loadedWorkflow, loadedMetrics, loadedLicense, loadedTeachers, loadedNba] = await Promise.all([
+        apiRequest<ProgramInstance>(`/api/program-instances/${id}`),
+        apiRequest<Workflow>(`/api/program-instances/${id}/workflow`),
+        apiRequest<ProgramMetric | null>(`/api/integrations/program-instances/${id}/metrics`),
+        apiRequest<License | null>(`/api/program-instances/${id}/license`),
+        apiRequest<Teacher[]>(`/api/program-instances/${id}/teachers`),
+        apiRequest<NbaItem[]>('/api/nba/today'),
+      ]);
+      setProgram(loadedProgram); setWorkflow(loadedWorkflow); setMetrics(loadedMetrics);
+      setLicense(loadedLicense); setTeachers(loadedTeachers); setNba(loadedNba.find((item) => item.program_instance_id === id));
+      setStakeholders(await apiRequest<Stakeholder[]>(`/api/organizations/${loadedProgram.organization_id}/stakeholders`));
+      setSelectedTransition(loadedWorkflow.available_transitions[0]?.id);
+      if (loadedWorkflow.current_stage_instance_id) {
+        await loadStage(loadedWorkflow.current_stage_instance_id);
+      }
+    } catch {
+      setMessage('Не удалось загрузить workflow программы.');
     }
-  };
+  }, [id, loadStage]);
 
-  useEffect(() => { void load().catch(() => setMessage('Не удалось загрузить workflow программы.')); }, [id]);
+  useEffect(() => { void load(); }, [load]);
   useEffect(() => { const target = searchParams.get('focus'); if (target) document.getElementById(target === 'date' || target === 'stakeholder' ? 'checklist' : target)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, [searchParams, selectedStageId]);
 
   const closeStage = async (skipCurrent = false) => {

@@ -2146,14 +2146,6 @@ class TransitionService:
             if teacher is None:
                 reasons.append({"code": "missing_teacher", "message": "An active teacher for this product is required"})
         return reasons
-        performed_by = self._get_performed_by(payload)
-        if self.db.get(User, performed_by) is None:
-            raise workflow_error(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                code="WORKFLOW_PERFORMER_NOT_FOUND",
-                message="Transition performer not found",
-                details={"performedBy": str(performed_by)},
-            )
 
     def _get_performed_by(self, payload: WorkflowTransitionExecute) -> UUID:
         if payload.performed_by is None:

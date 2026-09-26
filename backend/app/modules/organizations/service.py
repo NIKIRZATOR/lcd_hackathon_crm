@@ -180,7 +180,8 @@ class OrganizationService:
             self._clear_primary(stakeholder.organization_id, except_id=stakeholder.id)
         for field, value in values.items():
             setattr(stakeholder, field, value)
-        self.db.commit(); self.db.refresh(stakeholder)
+        self.db.commit()
+        self.db.refresh(stakeholder)
         return stakeholder
 
     def _list_row(self, organization: Organization) -> dict:

@@ -361,7 +361,9 @@ def create_stage_checklist_item(stage_id: UUID, payload: WorkflowChecklistItemCr
     if db.scalar(select(PlaybookChecklistItem.id).where(PlaybookChecklistItem.workflow_stage_id == stage_id, PlaybookChecklistItem.code == payload.code)):
         raise HTTPException(status_code=409, detail="Checklist item code already exists in this stage")
     item = PlaybookChecklistItem(workflow_stage_id=stage_id, **payload.model_dump())
-    db.add(item); db.commit(); db.refresh(item)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
     return item
 
 
@@ -371,8 +373,10 @@ def update_stage_checklist_item(stage_id: UUID, item_id: UUID, payload: Workflow
     item = db.get(PlaybookChecklistItem, item_id)
     if item is None or item.workflow_stage_id != stage_id:
         raise HTTPException(status_code=404, detail="Checklist item not found")
-    for field, value in payload.model_dump(exclude_unset=True).items(): setattr(item, field, value)
-    db.commit(); db.refresh(item)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(item, field, value)
+    db.commit()
+    db.refresh(item)
     return item
 
 
@@ -382,7 +386,8 @@ def delete_stage_checklist_item(stage_id: UUID, item_id: UUID, db: Session = Dep
     item = db.get(PlaybookChecklistItem, item_id)
     if item is None or item.workflow_stage_id != stage_id:
         raise HTTPException(status_code=404, detail="Checklist item not found")
-    db.delete(item); db.commit()
+    db.delete(item)
+    db.commit()
 
 
 @router.get("/transitions", response_model=Page[WorkflowTransitionRead])

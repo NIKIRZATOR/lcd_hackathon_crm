@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Checkbox, Descriptions, Input, List, Modal, Select, Spin, Steps, Table, Tag, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +17,8 @@ type Page<T> = { items: T[] };
 type Contract = { id: string; number: string; signed_on: string | null; valid_until: string | null; status: string | null; comment: string | null };
 type License = { id: string; product_name: string; license_number: string | null; valid_until: string | null; transfer_status: string; product_access: string | null };
 type Teacher = { id: string; full_name: string; product_name: string; status: string; trained_on: string | null; qualification_until: string | null; last_lms_activity_on: string | null };
+type SelectOptionSource = { id?: string; name?: string; title?: string; code?: string; recommended?: boolean; disabled?: boolean; reason?: string };
+type SelectOptionsResponse = SelectOptionSource[] | { items?: SelectOptionSource[] };
 
 const OrganizationDetailPage = () => {
   const { id } = useParams();
@@ -120,15 +122,28 @@ const OrganizationDetailPage = () => {
 const WizardStep = ({ organizationId, step, values, onChange }: { organizationId: string; step: number; values: Record<string, string>; onChange: (value: Record<string, string>) => void }) => {
   const [options, setOptions] = useState<{ label: string; value: string; recommended?: boolean; disabled?: boolean }[]>([]);
   const [kams, setKams] = useState<{ label: string; value: string }[]>([]);
-  const playbookQuery = new URLSearchParams();
-  if (values.direction_id) playbookQuery.set('direction_id', values.direction_id);
-  if (values.product_id) playbookQuery.set('product_id', values.product_id);
-  if (values.parent_program_id) playbookQuery.set('parent_program_id', values.parent_program_id);
-  const paths = ['/api/it-directions?limit=100', '/api/it-products?limit=100', `/api/organizations/${organizationId}/available-playbooks?${playbookQuery.toString()}`, '/api/academic-windows'];
   const keys = ['direction_id', 'product_id', 'playbook_template_id', 'academic_window_id'];
   useEffect(() => {
-    apiRequest<any>(paths[step]).then((data) => setOptions((data.items ?? data).map((item: any) => ({ value: item.id, recommended: item.recommended, disabled: item.disabled, label: `${item.name ?? item.title ?? item.code}${item.recommended ? ' · рекомендуется' : ''}${item.reason ? ` — ${item.reason}` : ''}` }))));
-    if (step === 3) apiRequest<any[]>(`/api/organizations/${organizationId}/eligible-kams`).then((data) => setKams(data.map((item) => ({ value: item.id, label: item.full_name }))));
+    const loadOptions = async () => {
+      const playbookQuery = new URLSearchParams();
+      if (values.direction_id) playbookQuery.set('direction_id', values.direction_id);
+      if (values.product_id) playbookQuery.set('product_id', values.product_id);
+      if (values.parent_program_id) playbookQuery.set('parent_program_id', values.parent_program_id);
+      const paths = ['/api/it-directions?limit=100', '/api/it-products?limit=100', `/api/organizations/${organizationId}/available-playbooks?${playbookQuery.toString()}`, '/api/academic-windows'];
+      const data = await apiRequest<SelectOptionsResponse>(paths[step]);
+      const items = Array.isArray(data) ? data : data.items ?? [];
+      setOptions(items.flatMap((item) => item.id ? [{
+        value: item.id,
+        recommended: item.recommended,
+        disabled: item.disabled,
+        label: `${item.name ?? item.title ?? item.code ?? item.id}${item.recommended ? ' · рекомендуется' : ''}${item.reason ? ` — ${item.reason}` : ''}`,
+      }] : []));
+      if (step === 3) {
+        const kams = await apiRequest<{ id: string; full_name: string }[]>(`/api/organizations/${organizationId}/eligible-kams`);
+        setKams(kams.map((item) => ({ value: item.id, label: item.full_name })));
+      }
+    };
+    void loadOptions();
   }, [organizationId, step, values.direction_id, values.product_id, values.parent_program_id]);
   return <>
     <Select style={{ width: '100%' }} placeholder="Выберите значение" options={options} value={values[keys[step]]} onChange={(value) => onChange({ ...values, [keys[step]]: value })} />
@@ -145,20 +160,21 @@ const ContractsAndTeachers = ({ organizationId }: { organizationId: string }) =>
   const [createKind, setCreateKind] = useState<'contract' | 'license' | 'teacher' | null>(null);
   const [values, setValues] = useState<Record<string, string>>({ transfer_status: 'not_transferred', status: 'planned' });
 
-  const load = () => Promise.all([
-    apiRequest<Contract[]>(`/api/organizations/${organizationId}/contracts`),
-    apiRequest<License[]>(`/api/organizations/${organizationId}/licenses`),
-    apiRequest<Teacher[]>(`/api/organizations/${organizationId}/teachers`),
-    apiRequest<Page<{ id: string; product_name: string }>>(`/api/organizations/${organizationId}/program-instances`),
-    apiRequest<Page<{ id: string; name: string }>>('/api/it-products?limit=100'),
-  ]).then(([loadedContracts, loadedLicenses, loadedTeachers, loadedPrograms, loadedProducts]) => {
+  const load = useCallback(async () => {
+    const [loadedContracts, loadedLicenses, loadedTeachers, loadedPrograms, loadedProducts] = await Promise.all([
+      apiRequest<Contract[]>(`/api/organizations/${organizationId}/contracts`),
+      apiRequest<License[]>(`/api/organizations/${organizationId}/licenses`),
+      apiRequest<Teacher[]>(`/api/organizations/${organizationId}/teachers`),
+      apiRequest<Page<{ id: string; product_name: string }>>(`/api/organizations/${organizationId}/program-instances`),
+      apiRequest<Page<{ id: string; name: string }>>('/api/it-products?limit=100'),
+    ]);
     setContracts(loadedContracts); setLicenses(loadedLicenses); setTeachers(loadedTeachers);
     setPrograms(loadedPrograms.items); setProducts(loadedProducts.items);
-  });
+  }, [organizationId]);
 
   useEffect(() => {
     load().catch(() => undefined);
-  }, [organizationId]);
+  }, [load]);
 
   const create = async () => {
     if (!createKind) return;
