@@ -18,8 +18,6 @@ import TasksPage from '../pages/tasks/TasksPage';
 import UniversitiesPage from '../pages/universities/UniversitiesPage';
 import UniversityDetailPage from '../pages/universities/UniversityDetailPage';
 import WorkflowDetailPage from '../pages/workflow/WorkflowDetailPage';
-import WorkflowEditPage from '../pages/workflow/WorkflowEditPage';
-import WorkflowJournalPage from '../pages/workflow/WorkflowJournalPage';
 import WorkflowPage from '../pages/workflow/WorkflowPage';
 import { allowedRoles } from './constants';
 import StartRoute from './StartRoute';
@@ -39,8 +37,8 @@ const AppRoutes = () => (
       <Route path="/home" element={<HomePage />} />
       <Route path="/organizations" element={<OrganizationsPage />} />
       <Route path="/organizations/:id" element={<OrganizationDetailPage />} />
-      <Route path="/workflows" element={<WorkflowJournalPage />} />
-      <Route path="/workflows/:id" element={<ProgramDetailPage />} />
+      <Route path="/workflows" element={<WorkflowPage />} />
+      <Route path="/workflows/:id" element={<WorkflowDetailPage />} />
       <Route path="/programs/:id" element={<ProgramDetailPage />} />
       <Route path="/reports" element={<ReportsPage />} />
       <Route
@@ -64,7 +62,6 @@ const AppRoutes = () => (
       <Route path="/universities/:id" element={<UniversityDetailPage />} />
       <Route path="/workflow" element={<WorkflowPage />} />
       <Route path="/workflow/:id" element={<WorkflowDetailPage />} />
-      <Route path="/workflow/:id/edit" element={<WorkflowEditPage />} />
       <Route path="/tasks" element={<TasksPage />} />
       <Route path="/programs" element={<ProgramsPage />} />
       <Route path="/products" element={<ProductsPage />} />

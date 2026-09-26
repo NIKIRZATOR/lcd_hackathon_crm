@@ -37,19 +37,22 @@ const ProgramMasterModal = ({ open, organizationId, programs, onClose, onCreated
 
   useEffect(() => {
     if (!open) return;
-    setStep(0);
-    setDuplicateId(undefined);
-    setTemplateId(null);
-    setError('');
-    form.resetFields();
-    loadMasterOptions().then((options) => {
-      setDirections(options.directions);
-      setProducts(options.products);
-      setWindows(options.windows);
-      setPairs(options.pairs);
-      const current = options.windows.find((item) => item.current);
-      if (current) form.setFieldValue('windowId', current.id);
-    }).catch(() => setError('Не удалось загрузить направления и продукты'));
+    const timer = window.setTimeout(() => {
+      setStep(0);
+      setDuplicateId(undefined);
+      setTemplateId(null);
+      setError('');
+      form.resetFields();
+      loadMasterOptions().then((options) => {
+        setDirections(options.directions);
+        setProducts(options.products);
+        setWindows(options.windows);
+        setPairs(options.pairs);
+        const current = options.windows.find((item) => item.current);
+        if (current) form.setFieldValue('windowId', current.id);
+      }).catch(() => setError('Не удалось загрузить направления и продукты'));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [form, open]);
 
   const values = Form.useWatch([], form) as MasterValues | undefined;

@@ -59,7 +59,10 @@ const UniversityDetailPage = () => {
       .finally(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    const timer = window.setTimeout(reload, 0);
+    return () => window.clearTimeout(timer);
+  }, [reload]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

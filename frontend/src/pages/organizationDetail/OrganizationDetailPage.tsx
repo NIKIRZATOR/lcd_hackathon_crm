@@ -1,5 +1,5 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Descriptions, Empty, Progress, Spin, Table, Tabs, Tag } from 'antd';
+import { Alert, Button, Card, Empty, Progress, Spin, Table, Tabs, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 

@@ -79,14 +79,14 @@ const OrganizationsPage = () => {
   const [error, setError] = useState<string>();
   const seesTeam = user?.roles.some((role) => role === 'MANAGER' || role === 'ADMIN') ?? false;
 
-  const filters: Filters = {
+  const filters = useMemo<Filters>(() => ({
     search: params.get('search') ?? '',
     region: params.get('region') ?? '',
     type: params.get('type') ?? '',
     direction: params.get('direction') ?? '',
     product: params.get('product') ?? '',
     kam: params.get('kam') ?? '',
-  };
+  }), [params]);
 
   useEffect(() => {
     let cancelled = false;
