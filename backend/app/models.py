@@ -5,12 +5,12 @@ from app.modules.audit.model import AuditEvent
 from app.modules.documents.model import File
 from app.modules.documentation.model import DocumentationImage, DocumentationPage, DocumentationRequest
 from app.modules.imports.model import ImportArtifact, ImportJob, ImportMapping, ImportMappingField, ImportRowError
-from app.modules.integrations.model import IntegrationSignal, ProgramMetric
+from app.modules.integrations.model import ExternalCourseMapping, ExternalStreamMapping, IntegrationSignal, ProgramMetric
 from app.modules.interactions.model import InteractionContact, UniversityInteraction
 from app.modules.licenses.model import Contract, License
 from app.modules.nba.model import NbaItem, NbaRule
 from app.modules.organizations.model import OrgAssignment, Organization, OrganizationType, Stakeholder
-from app.modules.products.model import ITProduct, ProgramProduct, Vendor
+from app.modules.products.model import ITProduct, ProgramProduct, Vendor, VendorContact
 from app.modules.program_instances.model import AcademicWindow, ProgramInstance
 from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.reports.model import ReportArtifact, ReportJob
@@ -44,6 +44,8 @@ __all__ = [
     "ImportMappingField",
     "ImportRowError",
     "IntegrationSignal",
+    "ExternalCourseMapping",
+    "ExternalStreamMapping",
     "AuditEvent",
     "AcademicWindow",
     "ITDirection",
@@ -73,6 +75,7 @@ __all__ = [
     "User",
     "user_roles",
     "Vendor",
+    "VendorContact",
     "WorkflowStage",
     "WorkflowStageAttachment",
     "WorkflowStageComment",

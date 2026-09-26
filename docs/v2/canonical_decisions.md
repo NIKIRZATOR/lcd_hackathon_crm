@@ -1,9 +1,15 @@
-# Canonical decisions
+# Канонические решения
 
-- `ProgramInstance` is `organization × direction × product`; an organization has no common workflow status.
-- The canonical `full_cycle` has 13 stages. `control` is not a runtime stage.
-- The active supplied playbooks are `full_cycle`, `expansion`, `license_renewal`, `school_short`, and `teacher_replace`.
-- A supervisor (`MANAGER`) and `ADMIN` can create, edit and publish business templates; KAM cannot.
-- Published program snapshots are immutable. Website and LMS signals never create a program or automatically close a business stage.
-- Health starts at 100 and uses the documented penalties; NBA is deterministic P0–P4 logic.
-- KAM can return a previous stage of an own program with a required comment; server-side scope remains authoritative.
+- `ProgramInstance` — это `organization × direction × product`; у организации нет общего статуса workflow.
+- Канонический `full_cycle` состоит из 13 этапов. `control` не является runtime-этапом.
+- Активные предоставленные playbook: `full_cycle`, `expansion`, `license_renewal`, `school_short` и `teacher_replace`.
+- Руководитель (`MANAGER`) и `ADMIN` могут создавать, редактировать и публиковать бизнес-шаблоны; KAM не может.
+- Опубликованные снимки программ неизменяемы. Сигналы Website и LMS никогда не создают программу и не закрывают бизнес-этап автоматически.
+- Health начинается со 100 и использует документированные штрафы; NBA — детерминированная логика P0–P4.
+- KAM может вернуть предыдущий этап своей программы при обязательном комментарии; серверный data scope остаётся авторитетным.
+- Production API недоступен для конкурсного MVP. В текущем контуре ADMIN загружает входящий файл источника; Fixture Adapter и детерминированные заглушки команды используют единый downstream pipeline. Будущий HTTP adapter заменит только транспортный слой.
+- Файлы в `local_docs/file_examples` задают примеры схем источников. Они не монтируются и не читаются runtime backend.
+- Payment JSON обрабатывается только по фактически присутствующим полям. Сумма, валюта, дата платежа и статус транзакции не выводятся.
+- B2C-данные — integration staging, а не Student CRM. PII минимизируются до operational processing; raw payload fixture доступен только ADMIN.
+- B2C-записи влияют на `ProgramInstance` только через явное сопоставление курса и потока. Unmatched-записи — допустимое состояние; сигналы не создают программу и не закрывают workflow-этап.
+- Записи payment/order не меняют каноническую формулу Health. Результат B2B-партнёрства измеряется B2C-сигналами.

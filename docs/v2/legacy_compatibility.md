@@ -1,17 +1,19 @@
-# Legacy compatibility
+# Совместимость с legacy-контуром
 
-## Target
+## Целевой контур
 
-V2 uses `ProgramInstance`, its immutable workflow snapshot, organization-level framework contracts, program-level licenses, and the five canonical playbooks.
+V2 использует `ProgramInstance`, его неизменяемый workflow snapshot, рамочные договоры уровня организации, лицензии уровня программы и пять канонических playbook.
 
-## Legacy
+## Legacy-контур
 
-`UniversityInteraction`, historical 14-stage workflow versions, the `control` catalog entry, and the `materials_update` and `reactivation` templates remain to preserve existing records and Alembic history.
+`UniversityInteraction`, исторические 14-этапные версии workflow, элемент каталога `control`, а также шаблоны `materials_update` и `reactivation` сохраняются для существующих записей и истории Alembic.
 
-## Compatibility
+## Совместимость
 
-Existing runtime instances continue to reference their historical workflow version. The legacy templates are archived and inactive, so they are not offered by the V2 master.
+Существующие runtime instances продолжают ссылаться на свои исторические версии workflow. Legacy-шаблоны архивированы и неактивны, поэтому не предлагаются в мастере V2.
 
-## Removal criteria
+Сигналы интеграций Stage 5, B2C staging и внешние mappings относятся к V2-контуру `ProgramInstance`. Они не создают заново и не изменяют workflow state legacy `UniversityInteraction`.
 
-Legacy entities may be removed only after all active runtime instances and reports no longer reference them, data migration is verified, and API compatibility is explicitly retired.
+## Условия удаления
+
+Legacy-сущности можно удалить только после того, как на них перестанут ссылаться все активные runtime instances и отчёты, миграция данных будет проверена, а API-совместимость будет явно снята.
