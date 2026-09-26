@@ -1,31 +1,35 @@
-import type { ComponentType } from 'react';
+import { Flex } from 'antd';
 
-import { useAuth } from '../../auth';
+import PageLayout from '../../components/pageLayout/PageLayout';
 
-import AdminHomePage from './AdminHomePage';
-import KamHomePage from './KamHomePage';
-import ManagerHomePage from './ManagerHomePage';
+import DashboardAttentionTable from './components/DashboardAttentionTable';
+import DashboardDynamics from './components/DashboardDynamics';
+import DashboardFilters from './components/DashboardFilters';
+import type { DashboardFiltersValues } from './components/DashboardFilters/types';
+import DashboardInteractionFunnel from './components/DashboardInteractionFunnel';
+import DashboardKpiCards from './components/DashboardKpiCards';
+import DashboardProgramDemandTable from './components/DashboardProgramDemandTable';
 
-const HOME_PAGE_BY_ROLE: Record<string, ComponentType> = {
-  ADMIN: AdminHomePage,
-  MANAGER: ManagerHomePage,
-  KAM: KamHomePage,
-};
-
-const ROLE_PRIORITY = ['ADMIN', 'MANAGER', 'KAM'];
+import styles from './HomePage.module.scss';
 
 const HomePage = () => {
-  const { user } = useAuth();
-
-  const role = ROLE_PRIORITY.find((role) => user?.roles.includes(role));
-
-  if (!role) {
-    return null;
-  }
-
-  const RoleHomePage = HOME_PAGE_BY_ROLE[role];
-
-  return <RoleHomePage />;
+  const handleApplyFilters = (values: DashboardFiltersValues) => {
+    console.log('apply filters', values);
+  };
+  return (
+    <PageLayout title="Главная">
+      <Flex vertical gap={20} style={{ padding: '24px 0' }}>
+        <DashboardFilters onApply={handleApplyFilters} />
+        <DashboardKpiCards />
+        <DashboardAttentionTable />
+        <div className={styles.charts}>
+          <DashboardInteractionFunnel />
+          <DashboardDynamics />
+        </div>
+        <DashboardProgramDemandTable />
+      </Flex>
+    </PageLayout>
+  );
 };
 
 export default HomePage;
