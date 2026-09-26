@@ -52,7 +52,10 @@ const ManagementPage = () => {
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Не удалось открыть черновик.'); }
   };
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const fetchData = async () => { await load(); };
+    void fetchData();
+  }, [load]);
 
   const createTemplate = async () => {
     if (!newName.trim()) {

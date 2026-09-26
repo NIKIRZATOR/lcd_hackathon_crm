@@ -92,7 +92,6 @@ class FileService:
             self.storage.put(
                 bucket=bucket,
                 object_key=object_key,
-                attachment_kind=attachment_kind,
                 data=upload.file,
                 length=size_bytes,
                 content_type=upload.content_type,
@@ -110,6 +109,7 @@ class FileService:
                 provider="S3",
                 bucket=bucket,
                 object_key=object_key,
+                attachment_kind=attachment_kind,
                 uploaded_by=uploaded_by,
                 scan_status="NOT_SCANNED",
             )

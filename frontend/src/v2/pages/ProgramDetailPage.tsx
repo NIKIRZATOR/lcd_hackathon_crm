@@ -83,7 +83,10 @@ const ProgramDetailPage = () => {
     }
   }, [id, loadStage]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const fetchData = async () => { await load(); };
+    void fetchData();
+  }, [load]);
   useEffect(() => { const target = searchParams.get('focus'); if (target) document.getElementById(target === 'date' || target === 'stakeholder' ? 'checklist' : target)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, [searchParams, selectedStageId]);
 
   const closeStage = async (skipCurrent = false) => {

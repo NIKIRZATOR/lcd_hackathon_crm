@@ -173,7 +173,8 @@ const ContractsAndTeachers = ({ organizationId }: { organizationId: string }) =>
   }, [organizationId]);
 
   useEffect(() => {
-    load().catch(() => undefined);
+    const fetchData = async () => { await load().catch(() => undefined); };
+    void fetchData();
   }, [load]);
 
   const create = async () => {
