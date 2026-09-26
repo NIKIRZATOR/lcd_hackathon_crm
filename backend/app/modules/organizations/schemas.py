@@ -46,12 +46,42 @@ class OrganizationRead(BaseModel):
     updated_at: datetime
 
 
+class OrganizationListRead(OrganizationRead):
+    type_name: str
+    kam_name: str | None
+    active_programs_count: int
+    worst_health_score: int | None
+    worst_health_band: str | None
+    nearest_risk: str | None
+    no_activity: bool
+
+
 class Organization360Read(BaseModel):
     id: UUID
     type_name: str
     kam_name: str | None
     documents_count: int
     feed_events_count: int
+
+
+class OrganizationDocumentRead(BaseModel):
+    file_id: UUID
+    attachment_id: UUID | None = None
+    filename: str
+    kind: str | None = None
+    program_name: str | None = None
+    stage_name: str | None = None
+    created_at: datetime
+    uploaded_by_name: str | None = None
+
+
+class OrganizationFeedItemRead(BaseModel):
+    id: str
+    kind: str
+    title: str
+    description: str | None = None
+    created_at: datetime
+    actor_name: str | None = None
 
 
 class KamRead(BaseModel):
@@ -61,6 +91,7 @@ class KamRead(BaseModel):
 
 class AssignmentCreate(BaseModel):
     kam_user_id: UUID
+    reason: str | None = Field(default=None, max_length=1000)
 
 
 class AssignmentRead(BaseModel):
@@ -82,6 +113,19 @@ class StakeholderCreate(BaseModel):
     phone: str | None = None
     is_primary: bool = False
     comment: str | None = None
+    program_instance_id: UUID | None = None
+
+
+class StakeholderUpdate(BaseModel):
+    role_code: str | None = Field(default=None, pattern="^(vice_rector|dean|methodist|lawyer|chair|teacher|director|school_teacher|other)$")
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    position: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    is_primary: bool | None = None
+    is_active: bool | None = None
+    comment: str | None = None
+    program_instance_id: UUID | None = None
 
 
 class StakeholderRead(StakeholderCreate):
@@ -89,5 +133,6 @@ class StakeholderRead(StakeholderCreate):
     id: UUID
     organization_id: UUID
     program_instance_id: UUID | None
+    is_active: bool
     created_at: datetime
     updated_at: datetime

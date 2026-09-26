@@ -24,6 +24,7 @@ from app.modules.workflow_catalog.model import WorkflowPhase, WorkflowStageCatal
 from app.modules.checklists.model import PlaybookChecklistItem, ProgramChecklistValue
 from app.modules.health.service import HealthService
 from app.modules.integrations.service import IntegrationSyncService
+from app.modules.integrations.model import IntegrationSignal
 from app.modules.nba.service import NbaService
 from app.modules.users.model import ManagerMembership, Role, User
 from app.modules.workflows.model import WorkflowStage, WorkflowStageInstance, WorkflowTemplate, WorkflowTransition, WorkflowVersion
@@ -1017,6 +1018,10 @@ def seed_organization_core(
     demo_organizations = [
         ("Демо колледж цифровых технологий", "Демо СПО", "spo", users["kam2"]),
         ("Демо школа № 1", "Демо школа", "school", users["kam1"]),
+        ("Южный федеральный университет", "ЮФУ", "university", users["kam1"]),
+        ("Санкт-Петербургский политехнический университет", "СПбПУ", "university", users["kam2"]),
+        ("Президентская академия РАНХиГС", "РАНХиГС", "university", users["kam1"]),
+        ("Школа №15", "Школа №15", "school", users["kam2"]),
     ]
     for name, short_name, type_code, kam in demo_organizations:
         organization = get_by_field(db, Organization, "name", name)
@@ -1185,11 +1190,80 @@ def seed_program_instances(db: Session) -> None:
                 )
             )
 
+    required_cases = [
+        ("Южный федеральный университет", "full_cycle", "ЮФУ: первая встреча просрочена, протокол отсутствует."),
+        ("Санкт-Петербургский политехнический университет", "expansion", "СПбПУ: expansion, требуется проверить LMS-сигналы."),
+        ("Президентская академия РАНХиГС", "full_cycle", "РАНХиГС: здоровая активная программа."),
+        ("Школа №15", "school_short", "Школа №15: короткий сценарий передачи доступа."),
+        ("Уральский федеральный университет имени первого Президента России Б.Н. Ельцина", "full_cycle", "УрФУ: этап согласования учебного плана перед семестром."),
+    ]
+    base_program = db.scalar(select(ITProgram).order_by(ITProgram.name))
+    base_product = db.scalar(select(ITProduct).join(ProgramProduct, ProgramProduct.product_id == ITProduct.id).where(ProgramProduct.program_id == base_program.id)) if base_program is not None else None
+    if base_program is not None and base_product is not None:
+        for organization_name, template_code, comment in required_cases:
+            organization = get_by_field(db, Organization, "name", organization_name)
+            template = get_by_field(db, WorkflowTemplate, "code", template_code)
+            if organization is None or template is None:
+                continue
+            program = db.scalar(select(ProgramInstance).where(ProgramInstance.organization_id == organization.id, ProgramInstance.comment == comment))
+            if program is None:
+                kam_id = db.scalar(select(OrgAssignment.user_id).where(OrgAssignment.organization_id == organization.id, OrgAssignment.status == "active"))
+                parent = db.scalar(select(ProgramInstance).where(ProgramInstance.organization_id == organization.id, ProgramInstance.status == "active").order_by(ProgramInstance.created_at))
+                program = ProgramInstance(organization_id=organization.id, direction_id=base_program.direction_id, product_id=base_product.id, parent_program_id=parent.id if parent is not None else None, kam_user_id=kam_id, playbook_template_id=template.id, template_snapshot=ProgramInstanceService(db)._template_snapshot(template), status="active", academic_window_id=windows["2026_fall"].id, health_band="green", comment=comment)
+                db.add(program)
+                db.flush()
+                WorkflowRuntimeService(db).initialize_program_workflow(program, responsible_user_id=kam_id)
+
+    db.flush()
     for stage_instance in db.scalars(select(WorkflowStageInstance)).all():
         for item in db.scalars(select(PlaybookChecklistItem).where(PlaybookChecklistItem.workflow_stage_id == stage_instance.workflow_stage_id)):
             exists = db.scalar(select(ProgramChecklistValue).where(ProgramChecklistValue.stage_instance_id == stage_instance.id, ProgramChecklistValue.checklist_item_id == item.id))
             if exists is None:
                 db.add(ProgramChecklistValue(stage_instance_id=stage_instance.id, checklist_item_id=item.id))
+
+    scenario_stages = {
+        "ЮФУ": ("first_meeting", True),
+        "СПбПУ": ("classes_running", False),
+        "УрФУ": ("curriculum", False),
+        "Школа №15": ("transfer_access", False),
+    }
+    for short_name, (stage_code, overdue) in scenario_stages.items():
+        organization = db.scalar(select(Organization).where(Organization.short_name == short_name))
+        if organization is None:
+            continue
+        program = db.scalar(select(ProgramInstance).where(ProgramInstance.organization_id == organization.id, ProgramInstance.status == "active").order_by(ProgramInstance.created_at.desc()))
+        if program is None:
+            continue
+        target = db.scalar(select(WorkflowStageInstance).join(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id).join(WorkflowStageCatalog, WorkflowStageCatalog.id == WorkflowStage.stage_catalog_id).where(WorkflowStageInstance.program_instance_id == program.id, WorkflowStageCatalog.code == stage_code))
+        if target is None:
+            continue
+        target_stage = db.get(WorkflowStage, target.workflow_stage_id)
+        for previous, previous_stage in db.execute(
+            select(WorkflowStageInstance, WorkflowStage)
+            .join(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id)
+            .where(
+                WorkflowStageInstance.program_instance_id == program.id,
+                WorkflowStage.order_index < target_stage.order_index,
+            )
+        ):
+            previous.status = "COMPLETED"
+            previous.started_at = datetime.now(timezone.utc) - timedelta(days=14)
+            previous.completed_at = datetime.now(timezone.utc) - timedelta(days=3)
+            for value, item in db.execute(
+                select(ProgramChecklistValue, PlaybookChecklistItem)
+                .join(PlaybookChecklistItem, PlaybookChecklistItem.id == ProgramChecklistValue.checklist_item_id)
+                .where(ProgramChecklistValue.stage_instance_id == previous.id)
+            ):
+                value.is_done = True
+                if item.item_type == "text": value.value_text = "Демо-факт подтверждён для завершённого этапа."
+                elif item.item_type == "date": value.value_date = date.today() - timedelta(days=3)
+        target.status = "IN_PROGRESS"
+        target.started_at = datetime.now(timezone.utc) - timedelta(days=10 if overdue else 1)
+        target.due_at = datetime.now(timezone.utc) - timedelta(days=2) if overdue else datetime.now(timezone.utc) + timedelta(days=7)
+        program.current_stage_instance_id = target.id
+        program.current_stage_code = stage_code
+        if short_name == "СПбПУ" and not db.scalar(select(IntegrationSignal.id).where(IntegrationSignal.program_instance_id == program.id, IntegrationSignal.status == "unmatched")):
+            db.add(IntegrationSignal(source="lms", status="unmatched", organization_id=organization.id, program_instance_id=program.id, payload={"seed_case": "lms_issue"}, error_message="LMS record is not matched to the program"))
 
     first_program = db.scalar(select(ProgramInstance).order_by(ProgramInstance.created_at))
     if first_program is not None:

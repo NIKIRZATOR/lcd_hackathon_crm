@@ -9,6 +9,7 @@ class ContractCreate(BaseModel):
     number: str
     signed_on: date | None = None
     valid_until: datetime | None = None
+    status: str | None = None
     attachment_id: UUID | None = None
     comment: str | None = None
 
@@ -17,6 +18,7 @@ class ContractUpdate(BaseModel):
     number: str | None = None
     signed_on: date | None = None
     valid_until: datetime | None = None
+    status: str | None = None
     attachment_id: UUID | None = None
     comment: str | None = None
 

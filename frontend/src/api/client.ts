@@ -41,3 +41,10 @@ export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promi
 
   return response.json() as Promise<T>;
 };
+
+export const apiDownload = async (path: string): Promise<Blob> => {
+  const token = await tokenProvider?.();
+  const response = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+  if (!response.ok) throw new ApiError(response.status);
+  return response.blob();
+};
