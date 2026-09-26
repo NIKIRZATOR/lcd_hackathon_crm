@@ -33,7 +33,7 @@ class ProgramInstance(ModelBase):
             "direction_id",
             "product_id",
             unique=True,
-            postgresql_where=text("status IN ('draft', 'active', 'paused')"),
+            postgresql_where=text("status IN ('draft', 'active', 'paused') AND parent_program_id IS NULL"),
         ),
         Index("ix_program_instances_kam_status_health", "kam_user_id", "status", "health_band"),
     )

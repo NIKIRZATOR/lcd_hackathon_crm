@@ -32,12 +32,10 @@ from scripts.workflow_seed_data import LEGACY_WORKFLOW_TEMPLATE_NAMES, WORKFLOW_
 
 
 SHORT_PLAYBOOKS = {
-    "expansion": ["confirm_need", "reuse_contract", "transfer_materials_license", "train_teachers", "update_curriculum", "classes_running"],
-    "license_renewal": ["check_usage", "prepare_renewal_pack", "sign_docs", "transfer_materials_license", "confirm_active_classes"],
-    "teacher_replace": ["identify_new_teacher", "train_teachers", "confirm_activity"],
-    "materials_update": ["receive_new_pack", "update_product_docs", "update_curriculum"],
-    "school_short": ["find_contact", "arrange_meeting", "sign_docs", "transfer_materials_license", "train_teachers", "classes_running"],
-    "reactivation": ["diagnose_silence", "train_teachers", "update_curriculum", "classes_running"],
+    "expansion": ["identify_need", "document_package", "sign_license", "transfer_access", "train_teacher", "confirm_teacher", "curriculum", "start_classes", "classes_running", "period_results"],
+    "license_renewal": ["sign_license", "transfer_access", "confirm_teacher", "curriculum", "start_classes", "classes_running", "period_results"],
+    "teacher_replace": ["find_teacher", "train_teacher", "confirm_teacher", "handover_course"],
+    "school_short": ["find_contact", "identify_need", "document_package", "sign_license", "transfer_access", "train_teacher", "curriculum", "start_classes", "classes_running", "period_results"],
 }
 
 
@@ -655,11 +653,21 @@ def seed_workflow(db: Session, users: dict[str, User]) -> WorkflowTemplate:
     template.code = "full_cycle"
     template.applies_to_type = "all"
     template.status = "published"
+    for legacy_version in db.scalars(
+        select(WorkflowVersion).where(
+            WorkflowVersion.workflow_template_id == template.id,
+            WorkflowVersion.id != version.id,
+            WorkflowVersion.status == "PUBLISHED",
+        )
+    ):
+        legacy_version.status = "ARCHIVED"
+        legacy_version.archived_at = datetime.now(timezone.utc)
 
     for code, name, applies_to_type in [
-        ("expansion", "Расширение", "all"), ("license_renewal", "Продление лицензии", "all"),
-        ("teacher_replace", "Замена преподавателя", "all"), ("materials_update", "Обновление материалов", "all"),
-        ("school_short", "Короткий цикл школы", "school"), ("reactivation", "Реактивация", "all"),
+        ("expansion", "Расширение", "all"),
+        ("license_renewal", "Продление лицензии", "all"),
+        ("teacher_replace", "Замена преподавателя", "all"),
+        ("school_short", "Короткий цикл школы", "school"),
     ]:
         short_template = get_by_field(db, WorkflowTemplate, "code", code)
         if short_template is None:
@@ -671,6 +679,12 @@ def seed_workflow(db: Session, users: dict[str, User]) -> WorkflowTemplate:
         short_template.status = "published"
         short_template.is_active = True
         _seed_short_playbook(db, short_template, SHORT_PLAYBOOKS[code], creator.id)
+
+    for deprecated_code in ("materials_update", "reactivation"):
+        deprecated_template = get_by_field(db, WorkflowTemplate, "code", deprecated_code)
+        if deprecated_template is not None:
+            deprecated_template.is_active = False
+            deprecated_template.status = "archived"
 
     official_stage_names = {data["name"] for data in WORKFLOW_STAGES}
     for legacy_stage in db.scalars(
@@ -722,22 +736,48 @@ def seed_workflow(db: Session, users: dict[str, User]) -> WorkflowTemplate:
         stages_by_name[data["name"]] = stage
 
     ordered_stages = [stages_by_name[data["name"]] for data in WORKFLOW_STAGES]
-    catalog_codes = ["find_contact", "clarify_relevance", "arrange_meeting", "exchange_docs", "correct_docs", "sign_docs", "transfer_materials_license", "support_implementation", "train_teachers", "update_curriculum", "classes_running", "update_product_docs", "teacher_upskilling", "control"]
+    catalog_codes = ["find_contact", "first_meeting", "identify_need", "document_package", "sign_contract", "sign_license", "transfer_access", "train_teacher", "confirm_teacher", "curriculum", "start_classes", "classes_running", "period_results"]
     for stage, code in zip(ordered_stages, catalog_codes):
         catalog_stage = get_by_field(db, WorkflowStageCatalog, "code", code)
         if catalog_stage is not None:
             stage.stage_catalog_id = catalog_stage.id
     checklist = [
-        (0, "contact", "Контакт стейкхолдера подтверждён", "stakeholder_role", "other"),
-        (1, "relevance", "Зафиксирован результат проверки актуальности", "text", None),
-        (2, "meeting", "Дата встречи указана", "date", None),
-        (5, "contract", "Договор приложен", "file", None),
-        (8, "teacher", "Преподаватель обучен", "checkbox", None),
-        (10, "students", "Указано плановое число студентов", "number", None),
+        (0, "contact", "Контакт площадки: ФИО и телефон или e-mail", "stakeholder_role", "other"),
+        (1, "meeting_date", "Дата первой встречи", "date", None),
+        (1, "meeting_participant", "Участник встречи со стороны площадки", "stakeholder_role", "other"),
+        (1, "meeting_protocol", "Протокол встречи или комментарий не менее 40 символов", "text", None),
+        (2, "need_comment", "Причина потребности", "text", None),
+        (3, "contract_project", "Проект договора", "file", None, "project_contract"),
+        (3, "direction_materials", "Материалы направления", "file", None, "direction_materials"),
+        (3, "product_description", "Описание продукта", "file", None, "product_description"),
+        (4, "contract_number", "Номер договора", "text", None),
+        (4, "contract_signed_on", "Дата подписания договора", "date", None),
+        (4, "contract_attachment", "Подписанный договор", "file", None, "signed_contract"),
+        (5, "license_number", "Номер лицензии", "text", None),
+        (5, "license_valid_until", "Срок действия лицензии", "date", None),
+        (5, "license_attachment", "Подписанная лицензия", "file", None, "license"),
+        (6, "transfer_status", "Подтверждение передачи", "text", None),
+        (6, "product_access", "Доступ к продукту", "text", None),
+        (6, "transfer_attachment", "Акт или подтверждение передачи", "file", None, "transfer"),
+        (7, "teacher", "Преподаватель-носитель продукта", "stakeholder_role", "teacher"),
+        (7, "trained_on", "Дата обучения преподавателя", "date", None),
+        (8, "teacher_ready", "Подтверждение готовности преподавателя", "text", None),
+        (9, "curriculum", "Учебный план или комментарий согласования", "text", None),
+        (10, "classes_started_on", "Дата старта занятий", "date", None),
+        (10, "classes_started", "Подтверждение старта занятий", "text", None),
+        (12, "period_result", "Итог периода", "text", None),
     ]
-    for index, code, label, item_type, stakeholder_role in checklist:
-        if db.scalar(select(PlaybookChecklistItem).where(PlaybookChecklistItem.workflow_stage_id == ordered_stages[index].id, PlaybookChecklistItem.code == code)) is None:
-            db.add(PlaybookChecklistItem(workflow_stage_id=ordered_stages[index].id, code=code, label=label, item_type=item_type, required=True, required_stakeholder_role=stakeholder_role))
+    for row in checklist:
+        index, code, label, item_type, stakeholder_role, *attachment_kind = row
+        item = db.scalar(select(PlaybookChecklistItem).where(PlaybookChecklistItem.workflow_stage_id == ordered_stages[index].id, PlaybookChecklistItem.code == code))
+        if item is None:
+            item = PlaybookChecklistItem(workflow_stage_id=ordered_stages[index].id, code=code)
+            db.add(item)
+        item.label = label
+        item.item_type = item_type
+        item.required = True
+        item.required_stakeholder_role = stakeholder_role
+        item.required_attachment_kind = attachment_kind[0] if attachment_kind else None
     for from_stage, to_stage in zip(ordered_stages, ordered_stages[1:]):
         transition = db.scalar(
             select(WorkflowTransition).where(
@@ -784,6 +824,15 @@ def _seed_short_playbook(
         db.flush()
     version.status = "PUBLISHED"
     version.published_at = version.published_at or datetime.now(timezone.utc)
+    for legacy_stage in db.scalars(
+        select(WorkflowStage)
+        .join(WorkflowStageCatalog, WorkflowStage.stage_catalog_id == WorkflowStageCatalog.id)
+        .where(
+            WorkflowStage.workflow_version_id == version.id,
+            WorkflowStageCatalog.code.not_in(stage_codes),
+        )
+    ):
+        legacy_stage.is_active = False
     stages: dict[str, WorkflowStage] = {}
     for order, code in enumerate(stage_codes, 1):
         catalog = get_by_field(db, WorkflowStageCatalog, "code", code)
@@ -1016,6 +1065,7 @@ def seed_organization_core(
                 status="active",
                 assigned_at=interaction.created_at,
             ))
+            db.flush()
 
     for contact in db.scalars(select(UniversityContact)).all():
         if db.get(Stakeholder, contact.id) is None:
@@ -1240,8 +1290,23 @@ def seed_workflow_catalog(db: Session) -> None:
             phase = WorkflowPhase(code=code, name=name, sort_order=order, is_active=True)
             db.add(phase)
             db.flush()
+        elif code == "control":
+            phase.is_active = False
         phase_by_code[code] = phase
     stages = [
+        ("first_meeting", "Первая встреча", "outreach"),
+        ("identify_need", "Выявление потребности", "outreach"),
+        ("document_package", "Пакет документов", "paperwork"),
+        ("sign_contract", "Подписание договора", "paperwork"),
+        ("sign_license", "Подписание лицензии", "paperwork"),
+        ("transfer_access", "Передача и доступ к продукту", "onboarding"),
+        ("train_teacher", "Обучение преподавателя", "onboarding"),
+        ("confirm_teacher", "Подтверждение преподавателя", "onboarding"),
+        ("curriculum", "Учебный план", "onboarding"),
+        ("start_classes", "Старт занятий", "operations"),
+        ("period_results", "Итоги периода", "retention"),
+        ("find_teacher", "Найти нового преподавателя", "onboarding"),
+        ("handover_course", "Передать курс", "operations"),
         ("find_contact", "Найти контакт", "outreach"), ("clarify_relevance", "Уточнить актуальность", "outreach"), ("arrange_meeting", "Организовать встречу", "outreach"),
         ("exchange_docs", "Обменяться документами", "paperwork"), ("correct_docs", "Скорректировать документы", "paperwork"), ("sign_docs", "Подписать документы", "paperwork"),
         ("transfer_materials_license", "Передать материалы и лицензию", "onboarding"), ("support_implementation", "Сопроводить внедрение", "onboarding"), ("train_teachers", "Обучить преподавателей", "onboarding"), ("update_curriculum", "Обновить учебный план", "onboarding"),
@@ -1256,6 +1321,19 @@ def seed_workflow_catalog(db: Session) -> None:
         stage = get_by_field(db, WorkflowStageCatalog, "code", code)
         if stage is None:
             db.add(WorkflowStageCatalog(code=code, name=name, default_phase_id=phase_by_code[phase_code].id, is_active=True))
+
+    deprecated_codes = {
+        "control", "clarify_relevance", "arrange_meeting", "exchange_docs", "correct_docs",
+        "sign_docs", "transfer_materials_license", "support_implementation", "train_teachers",
+        "update_curriculum", "update_product_docs", "teacher_upskilling", "confirm_need",
+        "reuse_contract", "check_usage", "prepare_renewal_pack", "confirm_active_classes",
+        "identify_new_teacher", "confirm_activity", "receive_new_pack", "diagnose_silence",
+    }
+    for stage in db.scalars(select(WorkflowStageCatalog).where(WorkflowStageCatalog.code.in_(deprecated_codes))):
+        stage.is_active = False
+    # Short-playbook creation immediately queries this catalog. Persist all pending
+    # entries explicitly so the seed is independent of SQLAlchemy autoflush settings.
+    db.flush()
 
 
 def main() -> None:

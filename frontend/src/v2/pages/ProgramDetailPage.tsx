@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Checkbox, DatePicker, Descriptions, Input, InputNumber, List, Select, Spin, Tag, Typography, Upload } from 'antd';
+import { Alert, Button, Card, Checkbox, DatePicker, Descriptions, Input, InputNumber, List, Select, Space, Spin, Tag, Typography, Upload } from 'antd';
 import type { UploadProps } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
@@ -7,12 +7,12 @@ import { useParams } from 'react-router-dom';
 import { ApiError, apiRequest } from '../../api/client';
 
 type ProgramInstance = { organization_id: string; direction_name: string; product_name: string; playbook_name: string; playbook_code: string | null; status: string; kam_name: string | null; academic_window_title: string | null; current_stage_code: string | null; health_score: number | null; health_band: string };
-type Checklist = { id: string; label: string; item_type: 'checkbox' | 'file' | 'date' | 'stakeholder_role' | 'number' | 'text'; required: boolean; is_done: boolean; value_text?: string; value_number?: number; value_date?: string; stakeholder_id?: string; attachment_id?: string };
+type Checklist = { id: string; label: string; item_type: 'checkbox' | 'file' | 'date' | 'stakeholder_role' | 'number' | 'text'; required: boolean; required_attachment_kind?: string | null; is_done: boolean; value_text?: string; value_number?: number; value_date?: string; stakeholder_id?: string; attachment_id?: string };
 type Stage = { id: string; status: string; due_at: string | null; code: string; name: string; phase_code: string; phase_name: string; order_index: number; is_optional: boolean; is_final: boolean };
 type Transition = { id: string; name: string | null; to_stage_name: string };
 type Workflow = { stages: Stage[]; current_stage_instance_id: string | null; available_transitions: Transition[]; transition_history?: { id: string; comment: string | null; performed_at: string }[] };
 type Comment = { id: string; text: string; created_at: string };
-type Attachment = { id: string; file_id: string; original_name: string };
+type Attachment = { id: string; file_id: string; original_name: string; attachment_kind?: string | null };
 type ProgramMetric = { applications_count: number; students_count: number; streams_count: number; teacher_activity_on: string | null; synced_at: string | null };
 type SyncResult = { mapped: number; unmatched: number; errors: number; metrics: ProgramMetric };
 type Stakeholder = { id: string; full_name: string; role_code: string };
@@ -37,6 +37,7 @@ const ProgramDetailPage = () => {
   const [selectedTransition, setSelectedTransition] = useState<string>();
   const [comment, setComment] = useState(() => localStorage.getItem(`program:${id}:transition-comment`) ?? '');
   const [message, setMessage] = useState<string>();
+  const [attachmentKind, setAttachmentKind] = useState('');
 
   const activeStage = useMemo(() => workflow?.stages.find((stage) => stage.id === workflow.current_stage_instance_id), [workflow]);
   const selectedStage = useMemo(() => workflow?.stages.find((stage) => stage.id === selectedStageId) ?? activeStage, [activeStage, selectedStageId, workflow]);
@@ -97,7 +98,7 @@ const ProgramDetailPage = () => {
   const uploadProps: UploadProps = {
     beforeUpload: async (file) => {
       if (!selectedStage || !isViewingCurrentStage) return Upload.LIST_IGNORE;
-      const form = new FormData(); form.append('file', file);
+      const form = new FormData(); form.append('file', file); if (attachmentKind.trim()) form.append('attachment_kind', attachmentKind.trim());
       try {
         await apiRequest(`/api/workflows/stage-instances/${selectedStage.id}/attachments`, { method: 'POST', body: form });
         await load();
@@ -153,8 +154,8 @@ const ProgramDetailPage = () => {
         <List size="small" dataSource={comments} locale={{ emptyText: 'Комментариев пока нет' }} renderItem={(item) => <List.Item>{item.text}</List.Item>} />
         <Input.TextArea disabled={!isViewingCurrentStage} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Комментарий к переходу" rows={2} />
         <Typography.Title level={5}>Файлы</Typography.Title>
-        <List size="small" dataSource={attachments} locale={{ emptyText: 'Файлов пока нет' }} renderItem={(item) => <List.Item>{item.original_name}</List.Item>} />
-        <Upload {...uploadProps} disabled={!isViewingCurrentStage}><Button disabled={!isViewingCurrentStage}>Приложить файл</Button></Upload>
+        <List size="small" dataSource={attachments} locale={{ emptyText: 'Файлов пока нет' }} renderItem={(item) => <List.Item>{item.original_name}{item.attachment_kind ? ` · ${item.attachment_kind}` : ''}</List.Item>} />
+        <Space><Select style={{ width: 240 }} value={attachmentKind || undefined} placeholder="Вид вложения" options={[...new Set(checklist.filter((item) => item.item_type === 'file').map((item) => item.required_attachment_kind).filter(Boolean) as string[])].map((value) => ({ value, label: value }))} onChange={setAttachmentKind} allowClear /><Upload {...uploadProps} disabled={!isViewingCurrentStage}><Button disabled={!isViewingCurrentStage}>Приложить файл</Button></Upload></Space>
         {isViewingCurrentStage && workflow.available_transitions.length > 0 && <div style={{ marginTop: 20 }}><Select style={{ minWidth: 260 }} options={workflow.available_transitions.map((item) => ({ value: item.id, label: item.name ?? item.to_stage_name }))} value={selectedTransition} onChange={setSelectedTransition} /><Button type="primary" disabled={missingRequired > 0 || !selectedTransition} style={{ marginLeft: 8 }} onClick={() => void closeStage()}>Закрыть и перейти к «{transition?.to_stage_name ?? 'следующему этапу'}»</Button>{currentStage?.is_optional && <Button style={{ marginLeft: 8 }} onClick={() => void closeStage(true)}>Пропустить</Button>}</div>}
         {isViewingCurrentStage && currentStage?.is_final && workflow.available_transitions.length === 0 && <Button type="primary" disabled={missingRequired > 0} style={{ marginTop: 20 }} onClick={() => void closeStage()}>Завершить программу</Button>}
         <Typography.Title level={5}>История переходов</Typography.Title>
@@ -173,7 +174,7 @@ const ChecklistInput = ({ item, disabled, stakeholders, attachments, onSave }: {
     {item.item_type === 'number' && <InputNumber disabled={disabled} value={item.value_number} onChange={(value) => save('value_number', value)} style={{ width: '100%' }} />}
     {item.item_type === 'date' && <DatePicker disabled={disabled} value={item.value_date ? dayjs(item.value_date) : null} onChange={(value) => save('value_date', value?.format('YYYY-MM-DD') ?? null)} style={{ width: '100%' }} />}
     {item.item_type === 'stakeholder_role' && <Select disabled={disabled} value={item.stakeholder_id} options={stakeholders.map((person) => ({ value: person.id, label: `${person.full_name} · ${person.role_code}` }))} onChange={(value) => save('stakeholder_id', value)} style={{ width: '100%' }} />}
-    {item.item_type === 'file' && <Select disabled={disabled} value={item.attachment_id} options={attachments.map((file) => ({ value: file.file_id, label: file.original_name }))} onChange={(value) => save('attachment_id', value)} placeholder="Сначала приложите файл к этапу" style={{ width: '100%' }} />}
+    {item.item_type === 'file' && <Select disabled={disabled} value={item.attachment_id} options={attachments.filter((file) => !item.required_attachment_kind || file.attachment_kind === item.required_attachment_kind).map((file) => ({ value: file.file_id, label: file.original_name }))} onChange={(value) => save('attachment_id', value)} placeholder={item.required_attachment_kind ? `Загрузите файл вида ${item.required_attachment_kind}` : 'Сначала приложите файл к этапу'} style={{ width: '100%' }} />}
   </div>;
 };
 

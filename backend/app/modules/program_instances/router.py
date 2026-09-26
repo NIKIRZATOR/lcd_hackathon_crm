@@ -71,10 +71,15 @@ def list_program_instances(
 @router.get("/organizations/{organization_id}/available-playbooks")
 def available_playbooks(
     organization_id: UUID,
+    direction_id: UUID | None = None,
+    product_id: UUID | None = None,
+    parent_program_id: UUID | None = None,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
-    return ProgramInstanceService(db).available_playbooks(organization_id, current_user)
+    return ProgramInstanceService(db).available_playbooks(
+        organization_id, current_user, direction_id, product_id, parent_program_id
+    )
 
 
 @router.get(

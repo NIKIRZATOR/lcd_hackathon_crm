@@ -19,6 +19,10 @@ from app.modules.workflows.access import ensure_can_access_stage_instance
 
 router = APIRouter(prefix="/stage-instances", tags=["checklists"], dependencies=[Depends(require_roles(*CRM_ROLES))])
 
+MIN_TEXT_LENGTHS = {
+    "meeting_protocol": 40,
+}
+
 
 class ChecklistUpdate(BaseModel):
     is_done: bool
@@ -36,6 +40,7 @@ def checklist_read(value: ProgramChecklistValue, item: PlaybookChecklistItem) ->
         "item_type": item.item_type,
         "required": item.required,
         "required_stakeholder_role": item.required_stakeholder_role,
+        "required_attachment_kind": item.required_attachment_kind,
         "is_done": value.is_done,
         "value_text": value.value_text,
         "value_number": value.value_number,
@@ -90,6 +95,15 @@ def update_checklist(
             status_code=422,
             detail={"code": "CHECKLIST_VALUE_REQUIRED", "message": f"Value for {item.item_type} checklist item is required"},
         )
+    minimum_length = MIN_TEXT_LENGTHS.get(item.code)
+    if minimum_length and payload.value_text and len(payload.value_text.strip()) < minimum_length:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "CHECKLIST_TEXT_TOO_SHORT",
+                "message": f"Checklist item requires at least {minimum_length} characters",
+            },
+        )
     if payload.stakeholder_id is not None:
         stakeholder = db.get(Stakeholder, payload.stakeholder_id)
         stage_instance = db.get(WorkflowStageInstance, value.stage_instance_id)
@@ -108,13 +122,16 @@ def update_checklist(
         if item.required_stakeholder_role and stakeholder.role_code != item.required_stakeholder_role:
             raise HTTPException(status_code=422, detail="Stakeholder role does not satisfy checklist item")
     if payload.attachment_id is not None:
-        if db.get(File, payload.attachment_id) is None or not db.scalar(
+        attachment = db.get(File, payload.attachment_id)
+        if attachment is None or not db.scalar(
             select(WorkflowStageAttachment.id).where(
                 WorkflowStageAttachment.stage_instance_id == value.stage_instance_id,
                 WorkflowStageAttachment.file_id == payload.attachment_id,
             )
         ):
             raise HTTPException(status_code=422, detail="Attachment is not linked to this stage")
+        if item.required_attachment_kind and attachment.attachment_kind != item.required_attachment_kind:
+            raise HTTPException(status_code=422, detail={"code": "CHECKLIST_ATTACHMENT_KIND_MISMATCH", "message": "Attachment kind does not satisfy checklist item"})
     for field in ("value_text", "value_number", "value_date", "stakeholder_id", "attachment_id"):
         setattr(value, field, getattr(payload, field))
     value.is_done = payload.is_done

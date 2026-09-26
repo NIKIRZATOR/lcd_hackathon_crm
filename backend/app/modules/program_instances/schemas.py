@@ -69,3 +69,4 @@ class ProgramInstanceStart(BaseModel):
     kam_user_id: UUID | None = None
     academic_window_id: UUID | None = None
     comment: str | None = None
+    parent_program_id: UUID | None = None

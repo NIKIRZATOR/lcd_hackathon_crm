@@ -12,7 +12,9 @@ from app.modules.audit.repository import AuditEventRepository
 from app.modules.checklists.model import PlaybookChecklistItem, ProgramChecklistValue
 from app.modules.documents.model import File
 from app.modules.interactions.model import UniversityInteraction
+from app.modules.licenses.model import Contract, License
 from app.modules.program_instances.model import ProgramInstance
+from app.modules.teachers.model import TeacherCarrier
 from app.modules.users.model import User
 from app.modules.workflow_catalog.model import WorkflowStageCatalog
 from app.modules.workflows.model import (
@@ -116,7 +118,9 @@ class WorkflowTemplateService:
             )
         return template
 
-    def create_template(self, payload: WorkflowTemplateCreate) -> WorkflowTemplate:
+    def create_template(
+        self, payload: WorkflowTemplateCreate, *, created_by: UUID | None = None
+    ) -> WorkflowTemplate:
         if (
             payload.created_by is not None
             and self.db.get(User, payload.created_by) is None
@@ -125,7 +129,7 @@ class WorkflowTemplateService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Template creator not found",
             )
-        template = WorkflowTemplate(**payload.model_dump())
+        template = WorkflowTemplate(**payload.model_dump(exclude={"created_by"}), created_by=created_by)
         self.repository.add(template)
         self.db.commit()
         self.db.refresh(template)
@@ -143,7 +147,7 @@ class WorkflowTemplateService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Template creator not found",
             )
-        for field, value in payload.model_dump(exclude_unset=True).items():
+        for field, value in payload.model_dump(exclude_unset=True, exclude={"created_by"}).items():
             setattr(template, field, value)
         self.db.commit()
         self.db.refresh(template)
@@ -266,6 +270,9 @@ class WorkflowVersionService:
 
         version.status = "PUBLISHED"
         version.published_at = now
+        template = self._get_template(version.workflow_template_id)
+        template.status = "published"
+        template.is_active = True
         changes = self.detect_dangerous_changes(version.id)
         approved_request = self.change_request_repository.get_approved_for_version(
             version.id
@@ -941,13 +948,34 @@ class WorkflowVersionService:
                 is_initial=stage.is_initial,
                 is_final=stage.is_final,
                 is_optional=stage.is_optional,
+                semester_critical=stage.semester_critical,
                 default_duration_days=stage.default_duration_days,
                 requires_comment=stage.requires_comment,
                 requires_attachment=stage.requires_attachment,
                 is_active=stage.is_active,
+                stage_catalog_id=stage.stage_catalog_id,
             )
             self.stage_repository.add(cloned_stage)
             stage_map[stage.id] = cloned_stage
+
+        self.db.flush()
+        for source_stage_id, cloned_stage in stage_map.items():
+            for item in self.db.scalars(
+                select(PlaybookChecklistItem).where(
+                    PlaybookChecklistItem.workflow_stage_id == source_stage_id
+                )
+            ):
+                self.db.add(
+                    PlaybookChecklistItem(
+                        workflow_stage_id=cloned_stage.id,
+                        code=item.code,
+                        label=item.label,
+                        item_type=item.item_type,
+                        required=item.required,
+                        required_stakeholder_role=item.required_stakeholder_role,
+                        required_attachment_kind=item.required_attachment_kind,
+                    )
+                )
 
         source_transitions = self.db.scalars(
             select(WorkflowTransition).where(
@@ -2049,6 +2077,7 @@ class TransitionService:
                     "roles": missing_roles,
                 }
             )
+        reasons.extend(self._canonical_entity_reasons(stage, instance))
         if reasons:
             first_code = {
                 "missing_comment": "WORKFLOW_STAGE_REQUIRES_COMMENT",
@@ -2065,6 +2094,58 @@ class TransitionService:
                     "reasons": reasons,
                 },
             )
+
+    def _canonical_entity_reasons(
+        self, stage: WorkflowStage, instance: WorkflowStageInstance
+    ) -> list[dict[str, object]]:
+        if instance.program_instance_id is None or stage.stage_catalog_id is None:
+            return []
+        catalog = self.db.get(WorkflowStageCatalog, stage.stage_catalog_id)
+        program = self.db.get(ProgramInstance, instance.program_instance_id)
+        if catalog is None or program is None:
+            return []
+        code = catalog.code
+        reasons: list[dict[str, object]] = []
+        if code == "sign_contract":
+            contract = self.db.scalar(select(Contract).where(
+                Contract.organization_id == program.organization_id,
+                Contract.number.is_not(None),
+                (Contract.signed_on.is_not(None)) | (Contract.signed_at.is_not(None)),
+                Contract.attachment_id.is_not(None),
+            ))
+            if contract is None:
+                reasons.append({"code": "missing_contract", "message": "Signed framework contract is required"})
+        elif code in {"sign_license", "transfer_access"}:
+            license_record = self.db.scalar(select(License).where(
+                License.program_instance_id == program.id,
+                License.license_number.is_not(None),
+                License.valid_until.is_not(None),
+                License.attachment_id.is_not(None),
+            ))
+            if license_record is None:
+                reasons.append({"code": "missing_license", "message": "Signed program license is required"})
+            elif code == "transfer_access" and license_record.transfer_status != "transferred":
+                reasons.append({"code": "missing_transfer", "message": "License transfer must be marked transferred"})
+            elif code == "transfer_access" and not license_record.product_access:
+                reasons.append({"code": "missing_product_access", "message": "Product access details are required"})
+        elif code == "train_teacher":
+            teacher = self.db.scalar(select(TeacherCarrier).where(
+                TeacherCarrier.program_instance_id == program.id,
+                TeacherCarrier.product_id == program.product_id,
+                TeacherCarrier.trained_on.is_not(None),
+                TeacherCarrier.status.in_(["trained", "active"]),
+            ))
+            if teacher is None:
+                reasons.append({"code": "missing_teacher_training", "message": "A trained teacher for this product is required"})
+        elif code == "confirm_teacher":
+            teacher = self.db.scalar(select(TeacherCarrier).where(
+                TeacherCarrier.program_instance_id == program.id,
+                TeacherCarrier.product_id == program.product_id,
+                TeacherCarrier.status != "left",
+            ))
+            if teacher is None:
+                reasons.append({"code": "missing_teacher", "message": "An active teacher for this product is required"})
+        return reasons
         performed_by = self._get_performed_by(payload)
         if self.db.get(User, performed_by) is None:
             raise workflow_error(

@@ -26,17 +26,16 @@ def test_canonical_short_playbooks_are_complete() -> None:
         "expansion",
         "license_renewal",
         "teacher_replace",
-        "materials_update",
         "school_short",
-        "reactivation",
     }
     assert SHORT_PLAYBOOKS["teacher_replace"] == [
-        "identify_new_teacher",
-        "train_teachers",
-        "confirm_activity",
+        "find_teacher",
+        "train_teacher",
+        "confirm_teacher",
+        "handover_course",
     ]
-    assert SHORT_PLAYBOOKS["reactivation"][0] == "diagnose_silence"
-    assert SHORT_PLAYBOOKS["reactivation"][-1] == "classes_running"
+    assert SHORT_PLAYBOOKS["license_renewal"][0] == "sign_license"
+    assert SHORT_PLAYBOOKS["school_short"][-1] == "period_results"
 
 
 def test_program_start_accepts_explicit_kam_override() -> None:

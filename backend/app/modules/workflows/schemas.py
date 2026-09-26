@@ -101,6 +101,33 @@ class WorkflowStageRead(WorkflowStageBase):
     updated_at: datetime
 
 
+class WorkflowChecklistItemBase(BaseModel):
+    code: str
+    label: str
+    item_type: Literal["checkbox", "file", "date", "stakeholder_role", "number", "text"]
+    required: bool = True
+    required_stakeholder_role: str | None = None
+    required_attachment_kind: str | None = None
+
+
+class WorkflowChecklistItemCreate(WorkflowChecklistItemBase):
+    pass
+
+
+class WorkflowChecklistItemUpdate(BaseModel):
+    code: str | None = None
+    label: str | None = None
+    item_type: Literal["checkbox", "file", "date", "stakeholder_role", "number", "text"] | None = None
+    required: bool | None = None
+    required_stakeholder_role: str | None = None
+    required_attachment_kind: str | None = None
+
+
+class WorkflowChecklistItemRead(WorkflowChecklistItemBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+
+
 class WorkflowTransitionBase(BaseModel):
     workflow_template_id: UUID
     workflow_version_id: UUID | None = None

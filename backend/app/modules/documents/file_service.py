@@ -73,6 +73,7 @@ class FileService:
         upload: UploadFile,
         uploaded_by: UUID,
         description: str | None = None,
+        attachment_kind: str | None = None,
         request_id: str | None = None,
     ) -> WorkflowStageAttachment:
         instance = self._get_stage_instance(stage_instance_id)
@@ -91,6 +92,7 @@ class FileService:
             self.storage.put(
                 bucket=bucket,
                 object_key=object_key,
+                attachment_kind=attachment_kind,
                 data=upload.file,
                 length=size_bytes,
                 content_type=upload.content_type,

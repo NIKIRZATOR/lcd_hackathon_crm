@@ -16,6 +16,7 @@ class PlaybookChecklistItem(ModelBase):
     item_type: Mapped[str] = mapped_column(String(32), nullable=False)
     required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     required_stakeholder_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    required_attachment_kind: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 class ProgramChecklistValue(ModelBase):
     __tablename__ = "program_checklist_values"

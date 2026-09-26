@@ -13,7 +13,7 @@ type OrganizationHealth = { active_programs_count: number; worst_health_score: n
 type Organization360 = { type_name: string; kam_name: string | null; documents_count: number; feed_events_count: number };
 type Page<T> = { items: T[] };
 type Contract = { id: string; number: string; signed_on: string | null; valid_until: string | null };
-type License = { id: string; product_name: string; license_number: string | null; valid_until: string | null; transfer_status: string };
+type License = { id: string; product_name: string; license_number: string | null; valid_until: string | null; transfer_status: string; product_access: string | null };
 type Teacher = { id: string; full_name: string; product_name: string; status: string; qualification_until: string | null };
 
 const OrganizationDetailPage = () => {
@@ -89,14 +89,18 @@ const OrganizationDetailPage = () => {
 };
 
 const WizardStep = ({ organizationId, step, values, onChange }: { organizationId: string; step: number; values: Record<string, string>; onChange: (value: Record<string, string>) => void }) => {
-  const [options, setOptions] = useState<{ label: string; value: string; recommended?: boolean }[]>([]);
+  const [options, setOptions] = useState<{ label: string; value: string; recommended?: boolean; disabled?: boolean }[]>([]);
   const [kams, setKams] = useState<{ label: string; value: string }[]>([]);
-  const paths = ['/api/it-directions?limit=100', '/api/it-products?limit=100', `/api/organizations/${organizationId}/available-playbooks`, '/api/academic-windows'];
+  const playbookQuery = new URLSearchParams();
+  if (values.direction_id) playbookQuery.set('direction_id', values.direction_id);
+  if (values.product_id) playbookQuery.set('product_id', values.product_id);
+  if (values.parent_program_id) playbookQuery.set('parent_program_id', values.parent_program_id);
+  const paths = ['/api/it-directions?limit=100', '/api/it-products?limit=100', `/api/organizations/${organizationId}/available-playbooks?${playbookQuery.toString()}`, '/api/academic-windows'];
   const keys = ['direction_id', 'product_id', 'playbook_template_id', 'academic_window_id'];
   useEffect(() => {
-    apiRequest<any>(paths[step]).then((data) => setOptions((data.items ?? data).map((item: any) => ({ value: item.id, recommended: item.recommended, label: `${item.name ?? item.title ?? item.code}${item.recommended ? ' · рекомендуется' : ''}` }))));
+    apiRequest<any>(paths[step]).then((data) => setOptions((data.items ?? data).map((item: any) => ({ value: item.id, recommended: item.recommended, disabled: item.disabled, label: `${item.name ?? item.title ?? item.code}${item.recommended ? ' · рекомендуется' : ''}${item.reason ? ` — ${item.reason}` : ''}` }))));
     if (step === 3) apiRequest<any[]>(`/api/organizations/${organizationId}/eligible-kams`).then((data) => setKams(data.map((item) => ({ value: item.id, label: item.full_name }))));
-  }, [organizationId, step]);
+  }, [organizationId, step, values.direction_id, values.product_id, values.parent_program_id]);
   return <>
     <Select style={{ width: '100%' }} placeholder="Выберите значение" options={options} value={values[keys[step]]} onChange={(value) => onChange({ ...values, [keys[step]]: value })} />
     {step === 3 && <Select allowClear style={{ width: '100%', marginTop: 12 }} placeholder="KAM: наследовать назначение организации" options={kams} value={values.kam_user_id} onChange={(value) => { const next = { ...values }; if (value) next.kam_user_id = value; else delete next.kam_user_id; onChange(next); }} />}
@@ -137,7 +141,7 @@ const ContractsAndTeachers = ({ organizationId }: { organizationId: string }) =>
     const payload = createKind === 'contract'
       ? { number: values.number, signed_on: values.signed_on || null }
       : createKind === 'license'
-        ? { program_instance_id: values.program_instance_id, license_number: values.license_number || null, transfer_status: values.transfer_status }
+        ? { program_instance_id: values.program_instance_id, license_number: values.license_number || null, transfer_status: values.transfer_status, product_access: values.product_access || null }
         : { product_id: values.product_id, full_name: values.full_name, status: values.status };
     await apiRequest(paths[createKind], { method: 'POST', body: JSON.stringify(payload) });
     setCreateKind(null); setValues({ transfer_status: 'not_transferred', status: 'planned' }); await load();
@@ -157,6 +161,7 @@ const ContractsAndTeachers = ({ organizationId }: { organizationId: string }) =>
         { title: 'Номер', dataIndex: 'license_number', render: (value) => value ?? '—' },
         { title: 'Срок', dataIndex: 'valid_until', render: (value) => value?.slice(0, 10) ?? '—' },
         { title: 'Передача', dataIndex: 'transfer_status', render: (value) => <Tag>{value}</Tag> },
+        { title: 'Доступ к продукту', dataIndex: 'product_access', render: (value) => value ?? '—' },
       ]} />
     </Card>
     <Card title="Преподаватели-носители" extra={<Button size="small" onClick={() => setCreateKind('teacher')}>Добавить</Button>} style={{ marginTop: 16 }}>
@@ -169,7 +174,7 @@ const ContractsAndTeachers = ({ organizationId }: { organizationId: string }) =>
     </Card>
     <Modal title="Новая запись" open={createKind !== null} onCancel={() => setCreateKind(null)} onOk={() => void create()} okText="Сохранить">
       {createKind === 'contract' && <><Input placeholder="Номер договора" value={values.number} onChange={(event) => setValues({ ...values, number: event.target.value })} /><Input style={{ marginTop: 12 }} placeholder="Дата подписания (YYYY-MM-DD)" value={values.signed_on} onChange={(event) => setValues({ ...values, signed_on: event.target.value })} /></>}
-      {createKind === 'license' && <><Select style={{ width: '100%' }} placeholder="Программа" options={programs.map((program) => ({ value: program.id, label: program.product_name }))} value={values.program_instance_id} onChange={(value) => setValues({ ...values, program_instance_id: value })} /><Input style={{ marginTop: 12 }} placeholder="Номер лицензии" value={values.license_number} onChange={(event) => setValues({ ...values, license_number: event.target.value })} /><Select style={{ width: '100%', marginTop: 12 }} options={['not_transferred', 'in_progress', 'transferred', 'revoked'].map((value) => ({ value, label: value }))} value={values.transfer_status} onChange={(value) => setValues({ ...values, transfer_status: value })} /></>}
+      {createKind === 'license' && <><Select style={{ width: '100%' }} placeholder="Программа" options={programs.map((program) => ({ value: program.id, label: program.product_name }))} value={values.program_instance_id} onChange={(value) => setValues({ ...values, program_instance_id: value })} /><Input style={{ marginTop: 12 }} placeholder="Номер лицензии" value={values.license_number} onChange={(event) => setValues({ ...values, license_number: event.target.value })} /><Input style={{ marginTop: 12 }} placeholder="Доступ к продукту: URL, логин или описание" value={values.product_access} onChange={(event) => setValues({ ...values, product_access: event.target.value })} /><Select style={{ width: '100%', marginTop: 12 }} options={['not_transferred', 'in_progress', 'transferred', 'revoked'].map((value) => ({ value, label: value }))} value={values.transfer_status} onChange={(value) => setValues({ ...values, transfer_status: value })} /></>}
       {createKind === 'teacher' && <><Input placeholder="ФИО" value={values.full_name} onChange={(event) => setValues({ ...values, full_name: event.target.value })} /><Select style={{ width: '100%', marginTop: 12 }} placeholder="Продукт" options={products.map((product) => ({ value: product.id, label: product.name }))} value={values.product_id} onChange={(value) => setValues({ ...values, product_id: value })} /><Select style={{ width: '100%', marginTop: 12 }} options={['planned', 'trained', 'active', 'expired', 'left'].map((value) => ({ value, label: value }))} value={values.status} onChange={(value) => setValues({ ...values, status: value })} /></>}
     </Modal>
   </>;

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -70,13 +70,16 @@ class ProgramInstanceService:
         if organization.status == "archived":
             raise HTTPException(status_code=409, detail="Archived organization cannot start a program")
         template = self.db.get(WorkflowTemplate, payload.playbook_template_id)
-        if template is None or template.status != "published":
+        if template is None or template.status != "published" or not template.is_active:
             raise HTTPException(
                 status_code=422, detail="Published playbook is required"
             )
         organization_type = self.db.get(OrganizationType, organization.type_id)
         if organization_type is None or not self._template_applies(template, organization_type.code):
             raise HTTPException(status_code=422, detail="Playbook is not applicable to organization type")
+        self._validate_playbook_choice(
+            template, organization_id, organization_type.code, payload
+        )
         compatible_program = self.db.scalar(
             select(ITProgram)
             .join(ProgramProduct, ProgramProduct.program_id == ITProgram.id)
@@ -97,6 +100,7 @@ class ProgramInstanceService:
                 ProgramInstance.organization_id == organization_id,
                 ProgramInstance.direction_id == payload.direction_id,
                 ProgramInstance.product_id == payload.product_id,
+                ProgramInstance.parent_program_id.is_(None),
                 ProgramInstance.status.not_in(["completed", "cancelled"]),
             )
         )
@@ -106,26 +110,20 @@ class ProgramInstanceService:
             organization_id=organization_id,
             direction_id=payload.direction_id,
             product_id=payload.product_id,
-            kam_user_id=payload.kam_user_id,
+            kam_user_id=effective_kam_id,
             playbook_template_id=template.id,
             template_snapshot=self._template_snapshot(template),
             status="active",
             academic_window_id=payload.academic_window_id,
             health_band="green",
             comment=payload.comment,
+            parent_program_id=payload.parent_program_id,
         )
         try:
             self.db.add(program)
             self.db.flush()
             WorkflowRuntimeService(self.db).initialize_program_workflow(
                 program, responsible_user_id=effective_kam_id
-            )
-            self.db.add(
-                License(
-                    program_instance_id=program.id,
-                    product_id=program.product_id,
-                    transfer_status="not_transferred",
-                )
             )
             HealthService(self.db).recompute(program.id)
             NbaService(self.db).recompute_program(program.id)
@@ -142,7 +140,14 @@ class ProgramInstanceService:
             raise
         return self.get(program.id, current_user)
 
-    def available_playbooks(self, organization_id: UUID, current_user: User) -> list[dict[str, object]]:
+    def available_playbooks(
+        self,
+        organization_id: UUID,
+        current_user: User,
+        direction_id: UUID | None = None,
+        product_id: UUID | None = None,
+        parent_program_id: UUID | None = None,
+    ) -> list[dict[str, object]]:
         organization = OrganizationService(self.db).get(organization_id, current_user)
         organization_type = self.db.get(OrganizationType, organization.type_id)
         type_code = organization_type.code if organization_type else ""
@@ -154,7 +159,13 @@ class ProgramInstanceService:
                 )
             )
         )
-        recommended_code = "school_short" if type_code == "school" else "expansion" if has_signed_contract else "full_cycle"
+        parent = self.db.get(ProgramInstance, parent_program_id) if parent_program_id else None
+        recommended_code = (
+            "teacher_replace" if parent and parent.status in {"draft", "active", "paused"}
+            else "license_renewal" if parent and self._license_expires_soon(parent.id)
+            else "school_short" if type_code == "school"
+            else "expansion" if has_signed_contract else "full_cycle"
+        )
         templates = self.db.scalars(
             select(WorkflowTemplate)
             .where(
@@ -163,17 +174,74 @@ class ProgramInstanceService:
             )
             .order_by(WorkflowTemplate.name)
         ).all()
-        return [
-            {
+        result = []
+        for template in templates:
+            reason = self._playbook_unavailable_reason(
+                template, organization_id, type_code, direction_id, product_id, parent
+            )
+            result.append({
                 "id": template.id,
                 "code": template.code,
                 "name": template.name,
                 "applies_to_type": template.applies_to_type,
                 "recommended": template.code == recommended_code,
-            }
-            for template in templates
-            if self._template_applies(template, type_code)
-        ]
+                "disabled": reason is not None,
+                "reason": reason,
+            })
+        return result
+
+    def _validate_playbook_choice(
+        self,
+        template: WorkflowTemplate,
+        organization_id: UUID,
+        organization_type: str,
+        payload: ProgramInstanceStart,
+    ) -> None:
+        parent = self.db.get(ProgramInstance, payload.parent_program_id) if payload.parent_program_id else None
+        reason = self._playbook_unavailable_reason(
+            template, organization_id, organization_type, payload.direction_id, payload.product_id, parent
+        )
+        if reason:
+            raise HTTPException(status_code=422, detail=reason)
+
+    def _playbook_unavailable_reason(
+        self,
+        template: WorkflowTemplate,
+        organization_id: UUID,
+        organization_type: str,
+        direction_id: UUID | None,
+        product_id: UUID | None,
+        parent: ProgramInstance | None,
+    ) -> str | None:
+        if not self._template_applies(template, organization_type):
+            return "Playbook is not applicable to this organization type"
+        has_signed_contract = bool(self.db.scalar(select(Contract.id).where(
+            Contract.organization_id == organization_id,
+            (Contract.signed_on.is_not(None)) | (Contract.signed_at.is_not(None)),
+        )))
+        if template.code == "full_cycle" and has_signed_contract:
+            return "Full cycle is available only without an active framework contract"
+        if template.code == "expansion" and not has_signed_contract:
+            return "Expansion requires an active framework contract"
+        if template.code in {"license_renewal", "teacher_replace"}:
+            if parent is None:
+                return "This playbook must be started from a parent program"
+            if (parent.organization_id, parent.direction_id, parent.product_id) != (organization_id, direction_id, product_id):
+                return "Parent program must match organization, direction and product"
+            if template.code == "license_renewal" and not self._license_expires_soon(parent.id):
+                return "License renewal requires a parent license expiring within 90 days"
+            if template.code == "teacher_replace" and parent.status not in {"draft", "active", "paused"}:
+                return "Teacher replacement requires a live parent program"
+        return None
+
+    def _license_expires_soon(self, program_id: UUID) -> bool:
+        today = date.today()
+        return bool(self.db.scalar(select(License.id).where(
+            License.program_instance_id == program_id,
+            License.valid_until.is_not(None),
+            License.valid_until >= today,
+            License.valid_until <= today + timedelta(days=90),
+        )))
 
     @staticmethod
     def _template_applies(template: WorkflowTemplate, type_code: str) -> bool:

@@ -34,6 +34,7 @@ class LicenseCreate(BaseModel):
     signed_at: datetime | None = None
     valid_until: datetime | None = None
     transfer_status: Literal["not_transferred", "in_progress", "transferred", "revoked"] = "not_transferred"
+    product_access: str | None = None
     transferred_on: date | None = None
     attachment_id: UUID | None = None
     comment: str | None = None
@@ -45,6 +46,7 @@ class LicenseUpdate(BaseModel):
     signed_at: datetime | None = None
     valid_until: datetime | None = None
     transfer_status: Literal["not_transferred", "in_progress", "transferred", "revoked"] | None = None
+    product_access: str | None = None
     transferred_on: date | None = None
     attachment_id: UUID | None = None
     comment: str | None = None

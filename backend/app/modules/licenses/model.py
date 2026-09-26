@@ -67,6 +67,7 @@ class License(ModelBase):
     signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     transfer_status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    product_access: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     program_instance_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True), ForeignKey("program_instances.id"), nullable=True
     )
