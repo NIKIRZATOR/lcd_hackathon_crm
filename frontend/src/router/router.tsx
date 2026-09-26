@@ -17,10 +17,10 @@ import WorkflowEditPage from '../pages/workflow/WorkflowEditPage';
 import V2Layout from '../v2/app/V2Layout';
 import OrganizationDetailPage from '../v2/pages/OrganizationDetailPage';
 import ManagementPage from '../v2/pages/ManagementPage';
-import NbaTodayPage from '../v2/pages/NbaTodayPage';
+import HomePage from '../v2/pages/HomePage';
 import OrganizationsPage from '../v2/pages/OrganizationsPage';
 import ProgramDetailPage from '../v2/pages/ProgramDetailPage';
-import V2PlaceholderPage from '../v2/pages/V2PlaceholderPage';
+import V2PlaceholderPage from '../v2/pages/ReportsPage';
 import WorkflowJournalPage from '../v2/pages/WorkflowJournalPage';
 import { allowedRoles } from './constants';
 import StartRoute from './StartRoute';
@@ -39,7 +39,7 @@ const AppRoutes = () => {
         }
       >
         <Route path="/v2">
-          <Route index element={<NbaTodayPage />} />
+          <Route index element={<HomePage />} />
           <Route path="organizations" element={<OrganizationsPage />} />
           <Route path="organizations/:id" element={<OrganizationDetailPage />} />
           <Route path="workflows" element={<WorkflowJournalPage />} />
