@@ -53,7 +53,7 @@ const StartRoute = () => {
     );
   }
 
-  return <Navigate to="/v2" replace />;
+  return <Navigate to="/home" replace />;
 };
 
 export default StartRoute;

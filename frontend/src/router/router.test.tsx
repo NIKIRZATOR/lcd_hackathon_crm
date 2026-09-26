@@ -51,16 +51,22 @@ vi.mock('../pages/login/LoginPage', () => ({
   default: () => <div>Login page</div>,
 }));
 
-vi.mock('../v2/app/V2Layout', async () => {
+vi.mock('../layout/AppLayout', async () => {
   const { Outlet } = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
-  return { default: () => <div data-testid="v2-layout"><Outlet /></div> };
+  return {
+    default: () => (
+      <div data-testid="v2-layout">
+        <Outlet />
+      </div>
+    ),
+  };
 });
 
-vi.mock('../v2/pages/V2PlaceholderPage', () => ({
+vi.mock('../pages/reports/V2PlaceholderPage', () => ({
   default: ({ title }: { title: string }) => <div>{title}</div>,
 }));
 
-vi.mock('../v2/pages/NbaTodayPage', () => ({
+vi.mock('../pages/home/NbaTodayPage', () => ({
   default: () => <div>Главная</div>,
 }));
 
@@ -116,7 +122,7 @@ describe('AppRoutes start route', () => {
     expect(screen.queryByText('Dashboard home')).not.toBeInTheDocument();
   });
 
-  it('redirects authenticated users with a working role to V2 home', async () => {
+  it('redirects authenticated users with a working role to home', async () => {
     authState.value = {
       authenticated: true,
       initialized: true,
@@ -126,7 +132,7 @@ describe('AppRoutes start route', () => {
     renderRoute('/');
 
     expect(await screen.findByTestId('v2-layout')).toBeInTheDocument();
-    expect(screen.getByText('Главная')).toBeInTheDocument();
+    expect(screen.getByText('Сегодня')).toBeInTheDocument();
   });
 
   it('shows 403 on root route for authenticated users without a working role', () => {
@@ -155,7 +161,7 @@ describe('AppRoutes start route', () => {
       user: { roles: ['KAM'] },
     };
 
-    renderRoute('/v2/management');
+    renderRoute('/management');
 
     expect(await screen.findByText('Denied by route guard')).toBeInTheDocument();
   });
