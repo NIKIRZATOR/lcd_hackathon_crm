@@ -94,7 +94,12 @@ const Layout: React.FC = () => {
     <Menu
       mode="inline"
       items={items}
-      selectedKeys={[location.pathname]}
+      selectedKeys={[
+        [...navigationItems]
+          .sort((left, right) => right.path.length - left.path.length)
+          .find((item) => location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(`${item.path}/`)))
+          ?.path ?? location.pathname,
+      ]}
       onClick={handleMenuClick}
       style={{
         height: '100%',

@@ -94,7 +94,7 @@ const stages: Array<[string, StageTone, string]> = [
 
 const priorityCycle: TaskPriority[] = ['high', 'medium', 'medium', 'low'];
 
-const scoreOverrides = new Map<number, number>();
+const scoreOverrides = new Map<number | string, number>();
 
 export const levelByScore = (score: number) => {
   if (score >= 75) return { label: 'Высокий уровень', note: 'Стабильное и перспективное сотрудничество' };
@@ -102,9 +102,9 @@ export const levelByScore = (score: number) => {
   return { label: 'Низкий уровень', note: 'Взаимодействие просело и нужен контакт' };
 };
 
-export const getUniversityScore = (universityId: number, fallback: number) => scoreOverrides.get(universityId) ?? fallback;
+export const getUniversityScore = (universityId: number | string, fallback: number) => scoreOverrides.get(universityId) ?? fallback;
 
-export const saveUniversityScore = (universityId: number, score: number) => {
+export const saveUniversityScore = (universityId: number | string, score: number) => {
   scoreOverrides.set(universityId, score);
 };
 
@@ -118,7 +118,35 @@ const siteFor = (university: UniversityItem) => {
 
 const countOr = (value: number, fallback: number) => (value > 0 ? value : fallback);
 
+const liveUniversityCard = (university: UniversityItem): UniversityCard => {
+  const owners = university.responsibles ?? [];
+
+  return {
+    site: '—',
+    partnership: university.healthScore == null ? '—' : university.healthScore >= 75 ? 'Партнёр' : university.healthScore >= 50 ? 'В процессе' : 'Пауза',
+    score: university.healthScore ?? 0,
+    students: university.studentsCount ?? -1,
+    teachers: university.teachersCount ?? -1,
+    products: university.productsCount ?? -1,
+    rtkManager: { name: university.manager || '—', role: 'Менеджер от РТК' },
+    universityOwners: owners.map((person) => ({ name: person.name || '—', role: person.role || '—' })),
+    attention: university.activityText && university.activityText !== '—'
+      ? [{ title: university.activityText, description: '—' }]
+      : [],
+    contacts: owners.map((person) => ({
+      name: person.name || '—',
+      role: person.role || '—',
+      phone: person.phone || '—',
+      email: person.email || '—',
+    })),
+    tasks: [],
+  };
+};
+
 export const buildUniversityCard = (university: UniversityItem): UniversityCard => {
+  if (typeof university.id !== 'number') return liveUniversityCard(university);
+  const universityId = university.id;
+
   const interactionCount = countOr(university.interactions, 0);
   const programCount = countOr(university.programs, 0);
   const streamCount = countOr(university.streams, 0);
@@ -126,14 +154,14 @@ export const buildUniversityCard = (university: UniversityItem): UniversityCard 
     ? university.responsibles.map((person) => [person.name, person.role || 'Ответственный от вуза'] as [string, string])
     : university.catalog
       ? []
-      : [0, 1].map((shift) => ownerPool[(university.id + shift) % ownerPool.length]);
+      : [0, 1].map((shift) => ownerPool[(universityId + shift) % ownerPool.length]);
   const interactions = Array.from({ length: interactionCount }, (_, index) => {
-    const [program, product] = programPool[(university.id + index) % programPool.length];
+    const [program, product] = programPool[(universityId + index) % programPool.length];
     const [stage, tone, nextStep] = stages[index % stages.length];
     const day = 25 + (index % 6);
 
     return {
-      id: `${university.id}-${index + 1}`,
+      id: `${universityId}-${index + 1}`,
       program,
       product,
       stage,
@@ -147,20 +175,20 @@ export const buildUniversityCard = (university: UniversityItem): UniversityCard 
   const products = university.catalog && interactionCount === 0
     ? Number(Boolean(university.product))
     : new Set(interactions.map((item) => item.product)).size;
-  const teachers = university.catalog && interactionCount === 0 ? 0 : programCount * 70 + university.id * 13 + 48;
+  const teachers = university.catalog && interactionCount === 0 ? 0 : programCount * 70 + universityId * 13 + 48;
   const students = university.catalog && interactionCount === 0 ? 0 : streamCount * 1800 + teachers * 8 + 120;
 
   return {
     site: university.catalog && interactionCount === 0 ? '' : siteFor(university),
     partnership: university.status === 'paused' ? 'Пауза' : university.status === 'progress' ? 'В процессе' : 'Партнёр',
-    score: university.id === 1 ? 82 : 58 + (university.id * 7) % 35,
+    score: universityId === 1 ? 82 : 58 + (universityId * 7) % 35,
     students,
     teachers,
     rtkManager: { name: managerName(university.manager), role: 'Менеджер от РТК' },
     universityOwners: owners.map(([name]) => ({ name, role: 'Ответственный от вуза' })),
     attention: interactionCount === 0 ? [] : [
       interactionCount > 2 && { title: `${Math.max(1, interactionCount % 3)} просроченные задачи`, description: 'Требуют подтверждения' },
-      { title: '1 лицензия истекает через 14 дней', description: programPool[university.id % programPool.length][1] },
+      { title: '1 лицензия истекает через 14 дней', description: programPool[universityId % programPool.length][1] },
       { title: 'Документ ожидает подписания', description: 'Договор о сотрудничестве' },
       programCount > 0 && { title: `${Math.max(1, programCount % 4)} преподавателя не начали обучение`, description: `Программа ${programPool[0][0]}` },
     ].filter((item): item is CardAttention => Boolean(item)),

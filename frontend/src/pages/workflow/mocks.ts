@@ -42,8 +42,9 @@ const buildWorkflowItems = (): WorkflowItem[] => {
   const items: WorkflowItem[] = [];
 
   universityItemsMock.forEach((university) => {
+    const universityId = typeof university.id === 'number' ? university.id : 0;
     for (let index = 0; index < interactionsPerUniversity; index += 1) {
-      const [program, product] = interactionPairs[(university.id - 1 + index) % interactionPairs.length];
+      const [program, product] = interactionPairs[(universityId - 1 + index) % interactionPairs.length];
       const stage = index === interactionsPerUniversity - 1
         ? 'Контроль'
         : stageNames[(index * 3) % (stageNames.length - 1)];
@@ -244,7 +245,7 @@ const baseWorkflowStepConfigs: Omit<WorkflowStepConfig, 'id'>[] = [
   },
 ];
 
-const workflowStepConfigs = new Map<number, WorkflowStepConfig[]>();
+const workflowStepConfigs = new Map<number | string, WorkflowStepConfig[]>();
 
 const getStepConfigs = (item: WorkflowItem) => {
   const existing = workflowStepConfigs.get(item.id);
@@ -260,14 +261,14 @@ const getStepConfigs = (item: WorkflowItem) => {
   return configs;
 };
 
-export const getWorkflowStepConfigs = (workflowId: number) => {
+export const getWorkflowStepConfigs = (workflowId: number | string) => {
   const item = workflowItemsMock.find((workflow) => workflow.id === workflowId);
   return item ? getStepConfigs(item) : [];
 };
 
 const sameInteraction = (value: string, other: string) => value.trim().toLowerCase() === other.trim().toLowerCase();
 
-export const findWorkflowByInteraction = (universityId: number, program: string, product: string) =>
+export const findWorkflowByInteraction = (universityId: number | string, program: string, product: string) =>
   workflowItemsMock.find((item) => (
     item.universityId === universityId
     && sameInteraction(item.program, program)
@@ -275,7 +276,7 @@ export const findWorkflowByInteraction = (universityId: number, program: string,
   ));
 
 export const createUniversityWorkflow = (input: {
-  universityId: number;
+  universityId: number | string;
   university: string;
   universityShort: string;
   program: string;
@@ -289,7 +290,7 @@ export const createUniversityWorkflow = (input: {
   if (existing) return { item: existing, created: false as const };
 
   const item: WorkflowItem = {
-    id: Math.max(0, ...workflowItemsMock.map((workflow) => workflow.id)) + 1,
+    id: Math.max(0, ...workflowItemsMock.map((workflow) => (typeof workflow.id === 'number' ? workflow.id : 0))) + 1,
     universityId: input.universityId,
     university: input.university,
     universityShort: input.universityShort,
@@ -306,7 +307,8 @@ export const createUniversityWorkflow = (input: {
   return { item, created: true as const };
 };
 
-export const nextWorkflowStepName = (workflowId: number, stageName: string) => {
+export const nextWorkflowStepName = (workflowId: number | string, stageName: string) => {
+  if (typeof workflowId !== 'number') return '—';
   const configs = getWorkflowStepConfigs(workflowId);
   const index = configs.findIndex((step) => step.name === stageName);
   if (index === -1 || index >= configs.length - 1) return '—';
@@ -339,7 +341,7 @@ export const deleteWorkflowStepConfig = (workflowId: number, stepId: number) => 
   return true;
 };
 
-export const advanceWorkflowStage = (workflowId: number) => {
+export const advanceWorkflowStage = (workflowId: number | string) => {
   const item = workflowItemsMock.find((workflow) => workflow.id === workflowId);
 
   if (!item) return undefined;
@@ -355,7 +357,7 @@ export const advanceWorkflowStage = (workflowId: number) => {
   return transition;
 };
 
-export const moveWorkflowToStage = (workflowId: number, stageId: number) => {
+export const moveWorkflowToStage = (workflowId: number | string, stageId: number) => {
   const item = workflowItemsMock.find((workflow) => workflow.id === workflowId);
 
   if (!item) return undefined;

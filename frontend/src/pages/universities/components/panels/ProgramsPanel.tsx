@@ -18,8 +18,8 @@ export const ProgramsPanel = ({ sections }: { sections: UniversitySections }) =>
     { title: 'ИТ-направление', dataIndex: 'direction', key: 'direction', wideOnly: true, sorter: byText((row: SectionProgram) => row.direction) },
     { title: 'ИТ-продукт / ПО', dataIndex: 'product', key: 'product', wideOnly: true, sorter: byText((row: SectionProgram) => row.product) },
     { title: 'Вендор', dataIndex: 'vendor', key: 'vendor', wideOnly: true, sorter: byText((row: SectionProgram) => row.vendor) },
-    { title: 'Потоки', dataIndex: 'streams', key: 'streams', width: 100, wideOnly: true, sorter: byNumber((row: SectionProgram) => row.streams) },
-    { title: 'Обучающиеся', dataIndex: 'students', key: 'students', width: 140, wideOnly: true, sorter: byNumber((row: SectionProgram) => row.students) },
+    { title: 'Потоки', dataIndex: 'streams', key: 'streams', width: 100, wideOnly: true, sorter: byNumber((row: SectionProgram) => row.streams), render: (value: number) => value < 0 ? '—' : value },
+    { title: 'Обучающиеся', dataIndex: 'students', key: 'students', width: 140, wideOnly: true, sorter: byNumber((row: SectionProgram) => row.students), render: (value: number) => value < 0 ? '—' : value },
     { title: 'Статус', key: 'status', width: compact ? undefined : 150, sorter: byText((row: SectionProgram) => programLabel[row.status]), render: (_v, row) => <Pill className={row.status === 'active' ? styles.green : styles.yellow}>{programLabel[row.status]}</Pill> },
   ]);
 
@@ -30,7 +30,7 @@ export const ProgramsPanel = ({ sections }: { sections: UniversitySections }) =>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setOpen(true); }}>Добавить связь</Button>
       </div>
       <div className={styles.card}>
-        <Table rowKey="id" size="middle" pagination={false} columns={columns} dataSource={programs} expandable={compact ? { expandedRowRender: (row) => <Details rows={[['Направление', row.direction], ['Продукт', row.product], ['Вендор', row.vendor], ['Потоки', row.streams], ['Обучающиеся', row.students]]} /> } : undefined} />
+        <Table rowKey="id" size="middle" pagination={false} columns={columns} dataSource={programs} expandable={compact ? { expandedRowRender: (row) => <Details rows={[['Направление', row.direction], ['Продукт', row.product], ['Вендор', row.vendor], ['Потоки', row.streams < 0 ? '—' : row.streams], ['Обучающиеся', row.students < 0 ? '—' : row.students]]} /> } : undefined} />
       </div>
       <div className={styles.split}>
         <div className={styles.block}>

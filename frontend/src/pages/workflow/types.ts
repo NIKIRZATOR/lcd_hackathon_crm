@@ -1,8 +1,8 @@
 export type WorkflowStatus = 'active' | 'attention' | 'completed' | 'overdue';
 
 export interface WorkflowItem {
-  id: number;
-  universityId?: number;
+  id: number | string;
+  universityId?: number | string;
   university: string;
   universityShort: string;
   program: string;
@@ -76,6 +76,7 @@ export interface WorkflowDetailMock {
   stepConfigs: WorkflowStepConfig[];
   currentStageId: number;
   checklist: WorkflowChecklistItem[];
+  checklistByStage?: Record<number, WorkflowChecklistItem[]>;
   files: WorkflowFile[];
   comments: WorkflowComment[];
 }

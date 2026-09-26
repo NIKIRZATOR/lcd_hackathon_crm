@@ -88,7 +88,7 @@ export const InteractionsPanel = ({ university }: { university: UniversityItem }
             onClick: (event) => {
               const target = event.target as HTMLElement;
               if (target.closest('.ant-table-row-expand-icon, .ant-table-row-expand-icon-cell')) return;
-              navigate(`/workflow/${row.id}`);
+              navigate(`/v2/workflows/${row.id}`);
             },
             style: { cursor: 'pointer' },
           })}
@@ -112,7 +112,7 @@ export const InteractionsPanel = ({ university }: { university: UniversityItem }
             setOpen(false);
             setVersion((current) => current + 1);
             if (!result.created) message.info('Такое взаимодействие уже есть, открываю его');
-            navigate(`/workflow/${result.item.id}`);
+            navigate(`/v2/workflows/${result.item.id}`);
           }}
         >
           <Form.Item name="program" label="ИТ-программа" rules={[{ required: true, whitespace: true, message: 'Укажите программу' }]}><Input /></Form.Item>

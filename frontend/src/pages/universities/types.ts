@@ -16,15 +16,18 @@ export interface UniversityCatalog {
 export interface UniversityResponsible {
   name: string;
   role: string;
+  phone?: string;
+  email?: string;
 }
 
 export interface UniversityItem {
-  id: number;
+  id: number | string;
+  healthScore?: number | null;
   name: string;
   shortName: string;
   city: string;
   region: string;
-  type: UniversityType;
+  type: UniversityType | string;
   profile: string;
   product: string;
   interactions: number;
@@ -36,13 +39,16 @@ export interface UniversityItem {
   catalog?: UniversityCatalog;
   activityAt: string;
   activityText: string;
+  studentsCount?: number;
+  teachersCount?: number;
+  productsCount?: number;
 }
 
 export interface UniversityFilters {
   search: string;
   status: UniversityStatus | '';
   region: string;
-  type: UniversityType | '';
+  type: string;
   profile: string;
   product: string;
   manager: string;

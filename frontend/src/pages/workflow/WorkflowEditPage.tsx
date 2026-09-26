@@ -2,9 +2,9 @@ import { PlusOutlined } from '@ant-design/icons';
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Button, Card, Empty, Modal, Tag, message } from 'antd';
+import { Button, Card, Empty, Modal, Spin, Tag, message } from 'antd';
 import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import WorkflowStepForm from './components/WorkflowStepForm';
@@ -13,8 +13,8 @@ import type { WorkflowStepFormValues } from './components/WorkflowStepForm';
 import {
   createWorkflowStepConfig,
   deleteWorkflowStepConfig,
-  getWorkflow,
   getWorkflowStepConfigs,
+  loadWorkflowDetail,
   reorderWorkflowStepConfigs,
   updateWorkflowStepConfig,
 } from './api';
@@ -26,9 +26,30 @@ const WorkflowEditPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const workflowId = Number(id);
-  const detail = getWorkflow(workflowId);
-  const [steps, setSteps] = useState<WorkflowStepConfig[]>(() => getWorkflowStepConfigs(workflowId));
-  const [selectedStepId, setSelectedStepId] = useState<number | null>(() => steps[0]?.id ?? null);
+  const [detail, setDetail] = useState<Awaited<ReturnType<typeof loadWorkflowDetail>>>();
+  const [isLoading, setIsLoading] = useState(true);
+  const [steps, setSteps] = useState<WorkflowStepConfig[]>([]);
+  const [selectedStepId, setSelectedStepId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!id) return undefined;
+    let cancelled = false;
+
+    loadWorkflowDetail(id)
+      .then((loaded) => {
+        if (cancelled || !loaded) return;
+        setDetail(loaded);
+        setSteps(loaded.stepConfigs.length ? loaded.stepConfigs : getWorkflowStepConfigs(workflowId));
+        setSelectedStepId(loaded.stepConfigs[0]?.id ?? null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, workflowId]);
   const [mode, setMode] = useState<'create' | 'edit'>('edit');
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -41,6 +62,7 @@ const WorkflowEditPage = () => {
   const selectedStep = useMemo(() => steps.find((step) => step.id === selectedStepId), [selectedStepId, steps]);
   const selectedStepNumber = Math.max(steps.findIndex((step) => step.id === selectedStepId) + 1, 1);
 
+  if (isLoading) return <Spin size="large" />;
   if (!detail) return <Empty description="Workflow не найден" />;
 
   const confirmDiscard = (action: () => void) => {
@@ -83,7 +105,7 @@ const WorkflowEditPage = () => {
       }
       setIsDirty(false);
       setIsSaving(false);
-      navigate(`/workflow/${workflowId}`);
+      navigate(`/v2/workflows/${id}`);
     }, 300);
   };
 
@@ -136,8 +158,8 @@ const WorkflowEditPage = () => {
   return (
     <div className={styles.page}>
       <div className={styles.breadcrumbs}>
-        <Link to="/workflow">Workflow</Link><span>›</span>
-        <Link to={`/workflow/${workflowId}`}>{detail.item.universityShort}</Link><span>›</span>
+        <Link to="/v2/workflows">Воркфлоу</Link><span>›</span>
+        <Link to={`/v2/workflows/${id}`}>{detail.item.universityShort}</Link><span>›</span>
         <span>Редактирование</span>
       </div>
       <header className={styles.header}>
@@ -177,7 +199,7 @@ const WorkflowEditPage = () => {
             <h2>{mode === 'create' ? 'Новый этап' : `${String(selectedStepNumber).padStart(2, '0')} · ${selectedStep?.name ?? ''}`}</h2>
             <span>{mode === 'create' ? 'Создание' : 'Редактирование'}</span>
           </div>
-          <WorkflowStepForm mode={mode} step={selectedStep} onSave={handleSave} onCancel={() => confirmDiscard(() => navigate(`/workflow/${workflowId}`))} onDelete={mode === 'edit' ? handleDelete : undefined} isSaving={isSaving} onDirtyChange={setIsDirty} />
+          <WorkflowStepForm mode={mode} step={selectedStep} onSave={handleSave} onCancel={() => confirmDiscard(() => navigate(`/v2/workflows/${id}`))} onDelete={mode === 'edit' ? handleDelete : undefined} isSaving={isSaving} onDirtyChange={setIsDirty} />
         </section>
       </div>
     </div>

@@ -63,7 +63,7 @@ const UniversityOverview = ({ card, interactions, programs, streams, onOpenTab, 
       <section className={styles.metrics} aria-label="Сводка по вузу">
         {stats.map(([value, label]) => (
           <div key={label} className={styles.metric}>
-            <strong>{value}</strong>
+            <strong>{typeof value === 'number' && value < 0 ? '—' : value}</strong>
             <span>{label}</span>
           </div>
         ))}

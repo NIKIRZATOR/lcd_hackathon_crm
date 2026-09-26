@@ -228,7 +228,30 @@ const catalogSections = (university: UniversityItem): UniversitySections => ({
   streams: [],
 });
 
+const emptySections = (): UniversitySections => ({
+  programs: [],
+  licenses: [],
+  directions: [],
+  teachers: [],
+  teacherSummary: { total: 0, ready: 0, training: 0, notStarted: 0, expiring: 0, programs: 0 },
+  documents: [],
+  docAlerts: [],
+  tasks: [],
+  history: [],
+  streams: [],
+});
+
+const liveSections = new Map<string, UniversitySections>();
+
+export const setLiveUniversitySections = (universityId: string, sections: UniversitySections) => {
+  liveSections.set(universityId, sections);
+};
+
 export const buildUniversitySections = (university: UniversityItem): UniversitySections => {
+  const live = liveSections.get(String(university.id));
+  if (live) return live;
+  if (typeof university.id !== 'number') return emptySections();
+
   const source = university.catalog && university.interactions === 0
     ? catalogSections(university)
     : university.id === 1 ? bauman() : generatedSections(university);
@@ -241,6 +264,7 @@ export const buildUniversitySections = (university: UniversityItem): UniversityS
 };
 
 const generatedSections = (university: UniversityItem): UniversitySections => {
+  const universityId = typeof university.id === 'number' ? university.id : 0;
 
   const count = Math.max(university.interactions, 1);
   const placeholders = Array.from({ length: count }, (_, index) => ({
@@ -248,7 +272,7 @@ const generatedSections = (university: UniversityItem): UniversitySections => {
     product: ['GitLab', 'TestIT', 'DataLens', 'Kaspersky'][index % 4],
     nextStep: 'Согласовать следующий шаг',
     due: `${10 + index} нояб.`,
-    owner: owners[(university.id + index) % owners.length],
+    owner: owners[(universityId + index) % owners.length],
   }));
 
   const programs: SectionProgram[] = directions.slice(0, Math.max(university.programs, 1)).map((direction, index) => ({

@@ -3,6 +3,7 @@ import 'dayjs/locale/ru';
 
 import { universityItemsMock } from './mocks';
 import { nextWorkflowStepName, workflowItemsMock } from '../workflow/mocks';
+import { universityWorkflowRows } from '../workflow/api';
 import type { WorkflowItem, WorkflowStatus } from '../workflow/types';
 import type { StageTone } from './universityCard';
 
@@ -40,7 +41,10 @@ const stageTone = (stage: string): StageTone => {
   return 'neutral';
 };
 
-export const listUniversityWorkflows = (universityId: number) => {
+export const listUniversityWorkflows = (universityId: number | string) => {
+  const live = universityWorkflowRows(universityId);
+  if (live) return live;
+
   linkWorkflowsToUniversities();
   return workflowItemsMock
     .filter((item) => item.universityId === universityId)

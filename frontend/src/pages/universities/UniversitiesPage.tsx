@@ -9,7 +9,7 @@ import {
   UploadOutlined,
   SyncOutlined,
 } from '@ant-design/icons';
-import { Button, Collapse, DatePicker, Grid, Input, Select, Spin, Table, Tag, Tooltip, message } from 'antd';
+import { Alert, Button, Collapse, DatePicker, Grid, Input, Select, Spin, Table, Tag, Tooltip, message } from 'antd';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -19,9 +19,9 @@ import PageLayout from '../../components/pageLayout/PageLayout';
 import CatalogImportModal from './components/CatalogImportModal';
 import UniversityCreateModal from './components/UniversityCreateModal';
 import { filterUniversities, hasActiveUniversityFilters, summarizeUniversities } from './filters';
-import { listUniversities, rememberUniversity } from './api';
+import { listUniversities, loadUniversities, rememberUniversity } from './api';
 import { emptyUniversityFilters, universityStatusLabels, universityTypeLabels } from './types';
-import type { UniversityDraft, UniversityFilters, UniversityItem, UniversityStatus } from './types';
+import type { UniversityDraft, UniversityFilters, UniversityItem, UniversityStatus, UniversityType } from './types';
 
 import styles from './UniversitiesPage.module.scss';
 
@@ -70,7 +70,17 @@ const getManagerInitials = (value: string) =>
     .slice(0, 2)
     .toUpperCase();
 
-const formatActivityDate = (value: string) => dayjs(value).locale('ru').format('D MMM YYYY');
+const formatActivityDate = (value: string) => (value && dayjs(value).isValid() ? dayjs(value).locale('ru').format('D MMM YYYY') : '—');
+
+const typeLabel = (type: UniversityItem['type']) => universityTypeLabels[type as UniversityType] ?? type;
+
+const showCount = (value: number) => (value < 0 ? '—' : value);
+
+const paletteIndex = (id: UniversityItem['id']) => (
+  typeof id === 'number'
+    ? Math.abs(id)
+    : Array.from(id).reduce((sum, char) => sum + char.charCodeAt(0), 0)
+);
 
 const uniqueSorted = (values: string[]) => [...new Set(values)].sort((left, right) => left.localeCompare(right, 'ru'));
 
@@ -84,7 +94,9 @@ const UniversitiesPage = () => {
     () => false,
   );
   const isCompactVisual = isTableCompact || isIntermediateViewport;
-  const [universities, setUniversities] = useState(listUniversities);
+  const [universities, setUniversities] = useState<UniversityItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [filters, setFilters] = useState<UniversityFilters>(emptyUniversityFilters);
   const [visibleCount, setVisibleCount] = useState(20);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -94,10 +106,31 @@ const UniversitiesPage = () => {
 
   const filteredUniversities = useMemo(() => filterUniversities(universities, filters), [filters, universities]);
   const summary = useMemo(() => summarizeUniversities(universities), [universities]);
-  const regionOptions = useMemo(() => uniqueSorted(universities.map((item) => item.region)), [universities]);
-  const profileOptions = useMemo(() => uniqueSorted(universities.map((item) => item.profile)), [universities]);
-  const productOptions = useMemo(() => uniqueSorted(universities.map((item) => item.product).filter(Boolean)), [universities]);
-  const managerOptions = useMemo(() => uniqueSorted(universities.map((item) => item.manager)), [universities]);
+  const knownValue = (value: string) => value && value !== '—';
+  const regionOptions = useMemo(() => uniqueSorted(universities.map((item) => item.region).filter(knownValue)), [universities]);
+  const profileOptions = useMemo(() => uniqueSorted(universities.map((item) => item.profile).filter(knownValue)), [universities]);
+  const productOptions = useMemo(() => uniqueSorted(universities.map((item) => item.product).filter(knownValue)), [universities]);
+  const managerOptions = useMemo(() => uniqueSorted(universities.map((item) => item.manager).filter(knownValue)), [universities]);
+  const typeOptions = useMemo(() => uniqueSorted(universities.map((item) => item.type).filter(knownValue)), [universities]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    loadUniversities()
+      .then((items) => {
+        if (!cancelled) setUniversities(items);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError('Не удалось загрузить вузы');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const loadMoreNode = loadMoreRef.current;
@@ -130,7 +163,7 @@ const UniversitiesPage = () => {
   };
 
   const renderUniversity = (item: UniversityItem) => {
-    const palette = badgePalette[item.id % badgePalette.length];
+    const palette = badgePalette[paletteIndex(item.id) % badgePalette.length];
 
     return (
       <div className={styles.universityCell}>
@@ -192,12 +225,12 @@ const UniversitiesPage = () => {
       dataIndex: 'type',
       key: 'type',
       show: ['wide'],
-      sorter: (left: UniversityItem, right: UniversityItem) => universityTypeLabels[left.type].localeCompare(universityTypeLabels[right.type], 'ru'),
-      render: (type: UniversityItem['type']) => universityTypeLabels[type],
+      sorter: (left: UniversityItem, right: UniversityItem) => typeLabel(left.type).localeCompare(typeLabel(right.type), 'ru'),
+      render: (type: UniversityItem['type']) => typeLabel(type),
     },
-    { title: 'Взаимодействия', dataIndex: 'interactions', key: 'interactions', show: ['wide'], sorter: (left: UniversityItem, right: UniversityItem) => left.interactions - right.interactions },
-    { title: 'Программы', dataIndex: 'programs', key: 'programs', show: ['wide'], sorter: (left: UniversityItem, right: UniversityItem) => left.programs - right.programs },
-    { title: 'Потоки', dataIndex: 'streams', key: 'streams', show: ['wide'], sorter: (left: UniversityItem, right: UniversityItem) => left.streams - right.streams },
+    { title: 'Взаимодействия', dataIndex: 'interactions', key: 'interactions', show: ['wide'], sorter: (left: UniversityItem, right: UniversityItem) => left.interactions - right.interactions, render: showCount },
+    { title: 'Программы', dataIndex: 'programs', key: 'programs', show: ['wide'], sorter: (left: UniversityItem, right: UniversityItem) => left.programs - right.programs, render: showCount },
+    { title: 'Потоки', dataIndex: 'streams', key: 'streams', show: ['wide'], sorter: (left: UniversityItem, right: UniversityItem) => left.streams - right.streams, render: showCount },
     {
       title: 'Менеджер',
       dataIndex: 'manager',
@@ -241,7 +274,7 @@ const UniversitiesPage = () => {
   const handleCreate = (draft: UniversityDraft) => {
     const created: UniversityItem = {
       ...draft,
-      id: Math.max(0, ...universities.map((item) => item.id)) + 1,
+      id: Math.max(0, ...universities.map((item) => (typeof item.id === 'number' ? item.id : 0))) + 1,
       interactions: 0,
       programs: 0,
       streams: 0,
@@ -289,9 +322,9 @@ const UniversitiesPage = () => {
         placeholder="Тип"
         value={filters.type || undefined}
         allowClear
-        options={(Object.keys(universityTypeLabels) as UniversityItem['type'][]).map((value) => ({
+        options={typeOptions.map((value) => ({
           value,
-          label: universityTypeLabels[value],
+          label: typeLabel(value),
         }))}
         onChange={(value) => updateFilter('type', value ?? '')}
       />
@@ -354,6 +387,8 @@ const UniversitiesPage = () => {
   return (
     <PageLayout>
       <div className={styles.page}>
+        {loadError && <Alert type="error" showIcon message={loadError} style={{ marginBottom: 16 }} />}
+        {isLoading && <Spin size="large" />}
         <div className={styles.headingRow}>
           <header className={styles.heading}>
             <h1 className={styles.title}>Вузы</h1>
@@ -424,7 +459,7 @@ const UniversitiesPage = () => {
               onClick: (event) => {
                 const target = event.target as HTMLElement;
                 if (target.closest('.ant-table-row-expand-icon, .ant-table-row-expand-icon-cell')) return;
-                navigate(`/universities/${item.id}`);
+                navigate(`/v2/organizations/${item.id}`);
               },
             })}
             expandable={isTableCompact || isIntermediateViewport ? {
@@ -435,11 +470,11 @@ const UniversitiesPage = () => {
                     <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Город</span><span>{item.city}</span></div>
                   )}
                   <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Статус</span><span>{universityStatusLabels[item.status]}</span></div>
-                  <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Тип</span><span>{universityTypeLabels[item.type]}</span></div>
+                  <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Тип</span><span>{typeLabel(item.type)}</span></div>
                   <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Профиль</span><span>{item.profile}</span></div>
-                  <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Взаимодействия</span><span>{item.interactions}</span></div>
-                  <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Программы</span><span>{item.programs}</span></div>
-                  <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Потоки</span><span>{item.streams}</span></div>
+                  <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Взаимодействия</span><span>{showCount(item.interactions)}</span></div>
+                  <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Программы</span><span>{showCount(item.programs)}</span></div>
+                  <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Потоки</span><span>{showCount(item.streams)}</span></div>
                   <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Активность</span>{renderActivity(item)}</div>
                 </div>
               ),

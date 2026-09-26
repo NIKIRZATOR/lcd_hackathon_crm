@@ -7,7 +7,7 @@ import {
   FilterOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
-import { Button, Collapse, DatePicker, Grid, Input, message, Progress, Segmented, Select, Spin, Table, Tag, Tooltip } from 'antd';
+import { Alert, Button, Collapse, DatePicker, Grid, Input, message, Progress, Segmented, Select, Spin, Table, Tag, Tooltip } from 'antd';
 import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -15,7 +15,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../../auth';
 import PageLayout from '../../components/pageLayout/PageLayout';
-import { listWorkflows, summarizeWorkflows } from './api';
+import { loadWorkflows, summarizeWorkflows } from './api';
 import type { WorkflowFilters, WorkflowItem, WorkflowStatus } from './types';
 
 import styles from './WorkflowPage.module.scss';
@@ -91,8 +91,29 @@ const WorkflowPage = () => {
   const isCompactVisual = isTableCompact || isIntermediateViewport;
   const navigate = useNavigate();
   const { user } = useAuth();
-  const workflows = listWorkflows();
+  const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const summary = summarizeWorkflows(workflows);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    loadWorkflows()
+      .then((items) => {
+        if (!cancelled) setWorkflows([...items]);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError('Не удалось загрузить воркфлоу');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const mineNames = useMemo(
     () => [user?.full_name, user?.username].map((value) => value?.trim() ?? '').filter(Boolean),
     [user?.full_name, user?.username],
@@ -116,11 +137,11 @@ const WorkflowPage = () => {
   }, [filters, setSearchParams, view]);
 
   const workflowFilterOptions = {
-    universities: [...new Set(workflows.map((item) => item.universityShort))].sort((left, right) => left.localeCompare(right, 'ru')),
-    programs: [...new Set(workflows.map((item) => item.program))],
-    products: [...new Set(workflows.map((item) => item.product))],
-    stages: [...new Set(workflows.map((item) => item.stage))],
-    responsibles: [...new Set(workflows.map((item) => item.responsible))],
+    universities: [...new Set(workflows.map((item) => item.universityShort))].filter((value) => value && value !== '—').sort((left, right) => left.localeCompare(right, 'ru')),
+    programs: [...new Set(workflows.map((item) => item.program))].filter((value) => value && value !== '—'),
+    products: [...new Set(workflows.map((item) => item.product))].filter((value) => value && value !== '—'),
+    stages: [...new Set(workflows.map((item) => item.stage))].filter((value) => value && value !== '—'),
+    responsibles: [...new Set(workflows.map((item) => item.responsible))].filter((value) => value && value !== '—'),
   };
 
   const query = filters.search.trim().toLowerCase();
@@ -220,14 +241,14 @@ const WorkflowPage = () => {
         </div>
       ),
     },
-    { title: 'Срок', dataIndex: 'deadline', key: 'deadline', show: ['wide'], render: (value: string) => dayjs(value).format('DD.MM.YYYY') },
+    { title: 'Срок', dataIndex: 'deadline', key: 'deadline', show: ['wide'], render: (value: string) => (value && dayjs(value).isValid() ? dayjs(value).format('DD.MM.YYYY') : '—') },
     { title: 'Статус', dataIndex: 'status', key: 'status', show: ['wide', 'mid', 'narrow'], render: (status: WorkflowStatus) => renderStatus(status, isCompactVisual) },
     {
       title: tableLayout === 'mid' ? '%' : 'Прогресс',
       dataIndex: 'progress',
       key: 'progress',
       show: ['wide', 'mid'],
-      render: (value: number) => renderProgress(value, isCompactVisual),
+      render: (value: number) => (value < 0 ? '—' : renderProgress(value, isCompactVisual)),
     },
   ] satisfies Array<TableColumnsType<WorkflowItem>[number] & { show: string[] }>)
     .filter((column) => column.show.includes(tableLayout))
@@ -274,6 +295,8 @@ const WorkflowPage = () => {
   return (
     <PageLayout>
       <div className={styles.page}>
+        {loadError && <Alert type="error" showIcon message={loadError} style={{ marginBottom: 16 }} />}
+        {isLoading && <Spin size="large" />}
         <header className={styles.heading}>
           <h1 className={styles.title}>Все workflow</h1>
           <p className={styles.subtitle}>
@@ -323,14 +346,14 @@ const WorkflowPage = () => {
             dataSource={filteredItems.slice(0, visibleCount)}
             pagination={false}
             rowClassName={styles.clickableRow}
-            onRow={(item) => ({ onClick: () => navigate(`/workflow/${item.id}`) })}
+            onRow={(item) => ({ onClick: () => navigate(`/v2/workflows/${item.id}`) })}
             expandable={isIntermediateViewport || isTableCompact ? {
               expandedRowRender: (item) => (
                 <div className={styles.mobileDetails}>
                   <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Продукт</span><span>{item.product}</span></div>
                   <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Этап</span><span>{item.stage}</span></div>
                   <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Ответственный</span><span>{item.responsible}</span></div>
-                  <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Прогресс</span>{renderExpandedProgress(item.progress)}</div>
+                  <div className={styles.mobileDetail}><span className={styles.mobileDetailLabel}>Прогресс</span>{item.progress < 0 ? '—' : renderExpandedProgress(item.progress)}</div>
                 </div>
               ),
             } : undefined}

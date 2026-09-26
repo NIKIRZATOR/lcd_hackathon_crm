@@ -145,7 +145,7 @@ export const applyCatalog = (rows: string[][], mapping: CatalogMapping) => {
     }
 
     const createdItem: UniversityItem = {
-      id: Math.max(0, ...universityItemsMock.map((item) => item.id)) + 1,
+      id: Math.max(0, ...universityItemsMock.map((item) => (typeof item.id === 'number' ? item.id : 0))) + 1,
       name,
       shortName: name,
       city: '',

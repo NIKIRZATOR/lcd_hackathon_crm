@@ -15,13 +15,10 @@ import WorkflowPage from '../pages/workflow/WorkflowPage';
 import WorkflowDetailPage from '../pages/workflow/WorkflowDetailPage';
 import WorkflowEditPage from '../pages/workflow/WorkflowEditPage';
 import V2Layout from '../v2/app/V2Layout';
-import OrganizationDetailPage from '../v2/pages/OrganizationDetailPage';
 import ManagementPage from '../v2/pages/ManagementPage';
 import NbaTodayPage from '../v2/pages/NbaTodayPage';
-import OrganizationsPage from '../v2/pages/OrganizationsPage';
 import ProgramDetailPage from '../v2/pages/ProgramDetailPage';
 import V2PlaceholderPage from '../v2/pages/V2PlaceholderPage';
-import WorkflowJournalPage from '../v2/pages/WorkflowJournalPage';
 import { allowedRoles } from './constants';
 import StartRoute from './StartRoute';
 
@@ -40,9 +37,11 @@ const AppRoutes = () => {
       >
         <Route path="/v2">
           <Route index element={<NbaTodayPage />} />
-          <Route path="organizations" element={<OrganizationsPage />} />
-          <Route path="organizations/:id" element={<OrganizationDetailPage />} />
-          <Route path="workflows" element={<WorkflowJournalPage />} />
+          <Route path="organizations" element={<UniversitiesPage />} />
+          <Route path="organizations/:id" element={<UniversityDetailPage />} />
+          <Route path="workflows" element={<WorkflowPage />} />
+          <Route path="workflows/:id" element={<WorkflowDetailPage />} />
+          <Route path="workflows/:id/edit" element={<WorkflowEditPage />} />
           <Route path="programs/:id" element={<ProgramDetailPage />} />
           <Route path="reports" element={<V2PlaceholderPage title="Отчёты" description="Конструктор и очередь отчётов будут подключены на этапе Reports MVP." />} />
           <Route

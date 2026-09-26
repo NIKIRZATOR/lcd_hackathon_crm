@@ -1,7 +1,7 @@
 import { EditOutlined } from '@ant-design/icons';
-import { Button, DatePicker, Empty, Form, Grid, InputNumber, Modal, Progress, Tabs, Tag, message } from 'antd';
+import { Button, DatePicker, Empty, Form, Grid, InputNumber, Modal, Progress, Spin, Tabs, Tag, message } from 'antd';
 import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import PageLayout from '../../components/pageLayout/PageLayout';
@@ -9,12 +9,12 @@ import { DocumentsPanel, HistoryPanel, InteractionsPanel, ProgramsPanel, Streams
 import UniversityOverview from './components/UniversityOverview';
 import UniversityPeopleModal from './components/UniversityPeopleModal';
 import UniversityTabBar from './components/UniversityTabBar';
-import { findUniversity, listUniversityWorkflows, rememberUniversity } from './api';
+import { findUniversity, listUniversityWorkflows, loadUniversity, rememberUniversity } from './api';
 import { PeriodContext } from './period';
 import type { Period } from './period';
 import { buildUniversitySections } from './sectionData';
 
-import { universityTypeLabels } from './types';
+import { universityTypeLabels, type UniversityType } from './types';
 import { buildUniversityCard, getUniversityScore, levelByScore, saveUniversityScore } from './universityCard';
 
 import styles from './UniversityDetailPage.module.scss';
@@ -35,8 +35,29 @@ const UniversityDetailPage = () => {
   const screens = useBreakpoint();
   const compactScore = screens.md === false;
   const { id } = useParams();
-  const [, setRevision] = useState(0);
-  const university = findUniversity(Number(id));
+  const [university, setUniversity] = useState(() => (id ? findUniversity(id) : undefined));
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return undefined;
+    let cancelled = false;
+    setIsLoading(true);
+
+    loadUniversity(id)
+      .then((item) => {
+        if (!cancelled) setUniversity(item);
+      })
+      .catch(() => {
+        if (!cancelled) setUniversity(undefined);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
   const card = useMemo(() => (university ? buildUniversityCard(university) : undefined), [university]);
   const sections = useMemo(() => (university ? buildUniversitySections(university) : undefined), [university]);
   const interactions = university ? listUniversityWorkflows(university.id).map((row) => ({
@@ -51,11 +72,27 @@ const UniversityDetailPage = () => {
     at: row.at,
   })) : [];
   const [score, setScore] = useState(() => (university && card ? getUniversityScore(university.id, card.score) : 0));
+
+  useEffect(() => {
+    if (!university || !card) return;
+    if (typeof university.healthScore === 'number' || typeof university.id === 'number') {
+      setScore(getUniversityScore(university.id, card.score));
+    }
+  }, [card, university]);
+
   const [tab, setTab] = useState('overview');
   const [period, setPeriod] = useState<Period>(null);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [scoreOpen, setScoreOpen] = useState(false);
   const [form] = Form.useForm<{ score: number }>();
+
+  if (isLoading) {
+    return (
+      <PageLayout>
+        <Spin size="large" />
+      </PageLayout>
+    );
+  }
 
   if (!university || !card || !sections) {
     return (
@@ -64,6 +101,11 @@ const UniversityDetailPage = () => {
       </PageLayout>
     );
   }
+
+  const typeLabel = university.type && university.type !== '—'
+    ? universityTypeLabels[university.type as UniversityType] ?? university.type
+    : '';
+  const scoreKnown = typeof university.healthScore === 'number' || typeof university.id === 'number';
 
   const level = levelByScore(score);
   const scoreColor = score >= 75 ? '#16844f' : score >= 50 ? '#d48806' : '#dc3c48';
@@ -85,8 +127,9 @@ const UniversityDetailPage = () => {
 
   const savePeople = (manager: string, responsibles: { name: string; role: string }[]) => {
     if (!university) return;
-    rememberUniversity({ ...university, manager: manager || 'Не назначен', responsibles });
-    setRevision((value) => value + 1);
+    const nextUniversity = { ...university, manager: manager || '—', responsibles };
+    rememberUniversity(nextUniversity);
+    setUniversity(nextUniversity);
     setPeopleOpen(false);
     message.success('Ответственные обновлены');
   };
@@ -101,7 +144,7 @@ const UniversityDetailPage = () => {
     <PageLayout>
       <div className={styles.page}>
         <div className={styles.breadcrumbs}>
-          <Link to="/universities">Вузы</Link>
+          <Link to="/v2/organizations">Вузы</Link>
           <span className={styles.breadcrumbSeparator}>›</span>
           <span className={styles.breadcrumbCurrent}>{university.shortName}</span>
         </div>
@@ -113,17 +156,17 @@ const UniversityDetailPage = () => {
               <h1>{university.shortName}</h1>
               <p>
                 {[
-                  university.type ? `${universityTypeLabels[university.type]} университет` : '',
-                  university.profile,
-                  university.city || 'Город не указан',
-                  card.site,
-                ].filter(Boolean).join(' · ')}
+                  typeLabel,
+                  university.profile !== '—' ? university.profile : '',
+                  university.city && university.city !== '—' ? university.city : '',
+                  card.site !== '—' ? card.site : '',
+                ].filter(Boolean).join(' · ') || '—'}
               </p>
               {university.catalog?.comment && <p className={styles.comment}>{university.catalog.comment}</p>}
               <div className={styles.tags}>
-                {university.type && <Tag>{universityTypeLabels[university.type]}</Tag>}
-                {university.profile && <Tag>{university.profile}</Tag>}
-                {university.product && <Tag>{university.product}</Tag>}
+                {typeLabel && <Tag>{typeLabel}</Tag>}
+                {university.profile && university.profile !== '—' && <Tag>{university.profile}</Tag>}
+                {university.product && university.product !== '—' && <Tag>{university.product}</Tag>}
                 <Tag>{card.partnership}</Tag>
               </div>
               <div className={styles.owners}>
@@ -143,7 +186,9 @@ const UniversityDetailPage = () => {
           </div>
 
           <div className={styles.score}>
-            {compactScore ? (
+            {!scoreKnown ? (
+              <div className={styles.scoreText}><strong>—</strong><span>Здоровье не посчитано</span></div>
+            ) : compactScore ? (
               <button type="button" className={styles.scoreButton} aria-label="Изменить уровень сотрудничества" onClick={openScore}>
                 <Progress type="circle" percent={score} size={64} strokeColor={scoreColor} format={(value) => value} />
               </button>
@@ -182,7 +227,7 @@ const UniversityDetailPage = () => {
           onChange={setTab}
           renderTabBar={() => <UniversityTabBar items={tabs} activeKey={tab} onChange={setTab} />}
           items={[
-            { key: 'overview', label: 'Обзор', children: <UniversityOverview card={card} interactions={interactions} programs={university.programs} streams={university.streams} onOpenTab={setTab} onOpenInteraction={(interactionId) => navigate(`/workflow/${interactionId}`)} /> },
+            { key: 'overview', label: 'Обзор', children: <UniversityOverview card={card} interactions={interactions} programs={university.programs} streams={university.streams} onOpenTab={setTab} onOpenInteraction={(interactionId) => navigate(`/v2/workflows/${interactionId}`)} /> },
             { key: 'interactions', label: 'Взаимодействия', children: <InteractionsPanel university={university} /> },
             { key: 'programs', label: 'Программы и продукты', children: <ProgramsPanel sections={sections} /> },
             { key: 'teachers', label: 'Преподаватели', children: <TeachersPanel sections={sections} /> },

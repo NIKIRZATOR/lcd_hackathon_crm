@@ -19,16 +19,18 @@ import {
   List,
   Modal,
   Space,
+  Spin,
   Tag,
   Tooltip,
   Upload,
   message,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { advanceWorkflowStage, addWorkflowStageComment, addWorkflowStageFile, getWorkflow, getWorkflowStageActivity, getWorkflowStepConfigs, moveWorkflowToStage } from './api';
+import { advanceWorkflowStage, addWorkflowStageComment, addWorkflowStageFile, getWorkflowStageActivity, loadWorkflowDetail, moveWorkflowToStage } from './api';
+import type { WorkflowDetailMock } from './types';
 import { transitionToNextStage, transitionToStage, type StageTransition } from './stageTransition';
 import type { WorkflowChecklistItem } from './types';
 import { isAllowedWorkflowFile, workflowFileRejectionMessage, workflowFileTypeLabel } from './workflowFiles';
@@ -38,11 +40,32 @@ import styles from './WorkflowDetailPage.module.scss';
 
 const getInitials = (value: string) => value.replaceAll('.', '').split(' ').map((part) => part[0]).join('').slice(0, 2);
 
+const formatDate = (value: string) => (value && dayjs(value).isValid() ? dayjs(value).format('D MMMM YYYY') : '—');
+
 const WorkflowDetailPage = () => {
   const { id } = useParams();
-  const workflowId = Number(id);
-  const detail = getWorkflow(Number(id));
+  const [detail, setDetail] = useState<WorkflowDetailMock | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
+  const workflowId = detail?.item.id ?? id ?? '';
   const [viewedStageId, setViewedStageId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!id) return undefined;
+    let cancelled = false;
+    setIsLoading(true);
+
+    loadWorkflowDetail(id)
+      .then((loaded) => {
+        if (!cancelled) setDetail(loaded);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
   // Мок меняется вне React. Счётчик перечитывает карточку, когда id этапа тот же
   // или когда добавились комментарий и файл.
   const [, setStageRevision] = useState(0);
@@ -61,15 +84,20 @@ const WorkflowDetailPage = () => {
     ?? detail?.stages.at(-1);
   const viewedStageIndex = detail && viewedStage ? detail.stages.findIndex((stage) => stage.id === viewedStage.id) : -1;
   const currentStageIndex = detail?.stages.findIndex((stage) => stage.state === 'current') ?? -1;
-  const stepConfigs = detail ? getWorkflowStepConfigs(workflowId) : [];
+  const stepConfigs = detail?.stepConfigs ?? [];
   const selectedConfig = stepConfigs.find((step) => step.id === viewedStage?.id);
   const checklist = viewedStage
-    ? checklistByStage[viewedStage.id] ?? selectedConfig?.checklistItems.map((label, index) => ({ id: index + 1, label, completed: false })) ?? []
+    ? checklistByStage[viewedStage.id]
+      ?? detail?.checklistByStage?.[viewedStage.id]
+      ?? selectedConfig?.checklistItems.map((label, index) => ({ id: index + 1, label, completed: false }))
+      ?? []
     : [];
   const stageActivity = detail && viewedStage
     ? getWorkflowStageActivity(workflowId, viewedStage.id, detail.currentStageId)
     : { files: [], comments: [] };
   const { files, comments } = stageActivity;
+
+  if (isLoading) return <Spin size="large" />;
 
   if (!detail || !viewedStage || viewedStageIndex < 0) {
     return <Empty description="Workflow не найден" />;
@@ -206,7 +234,7 @@ const WorkflowDetailPage = () => {
   return (
     <div className={styles.page}>
       <div className={styles.breadcrumbs}>
-        <Link to="/workflow">Workflow</Link>
+        <Link to="/v2/workflows">Воркфлоу</Link>
         <span className={styles.breadcrumbSeparator}>›</span>
         <span className={styles.breadcrumbCurrent}>
           {detail.item.universityShort} {detail.item.program}
@@ -225,7 +253,7 @@ const WorkflowDetailPage = () => {
             ИТ-продукт: <strong>{detail.item.product}</strong>
           </Tag>
           <Tag icon={<CalendarOutlined />}>
-            Период: <strong>{dayjs(detail.item.deadline).year()}</strong>
+            Период: <strong>{detail.item.deadline && dayjs(detail.item.deadline).isValid() ? dayjs(detail.item.deadline).year() : '—'}</strong>
           </Tag>
           <Tag>
             Ответственный: <strong>{detail.item.responsible}</strong>
@@ -244,7 +272,7 @@ const WorkflowDetailPage = () => {
                 setCommentText('');
               }}
             />
-            <Link className={styles.editStagesButton} to={`/workflow/${detail.item.id}/edit`}>
+            <Link className={styles.editStagesButton} to={`/v2/workflows/${detail.item.id}/edit`}>
               <Button block icon={<EditOutlined />}>Редактировать этапы</Button>
             </Link>
           </Card>
@@ -271,7 +299,7 @@ const WorkflowDetailPage = () => {
                 </div>
                 <div className={styles.metaTile}>
                   <span className={styles.metaLabel}>Срок</span>
-                  <strong><CalendarOutlined /> {dayjs(detail.item.deadline).format('D MMMM YYYY')}</strong>
+                  <strong><CalendarOutlined /> {formatDate(detail.item.deadline)}</strong>
                 </div>
               </div>
               {selectedConfig?.description && (

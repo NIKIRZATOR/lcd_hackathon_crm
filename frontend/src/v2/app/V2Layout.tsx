@@ -26,7 +26,7 @@ type NavigationItem = {
 
 const navigation: NavigationItem[] = [
   { key: '/v2', label: 'Главная', icon: <HomeOutlined /> },
-  { key: '/v2/organizations', label: 'Организации', icon: <BankOutlined /> },
+  { key: '/v2/organizations', label: 'Вузы', icon: <BankOutlined /> },
   { key: '/v2/workflows', label: 'Воркфлоу', icon: <ApartmentOutlined /> },
   { key: '/v2/reports', label: 'Отчёты', icon: <FileTextOutlined /> },
   { key: '/v2/management', label: 'Управление', icon: <SettingOutlined />, roles: ['MANAGER', 'ADMIN'] },
