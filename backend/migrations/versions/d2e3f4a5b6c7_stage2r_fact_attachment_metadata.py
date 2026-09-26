@@ -16,10 +16,19 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _add_column_if_missing(table_name: str, column: sa.Column) -> None:
+    columns = {item["name"] for item in sa.inspect(op.get_bind()).get_columns(table_name)}
+    if column.name not in columns:
+        op.add_column(table_name, column)
+
+
 def upgrade() -> None:
-    op.add_column("playbook_checklist_items", sa.Column("required_attachment_kind", sa.String(length=64), nullable=True))
-    op.add_column("files", sa.Column("attachment_kind", sa.String(length=64), nullable=True))
-    op.add_column("licenses", sa.Column("product_access", sa.String(length=1024), nullable=True))
+    _add_column_if_missing(
+        "playbook_checklist_items",
+        sa.Column("required_attachment_kind", sa.String(length=64), nullable=True),
+    )
+    _add_column_if_missing("files", sa.Column("attachment_kind", sa.String(length=64), nullable=True))
+    _add_column_if_missing("licenses", sa.Column("product_access", sa.String(length=1024), nullable=True))
 
 
 def downgrade() -> None:

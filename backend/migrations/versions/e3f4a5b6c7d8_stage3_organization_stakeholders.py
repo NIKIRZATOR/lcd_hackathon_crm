@@ -16,8 +16,17 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _add_column_if_missing(table_name: str, column: sa.Column) -> None:
+    columns = {item["name"] for item in sa.inspect(op.get_bind()).get_columns(table_name)}
+    if column.name not in columns:
+        op.add_column(table_name, column)
+
+
 def upgrade() -> None:
-    op.add_column("stakeholders", sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()))
+    _add_column_if_missing(
+        "stakeholders",
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
+    )
     op.alter_column("stakeholders", "is_active", server_default=None)
 
 

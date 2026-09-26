@@ -19,6 +19,7 @@ from app.core.database import (
 
 class WorkflowTemplate(ModelBase):
     __tablename__ = "workflow_templates"
+    __table_args__ = (Index("uq_workflow_templates_code", "code", unique=True),)
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -30,7 +31,7 @@ class WorkflowTemplate(ModelBase):
         ForeignKey("users.id"),
         nullable=True,
     )
-    code: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     applies_to_type: Mapped[str] = mapped_column(String(32), nullable=False, default="all")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
 
@@ -204,7 +205,10 @@ class WorkflowTransition(ModelBase):
 
 class WorkflowStageInstance(ModelBase):
     __tablename__ = "workflow_stage_instances"
-    __table_args__ = (Index("ix_workflow_stage_instances_status_due", "status", "due_at"),)
+    __table_args__ = (
+        Index("ix_workflow_stage_instances_status_due", "status", "due_at"),
+        Index("ix_workflow_stage_instances_program_instance", "program_instance_id"),
+    )
 
     interaction_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),

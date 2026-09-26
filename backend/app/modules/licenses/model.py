@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,7 +12,13 @@ class Contract(ModelBase):
     __tablename__ = "contracts"
     __table_args__ = (
         UniqueConstraint("interaction_id", "number", name="uq_contracts_interaction_number"),
-        UniqueConstraint("organization_id", "number", name="uq_contracts_organization_number"),
+        Index(
+            "uq_contracts_organization_number",
+            "organization_id",
+            "number",
+            unique=True,
+            postgresql_where=text("organization_id IS NOT NULL"),
+        ),
         CheckConstraint(
             "organization_id IS NOT NULL OR interaction_id IS NOT NULL",
             name="contract_owner_required",
@@ -37,7 +43,7 @@ class Contract(ModelBase):
     status: Mapped[str | None] = mapped_column(String(64), nullable=True)
     signed_on: Mapped[date | None] = mapped_column(nullable=True)
     attachment_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("files.id"), nullable=True)
-    comment: Mapped[str | None] = mapped_column(String, nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class License(ModelBase):
@@ -73,4 +79,4 @@ class License(ModelBase):
     )
     transferred_on: Mapped[date | None] = mapped_column(nullable=True)
     attachment_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("files.id"), nullable=True)
-    comment: Mapped[str | None] = mapped_column(String, nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
