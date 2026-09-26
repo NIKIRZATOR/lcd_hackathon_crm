@@ -1,8 +1,8 @@
 # Database Architecture And Backend API
 
-Дата обновления: 2026-09-23
+Дата обновления: 2026-09-26
 
-Документ описывает текущую backend-схему RTK EduFlow CRM с учётом промежуточных изменений Stage 2 Workflow Engine.
+Документ описывает текущую backend-схему RTK EduFlow CRM. Канонический рабочий контур V2 построен вокруг `organizations` и `program_instances`; legacy-сущности `universities` и `university_interactions` сохранены для обратной совместимости.
 
 ## Структура
 
@@ -25,6 +25,162 @@
 - `f4a9c7d2e6b3_extend_files_for_object_storage.py`
 - `a6e4c2f8b9d0_add_import_jobs.py`
 - `b7d9a2e1c4f6_add_contracts_licenses.py`
+- `c8a7d5e2f901_add_report_jobs.py`
+- `4e2cb764e196_baseline_schema.py`
+- `6c1e8a4d9b20_stage_8_contracts_licenses_teachers.py`
+- `7d3f1a9c2e40_program_runtime_owns_workflow.py`
+- `8a5e2d7f3c10_stage_10_nba.py`
+- `9b6f3a1e7d50_stage_11_metrics_integrations.py`
+- `a2c4e6f8b0d1_stage_1_db_invariants.py`
+- `b4d6f8a0c2e1_stage_2_typed_checklist.py`
+- `c1e2f3a4b5d6_allow_child_program_instances.py`
+- `d2e3f4a5b6c7_stage2r_fact_attachment_metadata.py`
+- `e3f4a5b6c7d8_stage3_organization_stakeholders.py`
+- `f4a5b6c7d8e9_stage4_nba_priority.py`
+
+## Каноническая схема V2
+
+Если далее в документе legacy `university_interactions` описан как рабочий объект, это относится только к прежнему API. Для нового функционала источником истины являются следующие сущности. Все таблицы на `ModelBase`, если не отмечено иначе, также имеют `id: UUID`, `created_at: timestamptz` и `updated_at: timestamptz`.
+
+### Организации и портфель
+
+#### `organization_types`
+
+- `code: varchar(32), unique`
+- `name: varchar(128)`
+- `is_active: boolean`
+
+#### `organizations`
+
+- `type_id: uuid, FK -> organization_types.id`
+- `name: varchar(255)`
+- `short_name: varchar(255), nullable`
+- `region: varchar(255), nullable`
+- `city: varchar(255), nullable`
+- `status: active | paused | archived`
+- `comment: text, nullable`
+
+#### `org_assignments`
+
+- `organization_id: uuid, FK -> organizations.id`
+- `user_id: uuid, FK -> users.id` — назначенный KAM.
+- `status: active | ended`
+- `assigned_at: timestamptz`
+- `assigned_by: uuid, FK -> users.id`
+- `ended_at: timestamptz, nullable`
+
+Есть частичный уникальный индекс: у организации может быть только одно активное назначение.
+
+#### `stakeholders`
+
+- `organization_id: uuid, FK -> organizations.id`
+- `program_instance_id: uuid, FK -> program_instances.id, nullable`
+- `role_code: vice_rector | dean | methodist | lawyer | chair | teacher | director | school_teacher | other`
+- `full_name: varchar(255)`, `position: varchar(255), nullable`
+- `email: varchar(255), nullable`, `phone: varchar(64), nullable`
+- `is_primary: boolean`, `is_active: boolean`
+- `comment: text, nullable`
+
+### Программы и workflow runtime
+
+#### `academic_windows`
+
+- `code: varchar(64), unique`, `title: varchar(255)`
+- `plan_cutoff_on: date`, `classes_start_on: date`, `classes_end_on: date`
+- `is_current: boolean`
+
+#### `program_instances`
+
+- `organization_id: uuid, FK -> organizations.id`
+- `direction_id: uuid, FK -> it_directions.id`
+- `product_id: uuid, FK -> it_products.id`
+- `kam_user_id: uuid, FK -> users.id, nullable`
+- `playbook_template_id: uuid, FK -> workflow_templates.id`
+- `workflow_version_id: uuid, FK -> workflow_versions.id, nullable`
+- `current_stage_instance_id: uuid, FK -> workflow_stage_instances.id, nullable`
+- `template_snapshot: jsonb`
+- `status: draft | active | paused | completed | cancelled`
+- `current_stage_code: varchar(64), nullable`
+- `academic_window_id: uuid, FK -> academic_windows.id, nullable`
+- `health_score: integer [0..100], nullable`, `health_band: green | yellow | red`
+- `started_at: timestamptz, nullable`, `completed_at: timestamptz, nullable`
+- `comment: text, nullable`
+- `parent_program_id: uuid, FK -> program_instances.id, nullable` — дочерняя программа renewal/teacher replacement.
+- `legacy_interaction_id: uuid, FK -> university_interactions.id, nullable, unique`
+
+Частичный уникальный индекс не допускает два активных корневых экземпляра с одинаковыми `organization_id + direction_id + product_id`. Дочерние экземпляры исключены из этого ограничения.
+
+#### `workflow_phases` и `workflow_stage_catalog`
+
+- `workflow_phases`: `code` (unique), `name`, `sort_order`, `is_active`.
+- `workflow_stage_catalog`: `code` (unique), `name`, `description`, `default_phase_id -> workflow_phases.id`, `is_active`.
+- `workflow_stages.stage_catalog_id -> workflow_stage_catalog.id` связывает этап конкретной версии эталона с каноническим каталогом.
+
+#### `workflow_stage_instances` и `workflow_transition_history`
+
+- Runtime-этап имеет nullable legacy `interaction_id -> university_interactions.id` и nullable V2 `program_instance_id -> program_instances.id`; также `workflow_stage_id`, `responsible_user_id`, `status`, `started_at`, `due_at`, `completed_at`, `skipped_at`.
+- `workflow_transition_history` аналогично хранит nullable `interaction_id` и `program_instance_id`, ссылки на runtime-этапы и transition, исполнителя, комментарий и время перехода.
+
+### Facts, checklist и файлы
+
+Отдельной таблицы facts нет: определение fact — это `playbook_checklist_items`, значение fact конкретной программы — `program_checklist_values`.
+
+#### `playbook_checklist_items`
+
+- `workflow_stage_id: uuid, FK -> workflow_stages.id`
+- `code: varchar(64)`, `label: varchar(255)`
+- `item_type: checkbox | file | date | stakeholder_role | number | text`
+- `required: boolean`
+- `required_stakeholder_role: varchar(32), nullable`
+- `required_attachment_kind: varchar(64), nullable` — для item_type `file`.
+
+#### `program_checklist_values`
+
+- `checklist_item_id: uuid, FK -> playbook_checklist_items.id`
+- `stage_instance_id: uuid, FK -> workflow_stage_instances.id`
+- `is_done: boolean`
+- одно из типизированных значений: `value_text`, `value_number`, `value_date`, `stakeholder_id -> stakeholders.id`, `attachment_id -> files.id`.
+
+Уникальность: `(stage_instance_id, checklist_item_id)`.
+
+#### `files`
+
+Помимо полей object storage и lifecycle, файл имеет `attachment_kind: varchar(64), nullable`. Этот вид используется при проверке обязательного file-fact. `workflow_stage_attachments` связывает файл с runtime-этапом.
+
+### Договоры, лицензии и преподаватели
+
+#### `contracts`
+
+- Новый договор принадлежит `organization_id -> organizations.id`; `interaction_id -> university_interactions.id` остаётся nullable для legacy-записей.
+- Требуется хотя бы один владелец: организация или legacy interaction.
+- `number`, `signed_at`, `valid_from`, `valid_until`, `status`, `signed_on`, `attachment_id -> files.id`, `comment`.
+
+#### `licenses`
+
+- `contract_id -> contracts.id, nullable`, `program_instance_id -> program_instances.id, nullable`; один из владельцев обязателен.
+- `product_id -> it_products.id`, `license_number`, `signed_at`, `valid_until`, `transfer_status`.
+- `product_access: varchar(1024), nullable` — явное подтверждение доступа к продукту.
+- `transferred_on`, `attachment_id -> files.id`, `comment`.
+
+#### `teacher_carriers`
+
+- `organization_id -> organizations.id`, `program_instance_id -> program_instances.id, nullable`, `product_id -> it_products.id`, `stakeholder_id -> stakeholders.id, nullable`.
+- `full_name`, `trained_on`, `qualification_until`, `last_lms_activity_on`.
+- `status: planned | trained | active | expired | left`.
+
+### Health, интеграции и NBA
+
+#### `program_metrics` и `integration_signals`
+
+- `program_metrics`: одна запись на `program_instance_id`; `applications_count`, `students_count`, `streams_count`, `teacher_activity_on`, `synced_at`.
+- `integration_signals`: `source`, `status: mapped | unmatched | error`, nullable `organization_id` и `program_instance_id`, `payload: jsonb`, `error_message`.
+
+#### `nba_rules` и `nba_items`
+
+- `nba_rules`: `code` (unique), `name`, `is_active`.
+- `nba_items`: `rule_id -> nba_rules.id`, `organization_id -> organizations.id`, nullable `program_instance_id` и `product_id`, `entity_key`, `severity: critical | high | medium | low`, `reason`, `action`.
+- V2-поля действия: `priority: P0..P4`, `action_target: varchar(128), nullable`.
+- Lifecycle: `due_at`, `status: active | resolved | dismissed`, `resolved_at`; уникальность `(rule_id, entity_key)`.
 
 ## UML Reference: Поля И Связи Таблиц
 
@@ -33,6 +189,8 @@
 - `id: UUID` - primary key.
 - `created_at: timestamptz`.
 - `updated_at: timestamptz`.
+
+Для сущностей, изменённых в V2, приоритет имеет раздел «Каноническая схема V2» выше: последующие дублирующие описания сохранены как исторический справочник legacy API.
 
 ### `alembic_version`
 
@@ -349,6 +507,9 @@ Fields:
 - `is_active: boolean`
 - `is_default: boolean`
 - `created_by: uuid, FK -> users.id, nullable`
+- `code: varchar(64), unique, nullable`
+- `applies_to_type: varchar(32)`
+- `status: varchar(32)`
 - `created_at`
 - `updated_at`
 
@@ -395,10 +556,12 @@ Fields:
 - `is_initial: boolean`
 - `is_final: boolean`
 - `is_optional: boolean`
+- `semester_critical: boolean`
 - `default_duration_days: integer, nullable`
 - `requires_comment: boolean`
 - `requires_attachment: boolean`
 - `is_active: boolean`
+- `stage_catalog_id: uuid, FK -> workflow_stage_catalog.id, nullable`
 - `created_at`
 - `updated_at`
 
@@ -434,7 +597,8 @@ Relations:
 Fields:
 
 - `id`
-- `interaction_id: uuid, FK -> university_interactions.id`
+- `interaction_id: uuid, FK -> university_interactions.id, nullable`
+- `program_instance_id: uuid, FK -> program_instances.id, nullable`
 - `workflow_stage_id: uuid, FK -> workflow_stages.id`
 - `responsible_user_id: uuid, FK -> users.id, nullable`
 - `status: varchar(64)`
@@ -458,7 +622,8 @@ Relations:
 Fields:
 
 - `id`
-- `interaction_id: uuid, FK -> university_interactions.id`
+- `interaction_id: uuid, FK -> university_interactions.id, nullable`
+- `program_instance_id: uuid, FK -> program_instances.id, nullable`
 - `from_stage_instance_id: uuid, FK -> workflow_stage_instances.id, nullable`
 - `to_stage_instance_id: uuid, FK -> workflow_stage_instances.id, nullable`
 - `transition_id: uuid, FK -> workflow_transitions.id, nullable`
@@ -518,6 +683,7 @@ Fields:
 - `provider: varchar(32), nullable`
 - `bucket: varchar(255), nullable`
 - `object_key: varchar(1024), nullable`
+- `attachment_kind: varchar(64), nullable`
 - `uploaded_by: uuid, FK -> users.id, nullable`
 - `scan_status: varchar(32), default NOT_SCANNED`
 - `deleted_at: timestamptz, nullable`
@@ -766,6 +932,11 @@ Fields:
 - `signed_at: timestamptz, nullable`
 - `valid_until: timestamptz, nullable`
 - `transfer_status: varchar(64), nullable`
+- `product_access: varchar(1024), nullable`
+- `program_instance_id: uuid, FK -> program_instances.id, nullable`
+- `transferred_on: date, nullable`
+- `attachment_id: uuid, FK -> files.id, nullable`
+- `comment: varchar, nullable`
 - `created_at`
 - `updated_at`
 
@@ -823,7 +994,7 @@ Runtime-логика:
 
 | Таблица | Назначение | Основные связи | Пример заполнения |
 | --- | --- | --- | --- |
-| `files` | Метаданные файлов. Бинарный контент должен быть вынесен в object storage на этапе 3. | `uploaded_by -> users.id`; используется в `workflow_stage_attachments`. | `original_name=contract.pdf`, `mime_type=application/pdf` |
+| `files` | Метаданные файлов; бинарный контент хранится в S3-совместимом object storage. | `uploaded_by -> users.id`; используется в `workflow_stage_attachments`. | `original_name=contract.pdf`, `mime_type=application/pdf` |
 
 ### Imports
 
