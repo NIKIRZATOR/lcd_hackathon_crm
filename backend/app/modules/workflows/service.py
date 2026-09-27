@@ -48,6 +48,7 @@ from app.modules.workflows.schemas import (
     WorkflowChangeRequestReview,
     WorkflowMigrationExecuteRequest,
     WorkflowMigrationPreviewRead,
+    ProgramRefuse,
     WorkflowMigrationPreviewRequest,
     WorkflowStageCreate,
     WorkflowStageInstanceStatusUpdate,
@@ -2027,6 +2028,135 @@ class TransitionService:
             "transition_history_id": str(history.id),
         }
 
+    def refuse_program(
+        self,
+        program: ProgramInstance,
+        payload: ProgramRefuse,
+        *,
+        request_id: str | None = None,
+    ) -> dict:
+        if (
+            program.status in {"completed", "cancelled"}
+            or program.workflow_version_id is None
+            or program.current_stage_instance_id is None
+        ):
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_NOT_INITIALIZED",
+                message="Program workflow is not active",
+            )
+        reason = payload.comment.strip()
+        if not reason:
+            raise workflow_error(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                code="WORKFLOW_REFUSAL_REASON_REQUIRED",
+                message="Refusal reason is required",
+            )
+        current = self.db.get(
+            WorkflowStageInstance,
+            program.current_stage_instance_id,
+            with_for_update=True,
+        )
+        if current is None or current.status not in {"IN_PROGRESS", "WAITING", "BLOCKED"}:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_CURRENT_STAGE_NOT_ACTIVE",
+                message="Current stage is not active",
+            )
+        if (
+            payload.expected_current_stage_instance_id
+            and payload.expected_current_stage_instance_id != current.id
+        ):
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_CURRENT_STAGE_CHANGED",
+                message="Current stage changed",
+            )
+        now = datetime.now(timezone.utc)
+        current.status = "COMPLETED"
+        current.completed_at = now
+        history = WorkflowTransitionHistory(
+            program_instance_id=program.id,
+            from_stage_instance_id=current.id,
+            to_stage_instance_id=None,
+            transition_id=None,
+            performed_by=payload.performed_by,
+            comment=reason,
+            performed_at=now,
+        )
+        self.history_repository.add(history)
+        program.status = "cancelled"
+        program.comment = reason
+        self.audit_repository.add(
+            AuditEvent(
+                actor_user_id=payload.performed_by,
+                action="workflow.program_refused",
+                entity_type="program_instance",
+                entity_id=program.id,
+                reason=reason,
+                event_metadata={"stage_instance_id": str(current.id)},
+                request_id=request_id,
+            )
+        )
+        self.db.flush()
+        return {
+            "program_instance_id": str(program.id),
+            "status": program.status,
+            "current_stage_instance_id": str(current.id),
+        }
+
+    def refuse_interaction(self, interaction_id: UUID, payload: ProgramRefuse) -> dict:
+        interaction = self.db.get(UniversityInteraction, interaction_id, with_for_update=True)
+        if interaction is None:
+            raise workflow_error(
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="WORKFLOW_INTERACTION_NOT_FOUND",
+                message="University interaction not found",
+            )
+        if interaction.status in TERMINAL_INTERACTION_STATUSES or interaction.current_stage_instance_id is None:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_INTERACTION_TERMINAL",
+                message="Interaction is already terminal",
+            )
+        current = self.db.get(WorkflowStageInstance, interaction.current_stage_instance_id, with_for_update=True)
+        if current is None or current.status not in {"IN_PROGRESS", "WAITING", "BLOCKED"}:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_CURRENT_STAGE_NOT_ACTIVE",
+                message="Current stage is not active",
+            )
+        if payload.expected_current_stage_instance_id and payload.expected_current_stage_instance_id != current.id:
+            raise workflow_error(
+                status_code=status.HTTP_409_CONFLICT,
+                code="WORKFLOW_CURRENT_STAGE_CHANGED",
+                message="Current stage changed",
+            )
+        reason = payload.comment.strip()
+        if not reason:
+            raise workflow_error(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                code="WORKFLOW_REFUSAL_REASON_REQUIRED",
+                message="Refusal reason is required",
+            )
+        now = datetime.now(timezone.utc)
+        current.status = "COMPLETED"
+        current.completed_at = now
+        interaction.status = "CANCELLED"
+        history = WorkflowTransitionHistory(
+            interaction_id=interaction.id,
+            program_instance_id=None,
+            from_stage_instance_id=current.id,
+            to_stage_instance_id=None,
+            transition_id=None,
+            performed_by=payload.performed_by,
+            comment=reason,
+            performed_at=now,
+        )
+        self.history_repository.add(history)
+        self.db.flush()
+        return {"interaction_id": str(interaction.id), "current_stage_instance_id": str(current.id)}
+
     def _validate_stage_requirements(
         self,
         stage: WorkflowStage,
@@ -2052,7 +2182,10 @@ class TransitionService:
             )
         )
         missing_count = self.db.scalar(select(func.count()).select_from(missing_query.subquery())) or 0
-        missing_items = self.db.execute(missing_query).scalars().all() if missing_count else []
+        missing_items = list(self.db.execute(missing_query).scalars().all()) if missing_count else []
+        if any(item.code == "contract_project" for item in missing_items) and self._organization_has_active_contract(instance):
+            missing_items = [item for item in missing_items if item.code != "contract_project"]
+            missing_count = len(missing_items)
         if missing_count:
             reasons.append(
                 {
@@ -2094,6 +2227,30 @@ class TransitionService:
                     "reasons": reasons,
                 },
             )
+
+    def _organization_has_active_contract(self, instance: WorkflowStageInstance) -> bool:
+        organization_id = None
+        if instance.program_instance_id is not None:
+            program = self.db.get(ProgramInstance, instance.program_instance_id)
+            organization_id = program.organization_id if program is not None else None
+        elif instance.interaction_id is not None:
+            interaction = self.db.get(UniversityInteraction, instance.interaction_id)
+            organization_id = interaction.university_id if interaction is not None else None
+        if organization_id is None:
+            return False
+        now = datetime.now(timezone.utc)
+        contracts = self.db.scalars(select(Contract).where(Contract.organization_id == organization_id)).all()
+        for contract in contracts:
+            status_name = (contract.status or "").lower()
+            if status_name and status_name not in {"active", "signed", "действующий"}:
+                continue
+            valid_until = contract.valid_until
+            if valid_until is not None and valid_until.tzinfo is None:
+                valid_until = valid_until.replace(tzinfo=timezone.utc)
+            if valid_until is not None and valid_until < now:
+                continue
+            return True
+        return False
 
     def _canonical_entity_reasons(
         self, stage: WorkflowStage, instance: WorkflowStageInstance

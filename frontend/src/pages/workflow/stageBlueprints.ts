@@ -17,7 +17,7 @@ export const stageBlueprints: Record<string, { title: string; note: string; fact
   first_meeting: {
     title: 'Первая встреча',
     note: 'Нужны дата, участник и протокол или заметка не короче 40 символов.',
-    aside: 'people',
+    aside: 'none',
     facts: [
       { code: 'meeting_date', label: 'Дата первой встречи', itemType: 'date' },
       { code: 'meeting_participant', label: 'Участник встречи со стороны площадки', itemType: 'stakeholder_role', role: 'other' },
@@ -118,6 +118,7 @@ const nameToCode: Record<string, string> = {
   'Поиск контакта': 'find_contact',
   'Первая встреча': 'first_meeting',
   'Потребность': 'identify_need',
+  'Выявление потребности': 'identify_need',
   'Пакет документов': 'document_package',
   'Подписание договора': 'sign_contract',
   'Подписание лицензии': 'sign_license',
