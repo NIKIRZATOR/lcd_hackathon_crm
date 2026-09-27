@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
+from app.api.router import health_check, readiness_check
 from app.common.errors import install_error_handlers
 from app.core.config import settings
 from app.core.logging import configure_logging
@@ -22,11 +23,29 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
+
+    @application.middleware("http")
+    async def add_optional_diagnostic_header(request: Request, call_next):
+        response = await call_next(request)
+        if settings.enable_diagnostic_headers:
+            import os
+
+            response.headers["X-Backend-Instance"] = os.getenv("HOSTNAME", "unknown")
+        return response
+
     install_error_handlers(application)
 
     @application.get("/")
     def root() -> dict[str, str]:
         return {"service": "backend", "message": f"{settings.app_name} backend is running"}
+
+    @application.get("/health")
+    def root_health_check() -> dict[str, str]:
+        return health_check()
+
+    @application.get("/ready")
+    def root_readiness_check() -> dict[str, str]:
+        return readiness_check()
 
     application.include_router(api_router, prefix=settings.api_prefix)
     return application

@@ -21,13 +21,16 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: rtk-eduflow-backend
     environment:
       APP_NAME: ${APP_NAME:-edu_crm}
       APP_ENV: development
       DEBUG: "true"
       API_PREFIX: /api
       DATABASE_URL: postgresql+psycopg://rtk_eduflow:rtk_eduflow@postgres:5432/rtk_eduflow
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
+      ENABLE_DIAGNOSTIC_HEADERS: ${ENABLE_DIAGNOSTIC_HEADERS:-false}
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
@@ -62,6 +65,11 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
   worker:
     build:
@@ -73,6 +81,9 @@ services:
       APP_ENV: development
       DEBUG: "true"
       DATABASE_URL: postgresql+psycopg://rtk_eduflow:rtk_eduflow@postgres:5432/rtk_eduflow
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
       KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk-eduflow}
@@ -181,7 +192,7 @@ services:
     container_name: rtk-eduflow-frontend
     environment:
       VITE_APP_NAME: ${APP_NAME:-edu_crm}
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
       VITE_KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
       VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk-eduflow}
       VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT_ID:-rtk-eduflow-frontend}
@@ -213,6 +224,42 @@ services:
     depends_on:
       keycloak-db-init:
         condition: service_completed_successfully
+
+  backup:
+    build:
+      context: ./infra/backup
+    profiles: ["backup"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-rtk_eduflow}
+      POSTGRES_USER: ${POSTGRES_USER:-rtk_eduflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rtk_eduflow}
+      KEYCLOAK_DB: ${KEYCLOAK_DB:-keycloak}
+      KEYCLOAK_URL_INTERNAL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk-eduflow}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-rtk_eduflow_minio}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-rtk_eduflow_minio_secret}
+      BACKUP_RETENTION_DAILY: ${BACKUP_RETENTION_DAILY:-7}
+      BACKUP_RETENTION_WEEKLY: ${BACKUP_RETENTION_WEEKLY:-28}
+      BACKUP_RETENTION_MONTHLY: ${BACKUP_RETENTION_MONTHLY:-93}
+    volumes:
+      - ${BACKUP_LOCAL_PATH:-./data/backups}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
+  backup-scheduler:
+    extends:
+      service: backup
+    profiles: ["backup-scheduler"]
+    command: ["schedule"]
 
 volumes:
   postgres_data:
