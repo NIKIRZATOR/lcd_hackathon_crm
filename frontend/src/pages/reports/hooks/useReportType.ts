@@ -5,8 +5,6 @@ import type { ReportType } from '../types';
 
 const REPORT_QUERY_KEY = 'report';
 
-const DEFAULT_REPORT_TYPE: ReportType = 'interactions';
-
 type UseReportTypeParams = {
   availableReportTypes: ReportType[];
 };
@@ -21,7 +19,7 @@ export const useReportType = ({ availableReportTypes }: UseReportTypeParams) => 
       return value;
     }
 
-    return DEFAULT_REPORT_TYPE;
+    return availableReportTypes[0];
   }, [availableReportTypes, searchParams]);
 
   const setReportType = useCallback(

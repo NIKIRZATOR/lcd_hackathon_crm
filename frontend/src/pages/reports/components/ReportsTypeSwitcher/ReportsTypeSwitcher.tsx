@@ -9,9 +9,9 @@ type ReportsTypeSwitcherProps = {
 };
 
 const REPORT_TYPE_LABELS: Record<ReportType, string> = {
-  interactions: 'Взаимодействия',
+  interactions: 'Взаимодействия *',
   programs: 'Программы',
-  manager: 'Менеджеры',
+  manager: 'Менеджеры *',
 };
 
 const ReportsTypeSwitcher = ({

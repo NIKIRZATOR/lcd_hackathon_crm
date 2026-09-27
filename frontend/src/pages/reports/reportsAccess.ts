@@ -10,20 +10,20 @@ type ReportsAccessConfig = {
 
 const REPORTS_ACCESS_CONFIG: Record<ReportsAccess, ReportsAccessConfig> = {
   kam: {
-    availableReportTypes: ['interactions'],
+    availableReportTypes: ['programs'],
     subtitle: (userName) =>
-      `${userName} · формирование и скачивание отчётов по вашим взаимодействиям`,
+      `${userName} · реальный отчёт по программам вашего портфеля`,
     showResponsible: false,
   },
 
   manager: {
-    availableReportTypes: ['interactions', 'programs', 'manager'],
+    availableReportTypes: ['programs', 'interactions', 'manager'],
     subtitle: (userName) => `${userName} · формирование и скачивание отчётов по вашей группе KAM`,
     showResponsible: true,
   },
 
   admin: {
-    availableReportTypes: ['interactions', 'programs', 'manager'],
+    availableReportTypes: ['programs', 'interactions', 'manager'],
     subtitle: (userName) =>
       `${userName} · формирование и скачивание отчётов по всем доступным данным`,
     showResponsible: true,

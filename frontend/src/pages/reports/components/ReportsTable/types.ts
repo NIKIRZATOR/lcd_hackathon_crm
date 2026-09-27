@@ -11,7 +11,7 @@ export type ReportColumnDefinition<T extends ReportTableItem> = {
   title: string;
   minWidth: number;
   render?: (item: T) => ReactNode;
-  sorter?: (a: T, b: T) => number;
+  sorter?: boolean | ((a: T, b: T) => number);
 };
 
 export type ReportTableExportConfig = {

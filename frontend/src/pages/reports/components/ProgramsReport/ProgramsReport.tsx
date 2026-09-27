@@ -18,14 +18,15 @@ const ProgramsReport = () => {
   const [preview, setPreview] = useState<Preview>();
   const [error, setError] = useState('');
   const [exportStatus, setExportStatus] = useState('');
+  const [sort, setSort] = useState<{ by: string; order: 'asc' | 'desc' }>({ by: 'organization', order: 'asc' });
   const reportPayload = () => {
     const period = filters.period;
-    return { organization_ids: filters.universityIds, direction_ids: filters.directionIds, product_ids: filters.productIds, responsible_user_ids: filters.responsibleIds, playbook_ids: filters.playbookIds, date_from: period?.[0]?.toISOString(), date_to: period?.[1]?.endOf('day').toISOString(), sort_by: 'organization', sort_order: 'asc' };
+    return { organization_ids: filters.universityIds, direction_ids: filters.directionIds, product_ids: filters.productIds, responsible_user_ids: filters.responsibleIds, playbook_ids: filters.playbookIds, date_from: period?.[0]?.toISOString(), date_to: period?.[1]?.endOf('day').toISOString(), sort_by: sort.by, sort_order: sort.order };
   };
   useEffect(() => { apiRequest<{ organizations: ProgramsReportFilterOptions['universities']; directions: ProgramsReportFilterOptions['directions']; products: ProgramsReportFilterOptions['products']; responsibles: ProgramsReportFilterOptions['responsibles']; playbooks: ProgramsReportFilterOptions['playbooks'] }>('/api/reports/filter-options').then((data) => setOptions({ universities: data.organizations, directions: data.directions, products: data.products, responsibles: data.responsibles, playbooks: data.playbooks })).catch(() => setError('Не удалось загрузить фильтры отчёта.')); }, []);
   useEffect(() => {
     apiRequest<Preview>('/api/reports/programs/preview?limit=100&offset=0', { method: 'POST', body: JSON.stringify(reportPayload()) }).then((data) => { setPreview(data); setError(''); }).catch(() => setError('Не удалось сформировать отчёт.'));
-  }, [filters]);
+  }, [filters, sort]);
   const download = async (format: TableExportFormat, columns: string[]) => {
     setExportStatus('Формируем файл отчёта…');
     try {
@@ -49,6 +50,10 @@ const ProgramsReport = () => {
       setExportStatus(downloadError instanceof Error ? downloadError.message : 'Не удалось сформировать файл.');
     }
   };
-  return <Flex vertical gap={20}>{error && <Alert type="error" showIcon message={error} />}{exportStatus && <Alert type={exportStatus === 'Файл готов и скачан.' ? 'success' : 'info'} showIcon message={exportStatus} />}{options ? <ProgramsReportFilters options={options} initialValues={filters} resetValues={EMPTY_FILTERS} onApply={setFilters} onReset={() => setFilters(EMPTY_FILTERS)} /> : <Spin />}<ProgramsReportTable items={preview?.items ?? []} total={preview?.total ?? 0} aggregates={preview?.aggregates} onDownload={download} /></Flex>;
+  const handleSort = (key: string | null, order: 'ascend' | 'descend' | null) => {
+    const map: Record<string, string> = { organization: 'organization', direction: 'direction', product: 'product', health_band: 'health', applications: 'applications', payment_records: 'payment_records', students: 'students', streams: 'streams' };
+    setSort({ by: key && map[key] ? map[key] : 'organization', order: order === 'descend' ? 'desc' : 'asc' });
+  };
+  return <Flex vertical gap={20}>{error && <Alert type="error" showIcon message={error} />}{exportStatus && <Alert type={exportStatus === 'Файл готов и скачан.' ? 'success' : 'info'} showIcon message={exportStatus} />}{options ? <ProgramsReportFilters options={options} initialValues={filters} resetValues={EMPTY_FILTERS} onApply={setFilters} onReset={() => setFilters(EMPTY_FILTERS)} /> : <Spin />}<ProgramsReportTable items={preview?.items ?? []} total={preview?.total ?? 0} aggregates={preview?.aggregates} onDownload={download} onSort={handleSort} /></Flex>;
 };
 export default ProgramsReport;
