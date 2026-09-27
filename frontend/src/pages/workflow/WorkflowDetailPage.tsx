@@ -1,8 +1,8 @@
 import { DeleteOutlined, EditOutlined, SendOutlined } from '@ant-design/icons';
-import { Alert, Avatar, Button, Card, Empty, Input, List, Modal, Popconfirm, Space, Spin, Tag, Tooltip, message } from 'antd';
+import { Alert, Avatar, Button, Card, Empty, Input, List, Popconfirm, Space, Spin, Tag, Tooltip, message } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError, apiRequest } from '../../api/client';
 import { useAuth } from '../../auth';
@@ -44,6 +44,7 @@ import IdentifyNeedStage from './components/IdentifyNeedStage';
 import StageWorkspace from './components/StageWorkspace';
 import WorkflowSteps from './components/WorkflowSteps';
 import { findContactChecklistItem } from './contactSearch';
+import { hasEnteredControl, rememberControlEntered } from './controlExecution';
 import type { MeetingClosePlan } from './firstMeeting';
 import { documentClosePlan } from './documentPackage';
 import { signClosePlan, type SignClosePlan } from './signContract';
@@ -75,12 +76,14 @@ const errorText = (error: unknown) => {
 const WorkflowDetailPage = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const seesKam = user?.roles.some((role) => role === 'MANAGER' || role === 'ADMIN') ?? false;
   const [desk, setDesk] = useState<ProgramDesk | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedId, setSelectedId] = useState<string>('');
+  const [selectedId, setSelectedId] = useState<string>(() => searchParams.get('stage') === 'control' || hasEnteredControl(id) ? 'control' : '');
+  const [controlEntered, setControlEntered] = useState(() => hasEnteredControl(id));
   const [checklist, setChecklist] = useState<DeskChecklistItem[]>([]);
   const [factsStageId, setFactsStageId] = useState('');
   const [stageBlockers, setStageBlockers] = useState<string[] | null>(null);
@@ -123,6 +126,22 @@ const WorkflowDetailPage = () => {
   }, [load]);
 
   useEffect(() => {
+    const entered = hasEnteredControl(id);
+    setControlEntered(entered);
+    setSelectedId(entered || new URLSearchParams(window.location.search).get('stage') === 'control' ? 'control' : '');
+  }, [id]);
+
+  useEffect(() => {
+    const isControlSelected = selectedId === 'control';
+    if (isControlSelected === (searchParams.get('stage') === 'control')) return;
+    setSearchParams((current) => {
+      if (isControlSelected) current.set('stage', 'control');
+      else current.delete('stage');
+      return current;
+    }, { replace: true });
+  }, [searchParams, selectedId, setSearchParams]);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       const modal = document.querySelector('.ant-modal-wrap');
@@ -135,6 +154,16 @@ const WorkflowDetailPage = () => {
 
   useEffect(() => {
     const stage = desk?.stages.find((item) => item.id === selectedId);
+    if (selectedId === 'control' || (stage && (
+      stageCodeOf(stage.code, stage.name) === 'control'
+      || stage.name.trim().toLowerCase() === 'контроль исполнения'
+    ))) {
+      setChecklist([]);
+      setComments([]);
+      setFiles([]);
+      setFactsStageId(selectedId);
+      return;
+    }
     if (!selectedId || selectedId.startsWith('gap-')) {
       const code = stageCodeOf(stage?.code, stage?.name);
       const blueprint = stageBlueprints[code];
@@ -287,14 +316,20 @@ const WorkflowDetailPage = () => {
   if (!desk) return <PageLayout><Empty description={error || 'Программа не найдена'} /></PageLayout>;
 
   const controlId = 'control';
-  const controlSelected = selectedId === controlId;
-  const onControl = desk.stageCode === 'control';
-  const currentIndex = onControl ? desk.stages.length : Math.max(desk.stages.findIndex((stage) => stage.id === desk.currentStageId), 0);
-  const selectedIndex = controlSelected ? desk.stages.length : Math.max(desk.stages.findIndex((stage) => stage.id === selectedId), 0);
+  const isControlStage = (stage: ProgramDesk['stages'][number] | undefined) => Boolean(stage && (
+    stageCodeOf(stage.code, stage.name) === 'control'
+    || stage.name.trim().toLowerCase() === 'контроль исполнения'
+  ));
+  const serverControlStage = desk.stages.find(isControlStage);
+  const controlStepIndex = desk.stages.filter((stage) => !isControlStage(stage)).length;
+  const controlSelected = selectedId === controlId || selectedId === serverControlStage?.id;
+  const onControl = controlEntered || desk.stageCode === 'control' || desk.currentStageId === serverControlStage?.id;
+  const currentIndex = onControl ? controlStepIndex : Math.max(desk.stages.findIndex((stage) => stage.id === desk.currentStageId), 0);
+  const selectedIndex = controlSelected ? controlStepIndex : Math.max(desk.stages.findIndex((stage) => stage.id === selectedId), 0);
   const selected = desk.stages[selectedIndex];
   const next = desk.stages[selectedIndex + 1];
   const previous = desk.stages[selectedIndex - 1];
-  const isCurrent = selected?.id === desk.currentStageId;
+  const isCurrent = !onControl && selected?.id === desk.currentStageId;
   const readOnly = false;
   const findContact = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'find_contact');
   const firstMeeting = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'first_meeting');
@@ -545,11 +580,17 @@ const WorkflowDetailPage = () => {
         <div className={styles.layout}>
           <Card className={styles.stageCard} title="Путь">
             <WorkflowSteps
-              steps={[...desk.stages.map((stage) => ({ id: stage.id, title: stage.name, phase: stage.phase })), { id: controlId, title: 'Контроль исполнения', phase: desk.stages.at(-1)?.phase }]}
+              steps={[
+                ...desk.stages.filter((stage) => !isControlStage(stage)).map((stage) => ({ id: stage.id, title: stage.name, phase: stage.phase })),
+                { id: controlId, title: 'Контроль исполнения', phase: serverControlStage?.phase ?? desk.stages.at(-1)?.phase },
+              ]}
               currentStep={currentIndex}
               selectedStep={selectedIndex}
               mutedAfter={refusedAt >= 0 ? refusedAt : undefined}
-              onStepChange={(index) => setSelectedId(index >= desk.stages.length ? controlId : desk.stages[index].id)}
+              onStepChange={(index) => {
+                const visibleStages = desk.stages.filter((stage) => !isControlStage(stage));
+                setSelectedId(index >= visibleStages.length ? controlId : visibleStages[index].id);
+              }}
             />
           </Card>
           <div className={styles.content}>
@@ -576,8 +617,8 @@ const WorkflowDetailPage = () => {
               <Card className={styles.sectionCard}>
                 <div className={styles.stageHeading}>
                   <h2>{selected.name}</h2>
-                  <Tag className={refused ? styles.stageStatusUpcoming : isCurrent ? styles.stageStatusCurrent : readOnly ? styles.stageStatusCompleted : styles.stageStatusUpcoming}>
-                    {refused && selectedIndex === refusedAt ? 'Закрыт' : isCurrent && !refused ? 'Текущий' : selected.status === 'completed' || (refused && selectedIndex < refusedAt) ? 'Пройден' : 'Впереди'}
+                  <Tag className={refused ? styles.stageStatusUpcoming : isCurrent ? styles.stageStatusCurrent : selectedIndex < currentIndex || readOnly ? styles.stageStatusCompleted : styles.stageStatusUpcoming}>
+                    {refused && selectedIndex === refusedAt ? 'Закрыт' : isCurrent && !refused ? 'Текущий' : selectedIndex < currentIndex || selected.status === 'completed' || (refused && selectedIndex < refusedAt) ? 'Пройден' : 'Впереди'}
                   </Tag>
                 </div>
                 {findContact ? (
@@ -985,19 +1026,17 @@ const WorkflowDetailPage = () => {
                   <Button
                     type="primary"
                     style={periodResults && periodPlan?.early && periodPlan.enabled ? { background: '#f5c451', borderColor: '#f5c451', color: '#3d2e00' } : undefined}
-                    disabled={refused || desk.status === 'completed' || (periodResults ? !periodPlan?.enabled || !canMoveForward : classesRunning ? !runningPlan?.enabled || !canMoveForward : startClasses ? !startPlan?.enabled || !canMoveForward : curriculum ? !curriculumPlan?.enabled || !canMoveForward : confirmTeacher ? !confirmPlan?.enabled || !canMoveForward : trainTeacher ? !trainPlan?.enabled || !canMoveForward : transferAccess ? !transferPlan?.enabled || !canMoveForward : signLicense ? !licensePlan?.enabled || !canMoveForward : signContract ? !signPlan?.enabled || !canMoveForward : documentPackage ? !packagePlan?.enabled || !canMoveForward : identifyNeed ? !identifyPlan?.enabled || !canMoveForward : firstMeeting ? !meetingPlan?.enabled || (meetingPlan.action === 'forward' && !canMoveForward) : findContact ? !canMoveForward || stageBlockers === null : !canClose)}
-                    loading={busy}
+                    disabled={periodResults ? false : refused || desk.status === 'completed' || (classesRunning ? !runningPlan?.enabled || !canMoveForward : startClasses ? !startPlan?.enabled || !canMoveForward : curriculum ? !curriculumPlan?.enabled || !canMoveForward : confirmTeacher ? !confirmPlan?.enabled || !canMoveForward : trainTeacher ? !trainPlan?.enabled || !canMoveForward : transferAccess ? !transferPlan?.enabled || !canMoveForward : signLicense ? !licensePlan?.enabled || !canMoveForward : signContract ? !signPlan?.enabled || !canMoveForward : documentPackage ? !packagePlan?.enabled || !canMoveForward : identifyNeed ? !identifyPlan?.enabled || !canMoveForward : firstMeeting ? !meetingPlan?.enabled || (meetingPlan.action === 'forward' && !canMoveForward) : findContact ? !canMoveForward || stageBlockers === null : !canClose)}
+                    loading={periodResults ? false : busy}
                     onClick={() => {
                       if (firstMeeting && meetingPlan?.action === 'refuse') {
                         void refuse();
                         return;
                       }
-                      if (periodResults && periodPlan?.early) {
-                        Modal.confirm({ title: 'Окно ещё идёт. Перейти к контролю?', okText: 'Перейти', cancelText: 'Оставить', onOk: () => { void go(forward?.id).then((moved) => { if (moved) setSelectedId('control'); }); } });
-                        return;
-                      }
                       if (periodResults) {
-                        void go(forward?.id).then((moved) => { if (moved) setSelectedId('control'); });
+                        rememberControlEntered(desk.id);
+                        setControlEntered(true);
+                        setSelectedId(controlId);
                         return;
                       }
                       if (classesRunning || startClasses || curriculum) {
@@ -1031,7 +1070,7 @@ const WorkflowDetailPage = () => {
                       void go(forward?.id);
                     }}
                   >
-                    {desk.status === 'completed' ? 'Заход завершён' : refused ? 'Заход закрыт' : periodResults ? (periodPlan?.button ?? 'Закрыть и перейти к контролю исполнения') : classesRunning ? (runningPlan?.button ?? 'Закрыть и перейти к итогам') : startClasses ? (startPlan?.button ?? 'Закрыть и перейти к ведению занятий') : curriculum ? (curriculumPlan?.button ?? 'Закрыть и перейти к старту занятий') : confirmTeacher ? (confirmPlan?.button ?? 'Закрыть и перейти к учебному плану') : trainTeacher ? (trainPlan?.button ?? 'Закрыть и перейти к подтверждению преподавателя') : transferAccess ? (transferPlan?.button ?? 'Закрыть и перейти к обучению преподавателя') : signLicense ? (licensePlan?.button ?? 'Закрыть и перейти к передаче и доступу') : signContract ? (signPlan?.button ?? 'Закрыть и перейти к подписанию лицензии') : documentPackage ? (packagePlan?.button ?? 'Закрыть и перейти к подписанию договора') : identifyNeed ? (identifyPlan?.button ?? 'Закрыть и перейти к пакету документов') : firstMeeting ? (meetingPlan?.button ?? 'Закрыть и перейти к выявлению потребности') : selected.final ? 'Завершить программу' : next ? `Закрыть и перейти к «${next.name}»` : 'Закрыть этап'}
+                    {refused ? 'Заход закрыт' : periodResults ? (periodPlan?.button ?? 'Перейти к контролю исполнения') : desk.status === 'completed' ? 'Заход завершён' : classesRunning ? (runningPlan?.button ?? 'Закрыть и перейти к итогам') : startClasses ? (startPlan?.button ?? 'Закрыть и перейти к ведению занятий') : curriculum ? (curriculumPlan?.button ?? 'Закрыть и перейти к старту занятий') : confirmTeacher ? (confirmPlan?.button ?? 'Закрыть и перейти к учебному плану') : trainTeacher ? (trainPlan?.button ?? 'Закрыть и перейти к подтверждению преподавателя') : transferAccess ? (transferPlan?.button ?? 'Закрыть и перейти к обучению преподавателя') : signLicense ? (licensePlan?.button ?? 'Закрыть и перейти к передаче и доступу') : signContract ? (signPlan?.button ?? 'Закрыть и перейти к подписанию лицензии') : documentPackage ? (packagePlan?.button ?? 'Закрыть и перейти к подписанию договора') : identifyNeed ? (identifyPlan?.button ?? 'Закрыть и перейти к пакету документов') : firstMeeting ? (meetingPlan?.button ?? 'Закрыть и перейти к выявлению потребности') : selected.final ? 'Завершить программу' : next ? `Закрыть и перейти к «${next.name}»` : 'Закрыть этап'}
                   </Button>
                 </div>
               </Card>

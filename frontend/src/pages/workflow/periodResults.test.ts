@@ -8,4 +8,8 @@ describe('итоги периода', () => {
     expect(periodClosePlan({ verdict: 'failed', reason: 'teacher', comment: 'ушёл' }).enabled).toBe(true);
     expect(periodClosePlan({ verdict: null, reason: null, comment: 'итог' }).enabled).toBe(false);
   });
+
+  it('ведёт к контролю, а не завершает заход', () => {
+    expect(periodClosePlan({ verdict: 'success', reason: null, comment: 'итог' }).button).toBe('Перейти к контролю исполнения');
+  });
 });

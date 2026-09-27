@@ -77,7 +77,7 @@ export const parsePeriodDraft = (raw: string | null | undefined): PeriodDraft =>
 export const serializePeriodDraft = (draft: PeriodDraft) => JSON.stringify({ v: 1, ...draft });
 
 export const periodClosePlan = (input: { verdict: Verdict | null; reason: FailReason | null; comment: string }) => ({
-  button: 'Закрыть и перейти к контролю исполнения',
+  button: 'Перейти к контролю исполнения',
   enabled: Boolean(input.verdict) && input.comment.trim().length > 0 && (input.verdict !== 'failed' || Boolean(input.reason)),
   hint: null as string | null,
 });

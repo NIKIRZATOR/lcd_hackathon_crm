@@ -10,6 +10,16 @@ export type ControlSignal = {
 
 export type ControlLevel = 'ok' | 'warning' | 'critical';
 
+const controlProgressKey = (programId: string) => `rtk-eduflow:control-entered:${programId}`;
+
+export const hasEnteredControl = (programId: string) => {
+  try { return localStorage.getItem(controlProgressKey(programId)) === '1'; } catch { return false; }
+};
+
+export const rememberControlEntered = (programId: string) => {
+  try { localStorage.setItem(controlProgressKey(programId), '1'); } catch { /* Контроль остаётся доступен в текущей вкладке. */ }
+};
+
 export const controlLevel = (signals: ControlSignal[]): ControlLevel => signals.some((item) => item.level === 'critical') ? 'critical' : signals.length ? 'warning' : 'ok';
 
 export const buildControlSignals = (input: {
