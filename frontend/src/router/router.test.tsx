@@ -66,8 +66,8 @@ vi.mock('../pages/reports/V2PlaceholderPage', () => ({
   default: ({ title }: { title: string }) => <div>{title}</div>,
 }));
 
-vi.mock('../pages/home/NbaTodayPage', () => ({
-  default: () => <div>Главная</div>,
+vi.mock('../pages/home/RoleHomePage', () => ({
+  default: () => <div>Сегодня</div>,
 }));
 
 vi.mock('../pages/analytics/AnalyticsPage', () => ({

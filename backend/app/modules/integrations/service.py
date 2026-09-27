@@ -52,6 +52,11 @@ class IntegrationSyncService:
                 .group_by(IntegrationSignal.status)
             )
             counts = {status: count for status, count in rows}
+            last_package_at = self.db.scalar(
+                select(func.max(IntegrationSignal.received_at)).where(
+                    IntegrationSignal.source == source
+                )
+            )
             result.append(
                 {
                     "source": source,
@@ -59,6 +64,7 @@ class IntegrationSyncService:
                     "mapped": counts.get("mapped", 0),
                     "unmatched": counts.get("unmatched", 0),
                     "errors": counts.get("error", 0),
+                    "last_package_at": last_package_at.isoformat() if last_package_at else None,
                 }
             )
         return result

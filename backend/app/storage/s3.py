@@ -53,6 +53,9 @@ class S3CompatibleStorage:
             last_modified=stat.last_modified,
         )
 
+    def healthcheck(self) -> None:
+        self._client.list_buckets()
+
     def get_stream(self, *, bucket: str, object_key: str) -> BinaryIO:
         return self._client.get_object(bucket, object_key)
 
