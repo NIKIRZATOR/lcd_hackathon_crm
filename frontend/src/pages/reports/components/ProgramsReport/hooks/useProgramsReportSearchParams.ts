@@ -8,20 +8,19 @@ const QUERY_KEYS = {
   from: 'from',
   to: 'to',
   universities: 'universities',
-  programs: 'programs',
+  directions: 'directions',
   products: 'products',
   responsibles: 'responsibles',
 } as const;
 
-const parseIds = (value: string | null): number[] => {
+const parseIds = (value: string | null): string[] => {
   if (!value) {
     return [];
   }
 
   return value
     .split(',')
-    .map(Number)
-    .filter((id) => Number.isInteger(id) && id > 0);
+    .filter(Boolean);
 };
 
 const parsePeriod = (
@@ -45,9 +44,10 @@ export const useProgramsReportSearchParams = () => {
     () => ({
       period: parsePeriod(searchParams.get(QUERY_KEYS.from), searchParams.get(QUERY_KEYS.to)),
       universityIds: parseIds(searchParams.get(QUERY_KEYS.universities)),
-      programIds: parseIds(searchParams.get(QUERY_KEYS.programs)),
+      directionIds: parseIds(searchParams.get(QUERY_KEYS.directions)),
       productIds: parseIds(searchParams.get(QUERY_KEYS.products)),
       responsibleIds: parseIds(searchParams.get(QUERY_KEYS.responsibles)),
+      playbookIds: parseIds(searchParams.get('playbooks')),
     }),
     [searchParams],
   );
@@ -60,7 +60,8 @@ export const useProgramsReportSearchParams = () => {
         params.delete(QUERY_KEYS.from);
         params.delete(QUERY_KEYS.to);
         params.delete(QUERY_KEYS.universities);
-        params.delete(QUERY_KEYS.programs);
+        params.delete(QUERY_KEYS.directions);
+        params.delete('playbooks');
         params.delete(QUERY_KEYS.products);
         params.delete(QUERY_KEYS.responsibles);
 
@@ -73,8 +74,8 @@ export const useProgramsReportSearchParams = () => {
           params.set(QUERY_KEYS.universities, values.universityIds.join(','));
         }
 
-        if (values.programIds.length) {
-          params.set(QUERY_KEYS.programs, values.programIds.join(','));
+        if (values.directionIds.length) {
+          params.set(QUERY_KEYS.directions, values.directionIds.join(','));
         }
 
         if (values.productIds.length) {
@@ -84,6 +85,7 @@ export const useProgramsReportSearchParams = () => {
         if (values.responsibleIds.length) {
           params.set(QUERY_KEYS.responsibles, values.responsibleIds.join(','));
         }
+        if (values.playbookIds.length) params.set('playbooks', values.playbookIds.join(','));
 
         return params;
       });
