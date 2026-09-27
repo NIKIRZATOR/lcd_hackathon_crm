@@ -13,7 +13,7 @@ type Transition = { id: string; name: string | null; to_stage_name: string };
 type Workflow = { stages: Stage[]; current_stage_instance_id: string | null; available_transitions: Transition[]; transition_history?: { id: string; comment: string | null; performed_at: string }[] };
 type Comment = { id: string; text: string; created_at: string };
 type Attachment = { id: string; file_id: string; original_name: string; attachment_kind?: string | null };
-type ProgramMetric = { applications_count: number; students_count: number; streams_count: number; teacher_activity_on: string | null; synced_at: string | null };
+type ProgramMetric = { applications_count: number; students_count: number; streams_count: number; payment_records_count: number; teacher_activity_on: string | null; synced_at: string | null; last_website_signal_at: string | null; last_payment_signal_at: string | null; last_lms_signal_at: string | null };
 type SyncResult = { mapped: number; unmatched: number; errors: number; metrics: ProgramMetric };
 type Stakeholder = { id: string; full_name: string; role_code: string };
 type License = { transfer_status: string; valid_until: string | null; signed_at: string | null };
@@ -141,6 +141,13 @@ const ProgramDetailPage = () => {
     </Card>
     <Card size="small" title="Метрики программы" extra={<Button onClick={() => void syncMetrics()}>Синхронизировать</Button>} style={{ marginTop: 16 }}>
       <Descriptions size="small" column={{ xs: 1, md: 4 }}><Descriptions.Item label="Заявки">{metrics?.applications_count ?? '—'}</Descriptions.Item><Descriptions.Item label="Студенты">{metrics?.students_count ?? '—'}</Descriptions.Item><Descriptions.Item label="Потоки">{metrics?.streams_count ?? '—'}</Descriptions.Item><Descriptions.Item label="Активность преподавателя">{metrics?.teacher_activity_on ?? '—'}</Descriptions.Item></Descriptions>
+      <Descriptions size="small" title="Интеграционные B2C-метрики" column={{ xs: 1, md: 4 }} style={{ marginTop: 12 }}>
+        <Descriptions.Item label="Записи B2C-заказов">{metrics?.payment_records_count ?? '—'} <Tag>PROVIDED</Tag></Descriptions.Item>
+        <Descriptions.Item label="Последний сигнал сайта">{metrics?.last_website_signal_at?.slice(0, 16) ?? '—'} <Tag>DEMO/STUB</Tag></Descriptions.Item>
+        <Descriptions.Item label="Последний сигнал LMS">{metrics?.last_lms_signal_at?.slice(0, 16) ?? '—'} <Tag>DEMO/STUB</Tag></Descriptions.Item>
+        <Descriptions.Item label="Последний B2C-сигнал">{metrics?.last_payment_signal_at?.slice(0, 16) ?? '—'} <Tag>PROVIDED</Tag></Descriptions.Item>
+      </Descriptions>
+      <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>Запись B2C-заказа из fixture не подтверждает оплату и не является выручкой.</Typography.Paragraph>
       {syncResult && <Alert type={syncResult.errors ? 'warning' : 'success'} showIcon message={`Синхронизация: mapped ${syncResult.mapped}, unmatched ${syncResult.unmatched}, errors ${syncResult.errors}.`} />}
     </Card>
     {nba && <Alert style={{ marginTop: 16 }} type={nba.severity === 'critical' ? 'error' : 'warning'} showIcon message={nba.action} />}

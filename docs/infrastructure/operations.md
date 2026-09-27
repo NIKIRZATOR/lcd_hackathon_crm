@@ -24,6 +24,12 @@ docker compose up --build
 docker compose run --rm backend alembic upgrade head
 ```
 
+Первичное создание данных:
+
+```powershell
+docker compose run --rm backend python scripts/seed_demo_data.py
+```
+
 Адреса сервисов:
 
 | Сервис | Адрес |
