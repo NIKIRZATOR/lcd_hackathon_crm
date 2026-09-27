@@ -5,7 +5,7 @@ from app.core.database import Base
 from app.modules.audit.model import AuditEvent
 from app.modules.reports.model import ReportArtifact, ReportJob
 from app.modules.reports.queue import dequeue_report_job, enqueue_report_job
-from app.worker.reports import ReportWorker
+from app.worker.reports import ReportWorker, render_report
 
 
 class FakeRedis:
@@ -39,7 +39,19 @@ def test_report_models_are_registered_in_metadata() -> None:
     assert ReportArtifact.__tablename__ == "report_artifacts"
 
 
-def test_report_worker_marks_job_failed_until_exporters_exist() -> None:
+def test_report_exporters_build_all_required_formats() -> None:
+    rows = [{"organization": "Тестовый вуз", "applications": 3}]
+
+    xlsx, _, _ = render_report(rows, ["organization", "applications"], "XLSX")
+    xls, _, _ = render_report(rows, ["organization", "applications"], "XLS")
+    pdf, _, _ = render_report(rows, ["organization", "applications"], "PDF")
+
+    assert xlsx.startswith(b"PK")
+    assert xls.startswith(bytes.fromhex("D0CF11E0"))
+    assert pdf.startswith(b"%PDF-")
+
+
+def test_report_worker_marks_job_failed_when_creator_is_missing() -> None:
     job = ReportJob(
         id=uuid4(),
         status="QUEUED",
@@ -82,7 +94,7 @@ def test_report_worker_marks_job_failed_until_exporters_exist() -> None:
     assert job.status == "FAILED"
     assert job.started_at is not None
     assert job.finished_at is not None
-    assert job.error_code == "REPORT_EXPORTER_NOT_IMPLEMENTED"
+    assert job.error_code == "REPORT_EXPORT_FAILED"
     assert db.commits == 2
     assert db.refreshed is job
     assert [event.action for event in db.added if isinstance(event, AuditEvent)] == [

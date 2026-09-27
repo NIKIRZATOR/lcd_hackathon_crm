@@ -54,10 +54,10 @@ const ProgramsReportFilters = ({
     },
     {
       type: 'select',
-      name: 'programIds',
-      label: 'Программа',
-      placeholder: 'Все программы',
-      options: getSelectOptions(options.programs),
+      name: 'directionIds',
+      label: 'Направление',
+      placeholder: 'Все направления',
+      options: getSelectOptions(options.directions),
     },
     {
       type: 'select',
@@ -73,6 +73,7 @@ const ProgramsReportFilters = ({
       placeholder: 'Все сотрудники',
       options: getSelectOptions(options.responsibles),
     },
+    { type: 'select', name: 'playbookIds', label: '* Плейбук', placeholder: 'Все плейбуки', options: getSelectOptions(options.playbooks) },
   ];
 
   return (
