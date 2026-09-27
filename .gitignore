@@ -27,3 +27,4 @@ local_docs
 AGENTS.md
 .tmp_pypdf
 data/backups/
+backend/scripts/seed_demo_data_expanded_clean_20_universities.py
