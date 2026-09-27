@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.common.errors import get_request_id
@@ -10,8 +10,8 @@ from app.modules.audit.service import AuditService
 from app.modules.auth.access import ADMIN_ROLES
 from app.modules.auth.dependencies import require_roles
 from app.modules.users.model import User
-from app.modules.users.schemas import ManagerMembershipCreate, ManagerMembershipRead, ManagerMembershipUpdate
-from app.modules.users.service import ManagerMembershipService
+from app.modules.users.schemas import ManagerMembershipCreate, ManagerMembershipRead, ManagerMembershipUpdate, UserRead, UserStatusUpdate
+from app.modules.users.service import ManagerMembershipService, UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -20,6 +20,54 @@ USERS_ADMIN_ERROR_RESPONSES = {
     403: {"description": "Only ADMIN users can manage manager memberships."},
     422: {"description": "Request validation failed."},
 }
+
+
+def _user_read(user: User) -> UserRead:
+    return UserRead(
+        id=user.id,
+        keycloak_user_id=user.keycloak_user_id,
+        username=user.username,
+        full_name=user.full_name,
+        email=user.email,
+        roles=sorted(role.name for role in user.roles),
+        is_active=user.is_active,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+    )
+
+
+@router.get("", response_model=Page[UserRead], responses=USERS_ADMIN_ERROR_RESPONSES)
+def list_users(
+    search: str | None = None,
+    is_active: bool | None = None,
+    role: str | None = None,
+    pagination: PaginationParams = Depends(),
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    result = UserService(db).list_users(
+        search=search,
+        is_active=is_active,
+        role=role,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return Page(items=[_user_read(user) for user in result.items], total=result.total, limit=pagination.limit, offset=pagination.offset)
+
+
+@router.patch("/{user_id}/status", response_model=UserRead, responses=USERS_ADMIN_ERROR_RESPONSES)
+def update_user_status(
+    user_id: UUID,
+    payload: UserStatusUpdate,
+    request: Request,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Admin cannot deactivate own account")
+    user = UserService(db).set_active(user_id, payload.is_active)
+    AuditService(db).log_event(actor_user_id=current_user.id, action="user.status.update", entity_type="user", entity_id=user.id, metadata={"is_active": user.is_active}, request_id=get_request_id(request))
+    return _user_read(user)
 
 
 @router.get(

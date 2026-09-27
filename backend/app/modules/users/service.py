@@ -66,6 +66,32 @@ class UserService:
         self.db.flush()
         return [existing_roles[name] for name in sorted(existing_roles)]
 
+    def list_users(
+        self,
+        *,
+        search: str | None,
+        is_active: bool | None,
+        role: str | None,
+        limit: int,
+        offset: int,
+    ) -> ListResult[User]:
+        return self.repository.list_users(
+            search=search,
+            is_active=is_active,
+            role=role,
+            limit=limit,
+            offset=offset,
+        )
+
+    def set_active(self, user_id: UUID, is_active: bool) -> User:
+        user = self.db.get(User, user_id)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        user.is_active = is_active
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
 
 class ManagerMembershipService:
     def __init__(self, db: Session) -> None:

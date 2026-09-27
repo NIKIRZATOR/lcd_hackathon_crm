@@ -7,14 +7,11 @@ from sqlalchemy import func, select
 from app.core.database import get_db_session
 from app.modules.auth.access import CRM_ROLES, get_subordinate_kam_ids
 from app.modules.auth.dependencies import require_roles
-from app.modules.audit.model import AuditEvent
+from app.modules.nba.admin_home_service import AdminHomeService
 from app.modules.nba.schemas import NbaItemRead
 from app.modules.nba.service import NbaService
-from app.modules.integrations.model import IntegrationSignal, ProgramMetric
-from app.modules.imports.model import ImportJob
+from app.modules.integrations.model import ProgramMetric
 from app.modules.program_instances.model import AcademicWindow, ProgramInstance
-from app.modules.reports.model import ReportJob
-from app.modules.workflows.model import WorkflowTemplate
 from app.modules.program_instances.service import ProgramInstanceService
 from app.modules.users.model import User
 
@@ -33,24 +30,7 @@ def list_today(
 def home_summary(db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
     roles = {role.name for role in current_user.roles}
     if "ADMIN" in roles:
-        return {
-            "role": "ADMIN",
-            "cards": {
-                "unmatched_integrations": db.scalar(select(func.count()).select_from(IntegrationSignal).where(IntegrationSignal.status == "unmatched")) or 0,
-                "integration_errors": db.scalar(select(func.count()).select_from(IntegrationSignal).where(IntegrationSignal.status == "error")) or 0,
-                "import_jobs": db.scalar(select(func.count()).select_from(ImportJob).where(ImportJob.status == "FAILED")) or 0,
-                "report_jobs": db.scalar(select(func.count()).select_from(ReportJob).where(ReportJob.status == "FAILED")) or 0,
-                "draft_playbooks": db.scalar(select(func.count()).select_from(WorkflowTemplate).where(WorkflowTemplate.status == "draft")) or 0,
-            },
-            "links": [
-                {"key": "unmatched_integrations", "label": "Несопоставленные интеграции", "path": "/management?tab=integrations"},
-                {"key": "integration_errors", "label": "Ошибки интеграций", "path": "/management?tab=integrations"},
-                {"key": "import_jobs", "label": "Ошибки импорта", "path": "/management?tab=integrations"},
-                {"key": "report_jobs", "label": "Проблемы отчётов", "path": "/reports"},
-                {"key": "draft_playbooks", "label": "Черновики плейбуков", "path": "/management?tab=playbooks"},
-            ],
-            "system_events": [{"id": str(event.id), "action": event.action, "result": event.result, "created_at": event.created_at.isoformat()} for event in db.scalars(select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(8))],
-        }
+        return AdminHomeService(db).summary()
     items = NbaService(db).today(current_user)
     kam_ids = get_subordinate_kam_ids(db, current_user.id) if "MANAGER" in roles else {current_user.id}
     active_programs = select(ProgramInstance).where(ProgramInstance.status.in_(("draft", "active", "paused")), ProgramInstance.kam_user_id.in_(kam_ids))

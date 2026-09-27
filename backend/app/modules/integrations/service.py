@@ -52,6 +52,11 @@ class IntegrationSyncService:
                 .group_by(IntegrationSignal.status)
             )
             counts = {status: count for status, count in rows}
+            last_package_at = self.db.scalar(
+                select(func.max(IntegrationSignal.received_at)).where(
+                    IntegrationSignal.source == source
+                )
+            )
             result.append(
                 {
                     "source": source,
@@ -59,9 +64,31 @@ class IntegrationSyncService:
                     "mapped": counts.get("mapped", 0),
                     "unmatched": counts.get("unmatched", 0),
                     "errors": counts.get("error", 0),
+                    "last_package_at": last_package_at.isoformat() if last_package_at else None,
                 }
             )
         return result
+
+    def packages(self) -> list[dict[str, object]]:
+        events = self.db.scalars(
+            select(AuditEvent)
+            .where(AuditEvent.action == "integration.package.process")
+            .order_by(AuditEvent.created_at.desc())
+            .limit(100)
+        ).all()
+        return [
+            {
+                "source": str(event.event_metadata.get("source", "UNKNOWN")),
+                "package_label": event.event_metadata.get("package_label"),
+                "processed_at": event.created_at,
+                "processed": int(event.event_metadata.get("processed", 0)),
+                "mapped": int(event.event_metadata.get("mapped", 0)),
+                "unmatched": int(event.event_metadata.get("unmatched", 0)),
+                "errors": int(event.event_metadata.get("errors", 0)),
+                "ignored": int(event.event_metadata.get("ignored", 0)),
+            }
+            for event in events
+        ]
 
     def diagnostics(self) -> list[dict[str, object]]:
         grouped: dict[tuple[str, str | None, str | None, str, UUID | None], int] = {}
@@ -200,6 +227,7 @@ class IntegrationSyncService:
         source: str,
         actor_user_id: UUID | None = None,
         file_path: Path | None = None,
+        package_label: str | None = None,
     ) -> dict[str, int]:
         if source not in SOURCES:
             raise ValueError("Unsupported integration source")
@@ -266,7 +294,7 @@ class IntegrationSyncService:
                 actor_user_id=actor_user_id,
                 action="integration.package.process",
                 entity_type="integration_source",
-                event_metadata={"source": source, **counts},
+                event_metadata={"source": source, "package_label": package_label, **counts},
             )
         )
         self.db.commit()

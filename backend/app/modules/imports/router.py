@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -14,7 +15,9 @@ from app.modules.imports.apply.service import ImportApplyService
 from app.modules.imports.diff.service import ImportDiffService
 from app.modules.imports.mapping.registry import TARGET_FIELDS
 from app.modules.imports.mapping.service import MappingService, import_error
-from app.modules.imports.model import ImportRowError
+from app.modules.documents.file_service import FileService
+from app.modules.documents.model import File as StoredFile
+from app.modules.imports.model import ImportArtifact, ImportRowError
 from app.modules.imports.schemas import (
     ImportConfirmRead,
     ImportDiffRead,
@@ -91,18 +94,18 @@ def create_import(
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*ADMIN_ROLES)),
 ):
-    return ImportService(db).create_job_from_upload(upload=file, actor_user_id=current_user.id)
+    return _job_read(ImportService(db).create_job_from_upload(upload=file, actor_user_id=current_user.id), db)
 
 
 @router.get("", response_model=Page[ImportJobRead], summary="List import jobs")
 def list_imports(pagination: PaginationParams = Depends(), db: Session = Depends(get_db_session)):
     result = ImportService(db).list_jobs(limit=pagination.limit, offset=pagination.offset)
-    return Page(items=result.items, total=result.total, limit=pagination.limit, offset=pagination.offset)
+    return Page(items=[_job_read(job, db) for job in result.items], total=result.total, limit=pagination.limit, offset=pagination.offset)
 
 
 @router.get("/{job_id}", response_model=ImportJobRead, summary="Get import job")
 def get_import(job_id: UUID, db: Session = Depends(get_db_session)):
-    return ImportService(db).get_job(job_id)
+    return _job_read(ImportService(db).get_job(job_id), db)
 
 
 @router.get(
@@ -151,7 +154,7 @@ def update_import_config(
     ImportService(db).preview(job_id=job.id, limit=1)
     db.commit()
     db.refresh(job)
-    return job
+    return _job_read(job, db)
 
 
 @router.get("/{job_id}/mapping", response_model=JobMappingRead, summary="Get import job mapping snapshot")
@@ -270,6 +273,33 @@ def confirm_import(
     )
 
 
+@router.get("/{job_id}/artifacts/{artifact_type}/download")
+def download_import_artifact(
+    job_id: UUID,
+    artifact_type: str,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    if artifact_type not in {"PROTOCOL", "ERROR_REPORT"}:
+        raise HTTPException(status_code=404, detail="Import artifact not found")
+    artifact = db.scalar(
+        select(ImportArtifact)
+        .where(ImportArtifact.import_job_id == job_id, ImportArtifact.artifact_type == artifact_type)
+        .order_by(ImportArtifact.created_at.desc())
+        .limit(1)
+    )
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Import artifact not found")
+    file_record = db.get(StoredFile, artifact.file_id)
+    if file_record is None:
+        raise HTTPException(status_code=404, detail="Import artifact file not found")
+    return StreamingResponse(
+        FileService(db).stream_file(file_record=file_record, actor_user_id=current_user.id),
+        media_type=file_record.mime_type or "application/json",
+        headers={"Content-Disposition": f'attachment; filename="{file_record.original_name}"'},
+    )
+
+
 def _mapping_read(service: MappingService, mapping_id: UUID) -> ImportMappingRead:
     mapping = service.get_mapping(mapping_id)
     fields = [ImportMappingFieldRead.model_validate(field) for field in service.get_mapping_fields(mapping.id)]
@@ -281,4 +311,15 @@ def _mapping_read(service: MappingService, mapping_id: UUID) -> ImportMappingRea
         created_at=mapping.created_at,
         updated_at=mapping.updated_at,
         fields=fields,
+    )
+
+
+def _job_read(job, db: Session) -> ImportJobRead:
+    source_file = db.get(StoredFile, job.source_file_id) if job.source_file_id else None
+    author = db.get(User, job.created_by)
+    return ImportJobRead.model_validate(job).model_copy(
+        update={
+            "source_file_name": source_file.original_name if source_file else None,
+            "created_by_name": author.full_name if author else None,
+        }
     )

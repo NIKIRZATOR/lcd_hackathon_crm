@@ -14,6 +14,9 @@ class ObjectStat:
 
 
 class StorageAdapter(Protocol):
+    def healthcheck(self) -> None:
+        """Raise an exception when object storage is unavailable."""
+
     def put(
         self,
         *,

@@ -27,6 +27,7 @@ class AuditService:
         self,
         *,
         actor_user_id: UUID | None,
+        actor_role: str | None,
         action: str | None,
         entity_type: str | None,
         entity_id: UUID | None,
@@ -40,6 +41,7 @@ class AuditService:
     ) -> ListResult[AuditEvent]:
         return self.repository.list(
             actor_user_id=actor_user_id,
+            actor_role=actor_role,
             action=action,
             entity_type=entity_type,
             entity_id=entity_id,
