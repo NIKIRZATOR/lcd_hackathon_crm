@@ -1,10 +1,10 @@
 import { DeleteOutlined, EditOutlined, SendOutlined } from '@ant-design/icons';
-import { Alert, Avatar, Button, Card, Empty, Input, List, Popconfirm, Space, Spin, Tag, Tooltip, message } from 'antd';
+import { Alert, Avatar, Button, Card, Empty, Input, List, Modal, Popconfirm, Space, Spin, Tag, Tooltip, message } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { ApiError } from '../../api/client';
+import { ApiError, apiRequest } from '../../api/client';
 import { useAuth } from '../../auth';
 import PageLayout from '../../components/pageLayout/PageLayout';
 import HealthMark from '../organizations/components/HealthMark';
@@ -15,6 +15,7 @@ import {
   loadProgramDesk,
   loadStageFacts,
   moveProgram,
+  reopenProgramStage,
   refuseProgram,
   rememberClosedProgram,
   saveChecklistItem,
@@ -29,12 +30,31 @@ import {
 import ContactSearchStage from './components/ContactSearchStage';
 import FirstMeetingStage from './components/FirstMeetingStage';
 import DocumentPackageStage from './components/DocumentPackageStage';
+import SignContractStage from './components/SignContractStage';
+import SignLicenseStage from './components/SignLicenseStage';
+import TransferAccessStage from './components/TransferAccessStage';
+import TrainTeacherStage from './components/TrainTeacherStage';
+import ConfirmTeacherStage from './components/ConfirmTeacherStage';
+import CurriculumStage from './components/CurriculumStage';
+import StartClassesStage from './components/StartClassesStage';
+import ClassesRunningStage from './components/ClassesRunningStage';
+import PeriodResultsStage from './components/PeriodResultsStage';
+import ControlExecutionStage from './components/ControlExecutionStage';
 import IdentifyNeedStage from './components/IdentifyNeedStage';
 import StageWorkspace from './components/StageWorkspace';
 import WorkflowSteps from './components/WorkflowSteps';
 import { findContactChecklistItem } from './contactSearch';
 import type { MeetingClosePlan } from './firstMeeting';
 import { documentClosePlan } from './documentPackage';
+import { signClosePlan, type SignClosePlan } from './signContract';
+import { signLicensePlan, type SignLicensePlan } from './signLicense';
+import { transferClosePlan, type TransferClosePlan } from './transferAccess';
+import { trainClosePlan, type TrainClosePlan } from './trainTeacher';
+import { confirmClosePlan, type ConfirmClosePlan } from './confirmTeacher';
+import { curriculumClosePlan, type CurriculumClosePlan } from './curriculum';
+import { startClosePlan, type StartClosePlan } from './startClasses';
+import { classesClosePlan, type ClassesClosePlan } from './classesRunning';
+import type { PeriodClosePlan } from './periodResults';
 import { identifyClosePlan } from './identifyNeed';
 import { stageBlueprints, stageCodeOf } from './stageBlueprints';
 import { emptyActionText } from './workflowBackendFieldGaps';
@@ -43,11 +63,6 @@ import { emptyActionText } from './workflowBackendFieldGaps';
 import styles from './WorkflowDetailPage.module.scss';
 
 const seededStageComment = 'Текущий статус этапа подтверждён ответственным сотрудником';
-
-const overdueDays = (due: string | null) => {
-  if (!due || !dayjs(due).isValid()) return 0;
-  return Math.max(dayjs().startOf('day').diff(dayjs(due), 'day'), 0);
-};
 
 const errorText = (error: unknown) => {
   if (!(error instanceof ApiError)) return 'Не удалось сохранить';
@@ -73,6 +88,15 @@ const WorkflowDetailPage = () => {
   const [meetingPlan, setMeetingPlan] = useState<MeetingClosePlan | null>(null);
   const [identifyPlan, setIdentifyPlan] = useState<ReturnType<typeof identifyClosePlan> | null>(null);
   const [packagePlan, setPackagePlan] = useState<ReturnType<typeof documentClosePlan> | null>(null);
+  const [signPlan, setSignPlan] = useState<SignClosePlan | null>(null);
+  const [licensePlan, setLicensePlan] = useState<SignLicensePlan | null>(null);
+  const [transferPlan, setTransferPlan] = useState<TransferClosePlan | null>(null);
+  const [trainPlan, setTrainPlan] = useState<TrainClosePlan | null>(null);
+  const [confirmPlan, setConfirmPlan] = useState<ConfirmClosePlan | null>(null);
+  const [curriculumPlan, setCurriculumPlan] = useState<CurriculumClosePlan | null>(null);
+  const [startPlan, setStartPlan] = useState<StartClosePlan | null>(null);
+  const [runningPlan, setRunningPlan] = useState<ClassesClosePlan | null>(null);
+  const [periodPlan, setPeriodPlan] = useState<(PeriodClosePlan & { early: boolean }) | null>(null);
   const [comments, setComments] = useState<DeskComment[]>([]);
   const [files, setFiles] = useState<DeskFile[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -168,6 +192,15 @@ const WorkflowDetailPage = () => {
     setMeetingPlan(null);
     setIdentifyPlan(null);
     setPackagePlan(null);
+    setSignPlan(null);
+    setLicensePlan(null);
+    setTransferPlan(null);
+    setTrainPlan(null);
+    setConfirmPlan(null);
+    setCurriculumPlan(null);
+    setStartPlan(null);
+    setRunningPlan(null);
+    setPeriodPlan(null);
   }, [selectedId]);
 
   useEffect(() => {
@@ -176,6 +209,55 @@ const WorkflowDetailPage = () => {
 
   const publishBlockers = useCallback((labels: string[]) => {
     setStageBlockers((current) => (current?.join('\n') === labels.join('\n') ? current : labels));
+  }, []);
+
+  const publishPeriodPlan = useCallback((next: PeriodClosePlan & { early: boolean }) => {
+    setPeriodPlan((current) => (current && current.enabled === next.enabled && current.early === next.early ? current : next));
+  }, []);
+
+  const publishRunningPlan = useCallback((next: ClassesClosePlan) => {
+    setRunningPlan((current) => (current && current.enabled === next.enabled && current.mode === next.mode ? current : next));
+  }, []);
+
+  const publishStartPlan = useCallback((next: StartClosePlan) => {
+    setStartPlan((current) => (current && current.enabled === next.enabled && current.button === next.button ? current : next));
+  }, []);
+
+  const publishCurriculumPlan = useCallback((next: CurriculumClosePlan) => {
+    setCurriculumPlan((current) => (current && current.enabled === next.enabled && current.windowId === next.windowId ? current : next));
+  }, []);
+
+  const publishConfirmPlan = useCallback((next: ConfirmClosePlan) => {
+    setConfirmPlan((current) => (current && current.enabled === next.enabled && current.windowId === next.windowId ? current : next));
+  }, []);
+
+  const publishTrainPlan = useCallback((next: TrainClosePlan) => {
+    setTrainPlan((current) => (
+      current && current.enabled === next.enabled && current.personId === next.personId && current.trainedOn === next.trainedOn && current.carrierId === next.carrierId && current.productId === next.productId
+        ? current : next
+    ));
+  }, []);
+
+  const publishTransferPlan = useCallback((next: TransferClosePlan) => {
+    setTransferPlan((current) => (
+      current && current.enabled === next.enabled && current.access === next.access && current.transferredOn === next.transferredOn && current.licenseId === next.licenseId && current.fileId === next.fileId
+        ? current : next
+    ));
+  }, []);
+
+  const publishLicensePlan = useCallback((next: SignLicensePlan) => {
+    setLicensePlan((current) => (
+      current && current.enabled === next.enabled && current.number === next.number && current.signedOn === next.signedOn && current.validUntil === next.validUntil && current.volume === next.volume && current.fileId === next.fileId
+        ? current : next
+    ));
+  }, []);
+
+  const publishSignPlan = useCallback((next: SignClosePlan) => {
+    setSignPlan((current) => (
+      current && current.enabled === next.enabled && current.button === next.button && current.number === next.number && current.signedOn === next.signedOn && current.validUntil === next.validUntil && current.signer === next.signer && current.fileId === next.fileId
+        ? current
+        : next
+    ));
   }, []);
 
   const publishPackagePlan = useCallback((next: ReturnType<typeof documentClosePlan>) => {
@@ -204,8 +286,11 @@ const WorkflowDetailPage = () => {
   if (loading && !desk) return <PageLayout><div className={styles.loader}><Spin size="large" /></div></PageLayout>;
   if (!desk) return <PageLayout><Empty description={error || 'Программа не найдена'} /></PageLayout>;
 
-  const currentIndex = Math.max(desk.stages.findIndex((stage) => stage.id === desk.currentStageId), 0);
-  const selectedIndex = Math.max(desk.stages.findIndex((stage) => stage.id === selectedId), 0);
+  const controlId = 'control';
+  const controlSelected = selectedId === controlId;
+  const onControl = desk.stageCode === 'control';
+  const currentIndex = onControl ? desk.stages.length : Math.max(desk.stages.findIndex((stage) => stage.id === desk.currentStageId), 0);
+  const selectedIndex = controlSelected ? desk.stages.length : Math.max(desk.stages.findIndex((stage) => stage.id === selectedId), 0);
   const selected = desk.stages[selectedIndex];
   const next = desk.stages[selectedIndex + 1];
   const previous = desk.stages[selectedIndex - 1];
@@ -215,6 +300,15 @@ const WorkflowDetailPage = () => {
   const firstMeeting = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'first_meeting');
   const identifyNeed = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'identify_need');
   const documentPackage = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'document_package');
+  const signContract = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'sign_contract');
+  const signLicense = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'sign_license');
+  const transferAccess = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'transfer_access');
+  const trainTeacher = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'train_teacher');
+  const confirmTeacher = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'confirm_teacher');
+  const curriculum = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'curriculum');
+  const startClasses = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'start_classes');
+  const classesRunning = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'classes_running');
+  const periodResults = Boolean(selected && stageCodeOf(selected.code, selected.name) === 'period_results');
   const refused = desk.status === 'cancelled';
   const refusedAt = refused ? desk.stages.findIndex((stage) => stageCodeOf(stage.code, stage.name) === 'first_meeting') : -1;
   const checklistMissing = checklist.filter((item) => item.required && !item.done).map((item) => item.label);
@@ -232,12 +326,15 @@ const WorkflowDetailPage = () => {
   const factBanner = desk.banner.startsWith('Заполните обязательный факт');
   const showFactBanner = factBanner && closeHint && missing.length > 0;
   const licenseBanner = /лиценз/i.test(desk.banner);
+  const closeReadyBanner = /можно закрыть|обязательные факты собраны/i.test(desk.banner);
   const showBanner = desk.banner !== emptyActionText
+    && !licenseBanner
+    && !closeReadyBanner
     && !(firstMeeting && factBanner)
-    && !(identifyNeed && (factBanner || licenseBanner))
-    && !(documentPackage && (factBanner || licenseBanner))
+    && !(identifyNeed && factBanner)
+    && !(documentPackage && factBanner)
+    && !(signContract && factBanner)
     && (!factBanner || showFactBanner);
-  const late = overdueDays(selected?.dueAt ?? null);
 
   const refreshFacts = async () => {
     if (!selected || selected.id.startsWith('gap-')) return;
@@ -298,6 +395,104 @@ const WorkflowDetailPage = () => {
       rememberClosedProgram(desk.id);
       const reloaded = await loadProgramDesk(desk.id);
       setDesk(reloaded);
+      return true;
+    } catch (reason) {
+      message.error(errorText(reason));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const closeTraining = async () => {
+    if (!trainPlan?.enabled || !trainPlan.personId || !trainPlan.productId || !trainPlan.trainedOn || !trainPlan.personName) return;
+    const moved = await go(forward?.id);
+    if (!moved || desk.id.startsWith('gap-')) return;
+    const body = {
+      product_id: trainPlan.productId,
+      program_instance_id: desk.id,
+      stakeholder_id: trainPlan.personId,
+      full_name: trainPlan.personName,
+      trained_on: trainPlan.trainedOn,
+      qualification_until: trainPlan.qualificationUntil,
+      status: trainPlan.status,
+    };
+    try {
+      if (trainPlan.carrierId) await apiRequest(`/api/teachers/${trainPlan.carrierId}`, { method: 'PATCH', body: JSON.stringify(body) });
+      else await apiRequest(`/api/organizations/${desk.organizationId}/teachers`, { method: 'POST', body: JSON.stringify(body) });
+    } catch (reason) {
+      message.error(errorText(reason));
+    }
+  };
+
+  const closeTransfer = async () => {
+    if (!transferPlan?.enabled || !transferPlan.licenseId || !transferPlan.transferredOn) return;
+    const moved = await go(forward?.id);
+    if (!moved || desk.id.startsWith('gap-')) return;
+    try {
+      await apiRequest(`/api/licenses/${transferPlan.licenseId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          transfer_status: 'transferred',
+          product_access: transferPlan.access,
+          transferred_on: transferPlan.transferredOn,
+        }),
+      });
+    } catch (reason) {
+      message.error(errorText(reason));
+    }
+  };
+
+  const closeLicense = async () => {
+    if (!licensePlan?.enabled || !licensePlan.fileId || !licensePlan.signedOn || !licensePlan.validUntil) return;
+    const moved = await go(forward?.id);
+    if (!moved || desk.id.startsWith('gap-')) return;
+    try {
+      await apiRequest(`/api/organizations/${desk.organizationId}/licenses`, {
+        method: 'POST',
+        body: JSON.stringify({
+          program_instance_id: desk.id,
+          license_number: licensePlan.number,
+          signed_at: `${licensePlan.signedOn}T00:00:00Z`,
+          valid_until: `${licensePlan.validUntil}T00:00:00Z`,
+          attachment_id: licensePlan.fileId,
+          comment: licensePlan.volume || null,
+          transfer_status: 'not_transferred',
+        }),
+      });
+    } catch (reason) {
+      message.error(errorText(reason));
+    }
+  };
+
+  const closeSignedContract = async () => {
+    if (!signPlan?.enabled || !signPlan.fileId || !signPlan.signedOn) return;
+    const moved = await go(forward?.id);
+    if (!moved || desk.id.startsWith('gap-')) return;
+    try {
+      await apiRequest(`/api/organizations/${desk.organizationId}/contracts`, {
+        method: 'POST',
+        body: JSON.stringify({
+          number: signPlan.number,
+          signed_on: signPlan.signedOn,
+          valid_until: signPlan.validUntil ? `${signPlan.validUntil}T00:00:00Z` : null,
+          status: 'signed',
+          attachment_id: signPlan.fileId,
+          comment: signPlan.signer || null,
+        }),
+      });
+    } catch (reason) {
+      message.error(errorText(reason));
+    }
+  };
+
+  const reopen = async () => {
+    if (!selected || selected.id.startsWith('gap-') || desk.id.startsWith('gap-')) return;
+    setBusy(true);
+    try {
+      await reopenProgramStage(desk.id, selected.id);
+      await load();
+      setSelectedId(selected.id);
     } catch (reason) {
       message.error(errorText(reason));
     } finally {
@@ -317,8 +512,10 @@ const WorkflowDetailPage = () => {
       const reloaded = await loadProgramDesk(desk.id);
       setDesk(reloaded);
       setSelectedId(reloaded.currentStageId || reloaded.stages[0]?.id || '');
+      return true;
     } catch (reason) {
       message.error(errorText(reason));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -348,21 +545,39 @@ const WorkflowDetailPage = () => {
         <div className={styles.layout}>
           <Card className={styles.stageCard} title="Путь">
             <WorkflowSteps
-              steps={desk.stages.map((stage) => ({ id: stage.id, title: stage.name, phase: stage.phase }))}
+              steps={[...desk.stages.map((stage) => ({ id: stage.id, title: stage.name, phase: stage.phase })), { id: controlId, title: 'Контроль исполнения', phase: desk.stages.at(-1)?.phase }]}
               currentStep={currentIndex}
               selectedStep={selectedIndex}
               mutedAfter={refusedAt >= 0 ? refusedAt : undefined}
-              onStepChange={(index) => setSelectedId(desk.stages[index].id)}
+              onStepChange={(index) => setSelectedId(index >= desk.stages.length ? controlId : desk.stages[index].id)}
             />
           </Card>
           <div className={styles.content}>
             {showBanner && <Alert type={desk.bannerTone === 'success' ? 'success' : desk.bannerTone === 'warning' ? 'warning' : 'info'} showIcon message={desk.banner} />}
-            {selected && (
+            {controlSelected && (
+              <Card className={styles.sectionCard}>
+                <div className={styles.stageHeading}>
+                  <h2>Контроль исполнения</h2>
+                  <Tag className={desk.status === 'completed' ? styles.stageStatusCompleted : styles.stageStatusCurrent}>{desk.status === 'completed' ? 'Архив' : 'Активен'}</Tag>
+                </div>
+                <ControlExecutionStage
+                  programId={desk.id}
+                  organizationId={desk.organizationId}
+                  archived={desk.status === 'completed'}
+                  windowId={desk.windowId}
+                  healthBand={desk.healthBand}
+                  healthScore={desk.healthScore}
+                  stages={desk.stages.map((stage) => ({ id: stage.id, name: stage.name, code: stage.code, status: stage.status, dueAt: stage.dueAt }))}
+                  onOpenStage={(stageId) => { if (stageId) setSelectedId(stageId); }}
+                />
+              </Card>
+            )}
+            {selected && !controlSelected && (
               <Card className={styles.sectionCard}>
                 <div className={styles.stageHeading}>
                   <h2>{selected.name}</h2>
                   <Tag className={refused ? styles.stageStatusUpcoming : isCurrent ? styles.stageStatusCurrent : readOnly ? styles.stageStatusCompleted : styles.stageStatusUpcoming}>
-                    {refused && selectedIndex === refusedAt ? 'Закрыт' : late > 0 ? `Просрочен на ${late} дн.` : isCurrent && !refused ? 'Текущий' : selected.status === 'completed' || (refused && selectedIndex < refusedAt) ? 'Пройден' : 'Впереди'}
+                    {refused && selectedIndex === refusedAt ? 'Закрыт' : isCurrent && !refused ? 'Текущий' : selected.status === 'completed' || (refused && selectedIndex < refusedAt) ? 'Пройден' : 'Впереди'}
                   </Tag>
                 </div>
                 {findContact ? (
@@ -410,6 +625,229 @@ const WorkflowDetailPage = () => {
                       await refreshFacts();
                     }}
                     onPeopleChange={(people) => setDesk((current) => current ? { ...current, people } : current)}
+                  />
+                ) : periodResults ? (
+                  <PeriodResultsStage
+                    key={selected.id}
+                    stageId={selected.id}
+                    programId={desk.id}
+                    organizationId={desk.organizationId}
+                    dueAt={selected.dueAt}
+                    ready={factsStageId === selected.id}
+                    items={factsStageId === selected.id ? checklist : []}
+                    files={files}
+                    fallbackPeople={desk.people}
+                    readOnly={readOnly || desk.status === 'completed'}
+                    onCommit={(item, patch) => { void changeItem(item, patch); }}
+                    onPlan={publishPeriodPlan}
+                    onUpload={async (file, kind) => {
+                      const uploaded = await uploadStageFile(selected.id, file, kind);
+                      const saved = { id: uploaded.id, fileId: uploaded.file_id, name: uploaded.original_name || file.name, kind: uploaded.attachment_kind ?? kind ?? null, sizeLabel: '' };
+                      setFiles((current) => [...current.filter((entry) => entry.id !== saved.id), saved]);
+                      return saved;
+                    }}
+                    onDeleteFile={async (file) => { await deleteStageFile(file.id); await refreshFacts(); }}
+                  />
+                ) : classesRunning ? (
+                  <ClassesRunningStage
+                    key={selected.id}
+                    stageId={selected.id}
+                    programId={desk.id}
+                    organizationId={desk.organizationId}
+                    productName={desk.product}
+                    windowTitle={desk.windowTitle}
+                    healthLabel={`${desk.healthScore ?? '—'} · ${desk.healthBand}`}
+                    dueAt={selected.dueAt}
+                    files={files}
+                    fallbackPeople={desk.people}
+                    readOnly={readOnly}
+                    onPlan={publishRunningPlan}
+                    onUpload={async (file, kind) => {
+                      const uploaded = await uploadStageFile(selected.id, file, kind);
+                      const saved = { id: uploaded.id, fileId: uploaded.file_id, name: uploaded.original_name || file.name, kind: uploaded.attachment_kind ?? kind ?? null, sizeLabel: '' };
+                      setFiles((current) => [...current.filter((entry) => entry.id !== saved.id), saved]);
+                      return saved;
+                    }}
+                    onDeleteFile={async (file) => { await deleteStageFile(file.id); await refreshFacts(); }}
+                  />
+                ) : startClasses ? (
+                  <StartClassesStage
+                    key={selected.id}
+                    stageId={selected.id}
+                    programId={desk.id}
+                    organizationId={desk.organizationId}
+                    productName={desk.product}
+                    programWindowId={desk.windowId}
+                    planClosed={desk.stages.find((stage) => stageCodeOf(stage.code, stage.name) === 'curriculum')?.status === 'COMPLETED'}
+                    dueAt={selected.dueAt}
+                    ready={factsStageId === selected.id}
+                    items={factsStageId === selected.id ? checklist : []}
+                    files={files}
+                    fallbackPeople={desk.people}
+                    readOnly={readOnly}
+                    onCommit={(item, patch) => { void changeItem(item, patch); }}
+                    onPlan={publishStartPlan}
+                    onUpload={async (file, kind) => {
+                      const uploaded = await uploadStageFile(selected.id, file, kind);
+                      const saved = { id: uploaded.id, fileId: uploaded.file_id, name: uploaded.original_name || file.name, kind: uploaded.attachment_kind ?? kind ?? null, sizeLabel: '' };
+                      setFiles((current) => [...current.filter((entry) => entry.id !== saved.id), saved]);
+                      return saved;
+                    }}
+                    onDeleteFile={async (file) => { await deleteStageFile(file.id); await refreshFacts(); }}
+                  />
+                ) : curriculum ? (
+                  <CurriculumStage
+                    key={selected.id}
+                    stageId={selected.id}
+                    programId={desk.id}
+                    organizationId={desk.organizationId}
+                    productName={desk.product}
+                    programWindowId={desk.windowId}
+                    dueAt={selected.dueAt}
+                    ready={factsStageId === selected.id}
+                    items={factsStageId === selected.id ? checklist : []}
+                    files={files}
+                    fallbackPeople={desk.people}
+                    readOnly={readOnly}
+                    onCommit={(item, patch) => { void changeItem(item, patch); }}
+                    onPlan={publishCurriculumPlan}
+                    onUpload={async (file, kind) => {
+                      const uploaded = await uploadStageFile(selected.id, file, kind);
+                      const saved = { id: uploaded.id, fileId: uploaded.file_id, name: uploaded.original_name || file.name, kind: uploaded.attachment_kind ?? kind ?? null, sizeLabel: '' };
+                      setFiles((current) => [...current.filter((entry) => entry.id !== saved.id), saved]);
+                      return saved;
+                    }}
+                    onDeleteFile={async (file) => { await deleteStageFile(file.id); await refreshFacts(); }}
+                  />
+                ) : confirmTeacher ? (
+                  <ConfirmTeacherStage
+                    key={selected.id}
+                    stageId={selected.id}
+                    programId={desk.id}
+                    organizationId={desk.organizationId}
+                    productName={desk.product}
+                    trainStageId={desk.stages.find((stage) => stageCodeOf(stage.code, stage.name) === 'train_teacher')?.id ?? null}
+                    programWindowId={desk.windowId}
+                    dueAt={selected.dueAt}
+                    ready={factsStageId === selected.id}
+                    items={factsStageId === selected.id ? checklist : []}
+                    files={files}
+                    fallbackPeople={desk.people}
+                    readOnly={readOnly}
+                    onCommit={(item, patch) => { void changeItem(item, patch); }}
+                    onPlan={publishConfirmPlan}
+                    onUpload={async (file, kind) => {
+                      const uploaded = await uploadStageFile(selected.id, file, kind);
+                      const saved = { id: uploaded.id, fileId: uploaded.file_id, name: uploaded.original_name || file.name, kind: uploaded.attachment_kind ?? kind ?? null, sizeLabel: '' };
+                      setFiles((current) => [...current.filter((entry) => entry.id !== saved.id), saved]);
+                      return saved;
+                    }}
+                    onDeleteFile={async (file) => { await deleteStageFile(file.id); await refreshFacts(); }}
+                  />
+                ) : trainTeacher ? (
+                  <TrainTeacherStage
+                    key={selected.id}
+                    stageId={selected.id}
+                    programId={desk.id}
+                    organizationId={desk.organizationId}
+                    productName={desk.product}
+                    dueAt={selected.dueAt}
+                    ready={factsStageId === selected.id}
+                    items={factsStageId === selected.id ? checklist : []}
+                    files={files}
+                    fallbackPeople={desk.people}
+                    readOnly={readOnly}
+                    onCommit={(item, patch) => { void changeItem(item, patch); }}
+                    onPlan={publishTrainPlan}
+                    onUpload={async (file, kind) => {
+                      const uploaded = await uploadStageFile(selected.id, file, kind);
+                      const saved = { id: uploaded.id, fileId: uploaded.file_id, name: uploaded.original_name || file.name, kind: uploaded.attachment_kind ?? kind ?? null, sizeLabel: '' };
+                      setFiles((current) => [...current.filter((entry) => entry.id !== saved.id), saved]);
+                      return saved;
+                    }}
+                    onDeleteFile={async (file) => { await deleteStageFile(file.id); await refreshFacts(); }}
+                  />
+                ) : transferAccess ? (
+                  <TransferAccessStage
+                    key={selected.id}
+                    stageId={selected.id}
+                    programId={desk.id}
+                    organizationId={desk.organizationId}
+                    productName={desk.product}
+                    dueAt={selected.dueAt}
+                    ready={factsStageId === selected.id}
+                    items={factsStageId === selected.id ? checklist : []}
+                    files={files}
+                    fallbackPeople={desk.people}
+                    readOnly={readOnly}
+                    onCommit={(item, patch) => { void changeItem(item, patch); }}
+                    onPlan={publishTransferPlan}
+                    onUpload={async (file, kind) => {
+                      const uploaded = await uploadStageFile(selected.id, file, kind);
+                      const saved = { id: uploaded.id, fileId: uploaded.file_id, name: uploaded.original_name || file.name, kind: uploaded.attachment_kind ?? kind ?? null, sizeLabel: '' };
+                      setFiles((current) => [...current.filter((entry) => entry.id !== saved.id), saved]);
+                      return saved;
+                    }}
+                    onDeleteFile={async (file) => { await deleteStageFile(file.id); await refreshFacts(); }}
+                  />
+                ) : signLicense ? (
+                  <SignLicenseStage
+                    key={selected.id}
+                    stageId={selected.id}
+                    programId={desk.id}
+                    organizationId={desk.organizationId}
+                    productName={desk.product}
+                    dueAt={selected.dueAt}
+                    ready={factsStageId === selected.id}
+                    items={factsStageId === selected.id ? checklist : []}
+                    files={files}
+                    fallbackPeople={desk.people}
+                    readOnly={readOnly}
+                    onCommit={(item, patch) => { void changeItem(item, patch); }}
+                    onPlan={publishLicensePlan}
+                    onUpload={async (file, kind) => {
+                      const uploaded = await uploadStageFile(selected.id, file, kind);
+                      const saved = { id: uploaded.id, fileId: uploaded.file_id, name: uploaded.original_name || file.name, kind: uploaded.attachment_kind ?? kind ?? null, sizeLabel: '' };
+                      setFiles((current) => [...current.filter((entry) => entry.id !== saved.id), saved]);
+                      return saved;
+                    }}
+                    onDeleteFile={async (file) => { await deleteStageFile(file.id); await refreshFacts(); }}
+                  />
+                ) : signContract ? (
+                  <SignContractStage
+                    key={selected.id}
+                    stageId={selected.id}
+                    organizationId={desk.organizationId}
+                    packageStageId={desk.stages.find((stage) => stageCodeOf(stage.code, stage.name) === 'document_package')?.id ?? null}
+                    dueAt={selected.dueAt}
+                    ready={factsStageId === selected.id}
+                    items={factsStageId === selected.id ? checklist : []}
+                    files={files}
+                    fallbackPeople={desk.people}
+                    readOnly={readOnly}
+                    onCommit={(item, patch) => { void changeItem(item, patch); }}
+                    onPlan={publishSignPlan}
+                    onUpload={async (file, kind) => {
+                      const uploaded = await uploadStageFile(selected.id, file, kind);
+                      const saved = {
+                        id: uploaded.id,
+                        fileId: uploaded.file_id,
+                        name: uploaded.original_name || file.name,
+                        kind: uploaded.attachment_kind ?? kind ?? null,
+                        sizeLabel: '',
+                      };
+                      setFiles((current) => [...current.filter((entry) => entry.id !== saved.id), saved]);
+                      return saved;
+                    }}
+                    onUploadProject={async (file) => {
+                      const packageStage = desk.stages.find((stage) => stageCodeOf(stage.code, stage.name) === 'document_package');
+                      if (!packageStage) throw new Error('Этап пакета документов не найден');
+                      await uploadStageFile(packageStage.id, file, 'project_contract');
+                    }}
+                    onDeleteFile={async (file) => {
+                      await deleteStageFile(file.id);
+                      await refreshFacts();
+                    }}
                   />
                 ) : documentPackage ? (
                   <DocumentPackageStage
@@ -539,17 +977,51 @@ const WorkflowDetailPage = () => {
                 )}
                 {firstMeeting && !refused && meetingPlan?.hint && <p className={styles.blockReason}>{meetingPlan.hint}</p>}
                 {firstMeeting && refused && <p className={styles.blockReason}>Заход закрыт. Следующие этапы не открываются.</p>}
-                {missing.length > 0 && isCurrent && !firstMeeting && !identifyNeed && !documentPackage && (!findContact || closeHint) && <p className={styles.blockReason}>Закрытие заблокировано: {missing.join(', ')}</p>}
+                {missing.length > 0 && isCurrent && !firstMeeting && !identifyNeed && !documentPackage && !signContract && !signLicense && !transferAccess && !trainTeacher && !confirmTeacher && !curriculum && !startClasses && !classesRunning && !periodResults && (!findContact || closeHint) && <p className={styles.blockReason}>Закрытие заблокировано: {missing.join(', ')}</p>}
                 <div className={styles.footerActions}>
+                  {selectedIndex < currentIndex && !refused && desk.status !== 'completed' && <Button loading={busy} onClick={() => void reopen()}>Вернуться на этот этап</Button>}
                   {backward && isCurrent && <Button disabled={!(drafts[selected.id] ?? '').trim()} loading={busy} onClick={() => void go(backward.id)}>Вернуть к «{previous?.name}»</Button>}
                   {selected.optional && isCurrent && <Button loading={busy} onClick={() => void go(forward?.id, true)}>Пропустить</Button>}
                   <Button
                     type="primary"
-                    disabled={refused || (documentPackage ? !packagePlan?.enabled || !canMoveForward : identifyNeed ? !identifyPlan?.enabled || !canMoveForward : firstMeeting ? !meetingPlan?.enabled || (meetingPlan.action === 'forward' && !canMoveForward) : findContact ? !canMoveForward || stageBlockers === null : !canClose)}
+                    style={periodResults && periodPlan?.early && periodPlan.enabled ? { background: '#f5c451', borderColor: '#f5c451', color: '#3d2e00' } : undefined}
+                    disabled={refused || desk.status === 'completed' || (periodResults ? !periodPlan?.enabled || !canMoveForward : classesRunning ? !runningPlan?.enabled || !canMoveForward : startClasses ? !startPlan?.enabled || !canMoveForward : curriculum ? !curriculumPlan?.enabled || !canMoveForward : confirmTeacher ? !confirmPlan?.enabled || !canMoveForward : trainTeacher ? !trainPlan?.enabled || !canMoveForward : transferAccess ? !transferPlan?.enabled || !canMoveForward : signLicense ? !licensePlan?.enabled || !canMoveForward : signContract ? !signPlan?.enabled || !canMoveForward : documentPackage ? !packagePlan?.enabled || !canMoveForward : identifyNeed ? !identifyPlan?.enabled || !canMoveForward : firstMeeting ? !meetingPlan?.enabled || (meetingPlan.action === 'forward' && !canMoveForward) : findContact ? !canMoveForward || stageBlockers === null : !canClose)}
                     loading={busy}
                     onClick={() => {
                       if (firstMeeting && meetingPlan?.action === 'refuse') {
                         void refuse();
+                        return;
+                      }
+                      if (periodResults && periodPlan?.early) {
+                        Modal.confirm({ title: 'Окно ещё идёт. Перейти к контролю?', okText: 'Перейти', cancelText: 'Оставить', onOk: () => { void go(forward?.id).then((moved) => { if (moved) setSelectedId('control'); }); } });
+                        return;
+                      }
+                      if (periodResults) {
+                        void go(forward?.id).then((moved) => { if (moved) setSelectedId('control'); });
+                        return;
+                      }
+                      if (classesRunning || startClasses || curriculum) {
+                        void go(forward?.id);
+                        return;
+                      }
+                      if (confirmTeacher) {
+                        void go(forward?.id);
+                        return;
+                      }
+                      if (trainTeacher) {
+                        void closeTraining();
+                        return;
+                      }
+                      if (transferAccess) {
+                        void closeTransfer();
+                        return;
+                      }
+                      if (signLicense) {
+                        void closeLicense();
+                        return;
+                      }
+                      if (signContract) {
+                        void closeSignedContract();
                         return;
                       }
                       if (!documentPackage && missing.length > 0) {
@@ -559,7 +1031,7 @@ const WorkflowDetailPage = () => {
                       void go(forward?.id);
                     }}
                   >
-                    {refused ? 'Заход закрыт' : documentPackage ? (packagePlan?.button ?? 'Закрыть и перейти к подписанию договора') : identifyNeed ? (identifyPlan?.button ?? 'Закрыть и перейти к пакету документов') : firstMeeting ? (meetingPlan?.button ?? 'Закрыть и перейти к выявлению потребности') : selected.final ? 'Завершить программу' : next ? `Закрыть и перейти к «${next.name}»` : 'Закрыть этап'}
+                    {desk.status === 'completed' ? 'Заход завершён' : refused ? 'Заход закрыт' : periodResults ? (periodPlan?.button ?? 'Закрыть и перейти к контролю исполнения') : classesRunning ? (runningPlan?.button ?? 'Закрыть и перейти к итогам') : startClasses ? (startPlan?.button ?? 'Закрыть и перейти к ведению занятий') : curriculum ? (curriculumPlan?.button ?? 'Закрыть и перейти к старту занятий') : confirmTeacher ? (confirmPlan?.button ?? 'Закрыть и перейти к учебному плану') : trainTeacher ? (trainPlan?.button ?? 'Закрыть и перейти к подтверждению преподавателя') : transferAccess ? (transferPlan?.button ?? 'Закрыть и перейти к обучению преподавателя') : signLicense ? (licensePlan?.button ?? 'Закрыть и перейти к передаче и доступу') : signContract ? (signPlan?.button ?? 'Закрыть и перейти к подписанию лицензии') : documentPackage ? (packagePlan?.button ?? 'Закрыть и перейти к подписанию договора') : identifyNeed ? (identifyPlan?.button ?? 'Закрыть и перейти к пакету документов') : firstMeeting ? (meetingPlan?.button ?? 'Закрыть и перейти к выявлению потребности') : selected.final ? 'Завершить программу' : next ? `Закрыть и перейти к «${next.name}»` : 'Закрыть этап'}
                   </Button>
                 </div>
               </Card>

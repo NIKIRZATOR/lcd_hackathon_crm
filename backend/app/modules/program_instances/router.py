@@ -24,7 +24,7 @@ from app.modules.program_instances.service import ProgramInstanceService
 from app.modules.users.model import User
 from app.modules.workflow_catalog.model import WorkflowPhase, WorkflowStageCatalog
 from app.modules.workflows.model import WorkflowStage, WorkflowStageInstance, WorkflowTransitionHistory
-from app.modules.workflows.schemas import ProgramRefuse, WorkflowTransitionExecute
+from app.modules.workflows.schemas import ProgramRefuse, ProgramReopen, WorkflowTransitionExecute
 from app.modules.workflows.service import TransitionService, WorkflowRuntimeService
 
 router = APIRouter(
@@ -305,6 +305,24 @@ def refuse_program_instance(
     NbaService(db).recompute_program(program_instance_id)
     db.commit()
     return result
+
+
+@router.post("/program-instances/{program_instance_id}/reopen")
+def reopen_program_stage(
+    program_instance_id: UUID,
+    payload: ProgramReopen,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    ProgramInstanceService(db).get(program_instance_id, current_user)
+    model = db.get(ProgramInstance, program_instance_id)
+    if model is None or model.status in {"completed", "cancelled"}:
+        raise HTTPException(status_code=409, detail="Program workflow is not active")
+    TransitionService(db).reopen_program_stage(model, payload.stage_instance_id)
+    HealthService(db).recompute(program_instance_id)
+    NbaService(db).recompute_program(program_instance_id)
+    db.commit()
+    return {"current_stage_instance_id": str(model.current_stage_instance_id)}
 
 
 @router.post("/program-instances/{program_instance_id}/transition")

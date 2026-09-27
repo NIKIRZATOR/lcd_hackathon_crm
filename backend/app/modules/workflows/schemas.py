@@ -312,6 +312,10 @@ class WorkflowTransitionExecute(BaseModel):
     expected_current_stage_instance_id: UUID | None = None
 
 
+class ProgramReopen(BaseModel):
+    stage_instance_id: UUID
+
+
 class ProgramRefuse(BaseModel):
     comment: str
     performed_by: UUID | None = None

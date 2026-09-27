@@ -408,7 +408,8 @@ class ProgramInstanceService:
                     continue
             if preset == "semester" and not (program.academic_window_id and (window := self.db.get(AcademicWindow, program.academic_window_id)) and 0 <= (window.plan_cutoff_on - date.today()).days <= 21):
                 continue
-            result.append(WorkflowJournalRead(id=program.id, organization_name=org_name, direction_name=direction_name, product_name=product_name, playbook_name=playbook_name, current_stage_name=stage_name, due_at=due_at, health_score=program.health_score, health_band=program.health_band, kam_name=kam_name, students_count=students, applications_count=applications))
+            shown_stage = "Контроль исполнения" if program.current_stage_code == "control" else stage_name
+            result.append(WorkflowJournalRead(id=program.id, organization_name=org_name, direction_name=direction_name, product_name=product_name, playbook_name=playbook_name, current_stage_name=shown_stage, due_at=due_at, health_score=program.health_score, health_band=program.health_band, kam_name=kam_name, students_count=students, applications_count=applications))
         return result
 
     def _recompute_missing_health(self, organization_id: UUID) -> None:

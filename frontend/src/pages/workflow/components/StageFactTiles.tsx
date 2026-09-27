@@ -1,4 +1,5 @@
 import { ClockCircleOutlined, MailOutlined, PhoneOutlined, UserOutlined, WarningOutlined } from '@ant-design/icons';
+import type { ReactNode } from 'react';
 
 import styles from './ContactSearchStage.module.scss';
 
@@ -66,9 +67,10 @@ const FactTile = ({ tile }: { tile: StageFactTile }) => {
   return <button type="button" className={className} onClick={tile.onClick} disabled={tile.disabled}>{body}</button>;
 };
 
-const StageFactTiles = ({ tiles }: { tiles: StageFactTile[] }) => (
+const StageFactTiles = ({ tiles, children }: { tiles: StageFactTile[]; children?: ReactNode }) => (
   <div className={styles.tiles}>
     {tiles.map((tile) => <FactTile key={tile.label} tile={tile} />)}
+    {children}
   </div>
 );
 

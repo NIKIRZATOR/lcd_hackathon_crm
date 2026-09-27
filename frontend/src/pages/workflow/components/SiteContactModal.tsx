@@ -17,6 +17,7 @@ export type SiteContactFormValues = {
 type SiteContactModalProps = {
   open: boolean;
   mode: 'create' | 'edit';
+  variant?: 'contact' | 'teacher';
   saving?: boolean;
   contact?: SiteContact | null;
   defaultPrimary?: boolean;
@@ -29,14 +30,15 @@ type SiteContactModalProps = {
 const roleOptions = stakeholderRoles.map((role) => ({ value: role.value, label: role.label }));
 const sourceOptions = contactSources.map((source) => ({ value: source.value, label: source.label }));
 
-const SiteContactModal = ({ open, mode, saving, contact, defaultPrimary, source, onSourceChange, onCancel, onSubmit }: SiteContactModalProps) => {
+const SiteContactModal = ({ open, mode, variant = 'contact', saving, contact, defaultPrimary, source, onSourceChange, onCancel, onSubmit }: SiteContactModalProps) => {
+  const teacher = variant === 'teacher';
   const [form] = Form.useForm<SiteContactFormValues>();
   const knownRole = stakeholderRoles.some((role) => role.value === contact?.roleCode);
   return (
     <Modal
       open={open}
       destroyOnHidden
-      title={mode === 'edit' ? 'Контакт площадки' : 'Новый контакт'}
+      title={teacher ? 'Новый преподаватель' : mode === 'edit' ? 'Контакт площадки' : 'Новый контакт'}
       okText={mode === 'edit' ? 'Сохранить' : 'Добавить'}
       cancelText="Отмена"
       confirmLoading={saving}
@@ -51,7 +53,7 @@ const SiteContactModal = ({ open, mode, saving, contact, defaultPrimary, source,
           layout="vertical"
           requiredMark={false}
           initialValues={{
-            roleCode: knownRole ? contact?.roleCode : 'other',
+            roleCode: teacher ? 'teacher' : knownRole ? contact?.roleCode : 'other',
             name: contact?.name ?? '',
             phone: contact?.phone ?? '',
             email: contact?.email ?? '',
@@ -59,9 +61,11 @@ const SiteContactModal = ({ open, mode, saving, contact, defaultPrimary, source,
           }}
           onFinish={onSubmit}
         >
-          <Form.Item name="roleCode" label="Должность" rules={[{ required: true, message: 'Выберите должность' }]}>
-            <Select options={roleOptions} />
-          </Form.Item>
+          {!teacher && (
+            <Form.Item name="roleCode" label="Должность" rules={[{ required: true, message: 'Выберите должность' }]}>
+              <Select options={roleOptions} />
+            </Form.Item>
+          )}
           <Form.Item name="name" label="ФИО" rules={[{ required: true, whitespace: true, message: 'Введите ФИО' }]}>
             <Input maxLength={255} autoComplete="name" />
           </Form.Item>
@@ -71,18 +75,22 @@ const SiteContactModal = ({ open, mode, saving, contact, defaultPrimary, source,
           <Form.Item name="email" label="Почта">
             <Input maxLength={255} autoComplete="email" />
           </Form.Item>
-          <Form.Item label="Откуда контакт">
-            <Select
-              allowClear
-              placeholder="Не указан"
-              value={source ?? undefined}
-              options={sourceOptions}
-              onChange={(value) => onSourceChange(value ?? null)}
-            />
-          </Form.Item>
-          <Form.Item name="primary" valuePropName="checked">
-            <Checkbox>Сделать основным контактом вуза</Checkbox>
-          </Form.Item>
+          {!teacher && (
+            <>
+              <Form.Item label="Откуда контакт">
+                <Select
+                  allowClear
+                  placeholder="Не указан"
+                  value={source ?? undefined}
+                  options={sourceOptions}
+                  onChange={(value) => onSourceChange(value ?? null)}
+                />
+              </Form.Item>
+              <Form.Item name="primary" valuePropName="checked">
+                <Checkbox>Сделать основным контактом вуза</Checkbox>
+              </Form.Item>
+            </>
+          )}
         </Form>
       )}
     </Modal>

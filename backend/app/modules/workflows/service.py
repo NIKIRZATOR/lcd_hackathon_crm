@@ -1865,6 +1865,37 @@ class TransitionService:
             current_stage_instance_id=interaction.current_stage_instance_id,
         )
 
+    def reopen_program_stage(self, program: ProgramInstance, stage_instance_id: UUID) -> None:
+        owner = WorkflowStageInstance.interaction_id == program.legacy_interaction_id if program.legacy_interaction_id else WorkflowStageInstance.program_instance_id == program.id
+        rows = self.db.execute(
+            select(WorkflowStageInstance, WorkflowStage)
+            .join(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id)
+            .where(owner)
+            .order_by(WorkflowStage.order_index)
+        ).all()
+        ordered = [(instance, stage) for instance, stage in rows]
+        target_index = next((index for index, (instance, _stage) in enumerate(ordered) if instance.id == stage_instance_id), None)
+        current_index = len(ordered) if program.current_stage_code == "control" and program.current_stage_instance_id is None else next((index for index, (instance, _stage) in enumerate(ordered) if instance.id == program.current_stage_instance_id), None)
+        if target_index is None or current_index is None or target_index >= current_index:
+            raise workflow_error(status_code=status.HTTP_409_CONFLICT, code="WORKFLOW_STAGE_NOT_PREVIOUS", message="Only an earlier stage can be reopened")
+        for index, (instance, _stage) in enumerate(ordered):
+            if index < target_index:
+                continue
+            instance.status = "IN_PROGRESS" if index == target_index else "PENDING"
+            instance.completed_at = None
+            if index > target_index:
+                instance.started_at = None
+        target, stage = ordered[target_index]
+        program.current_stage_instance_id = target.id
+        if stage.stage_catalog_id is not None:
+            catalog = self.db.get(WorkflowStageCatalog, stage.stage_catalog_id)
+            if catalog is not None:
+                program.current_stage_code = catalog.code
+        if program.legacy_interaction_id is not None:
+            interaction = self.db.get(UniversityInteraction, program.legacy_interaction_id)
+            if interaction is not None:
+                interaction.current_stage_instance_id = target.id
+
     def execute_program_transition(
         self,
         program: ProgramInstance,
@@ -1933,10 +1964,15 @@ class TransitionService:
                 performed_at=now,
             )
             self.history_repository.add(history)
-            program.status = "completed"
-            program.completed_at = now
-            program.current_stage_instance_id = None
-            program.current_stage_code = None
+            catalog = self.db.get(WorkflowStageCatalog, stage.stage_catalog_id) if stage.stage_catalog_id else None
+            if catalog is not None and catalog.code == "period_results":
+                program.current_stage_instance_id = None
+                program.current_stage_code = "control"
+            else:
+                program.status = "completed"
+                program.completed_at = now
+                program.current_stage_instance_id = None
+                program.current_stage_code = None
             self.audit_repository.add(
                 AuditEvent(
                     actor_user_id=self._get_performed_by(payload),
@@ -2273,12 +2309,14 @@ class TransitionService:
             if contract is None:
                 reasons.append({"code": "missing_contract", "message": "Signed framework contract is required"})
         elif code in {"sign_license", "transfer_access"}:
-            license_record = self.db.scalar(select(License).where(
+            license_filters = [
                 License.program_instance_id == program.id,
                 License.license_number.is_not(None),
                 License.valid_until.is_not(None),
-                License.attachment_id.is_not(None),
-            ))
+            ]
+            if code == "sign_license":
+                license_filters.append(License.attachment_id.is_not(None))
+            license_record = self.db.scalar(select(License).where(*license_filters))
             if license_record is None:
                 reasons.append({"code": "missing_license", "message": "Signed program license is required"})
             elif code == "transfer_access" and license_record.transfer_status != "transferred":

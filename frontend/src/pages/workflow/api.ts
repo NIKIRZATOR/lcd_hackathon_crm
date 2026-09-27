@@ -595,6 +595,11 @@ export const refuseProgram = (programId: string, payload: { stageId: string; com
   }),
 });
 
+export const reopenProgramStage = (programId: string, stageId: string) => apiRequest(`/api/program-instances/${programId}/reopen`, {
+  method: 'POST',
+  body: JSON.stringify({ stage_instance_id: stageId }),
+});
+
 export const moveProgram = (programId: string, payload: { transitionId?: string; comment?: string; stageId?: string; skip?: boolean }) => apiRequest(`/api/program-instances/${programId}/transition`, {
   method: 'POST',
   body: JSON.stringify({

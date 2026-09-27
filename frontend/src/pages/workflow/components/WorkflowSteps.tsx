@@ -67,7 +67,6 @@ const WorkflowSteps = ({ steps, currentStep, selectedStep = currentStep, horizon
         const status = mutedAfter == null
           ? getStepStatus(index, currentStep)
           : index <= mutedAfter ? 'finish' : 'wait';
-        const connectorFinished = mutedAfter == null ? index < currentStep : index < mutedAfter;
         const isClickable = Boolean(onStepChange) && !step.disabled;
         const isSelected = index === selectedStep;
 
@@ -92,9 +91,6 @@ const WorkflowSteps = ({ steps, currentStep, selectedStep = currentStep, horizon
             <span className={styles.stepNumber}>{String(index + 1).padStart(2, '0')}</span>
             <span className={styles.markerColumn}>
               <StepMarker status={status} />
-              {index < steps.length - 1 && (
-                <span className={`${styles.connector} ${connectorFinished ? styles.connectorFinished : ''}`} aria-hidden="true" />
-              )}
             </span>
             <span className={`${styles.stepTitle} ${status === 'process' ? styles.currentTitle : ''} ${mutedAfter != null && index > mutedAfter ? styles.mutedTitle : ''}`}>
               {step.title}
