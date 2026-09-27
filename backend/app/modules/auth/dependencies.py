@@ -37,13 +37,16 @@ def get_current_user(
     email = payload.get("email")
     roles = get_token_roles(payload)
 
-    return UserService(db).sync_keycloak_user(
+    user = UserService(db).sync_keycloak_user(
         keycloak_user_id=UUID(subject),
         username=username,
         email=email,
         full_name=full_name,
         roles=roles,
     )
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is inactive")
+    return user
 
 
 def require_roles(*required_roles: str) -> Callable[[User], User]:

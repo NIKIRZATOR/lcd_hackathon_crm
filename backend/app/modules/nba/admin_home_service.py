@@ -62,6 +62,7 @@ class AdminHomeService:
             "quick_actions": [
                 {"label": "Обработать fixture", "path": "/management?tab=integrations"},
                 {"label": "Открыть сопоставления", "path": "/management?tab=integrations"},
+                {"label": "Назначить KAM организациям", "path": "/management?tab=assignments"},
                 {"label": "Эталоны workflow", "path": "/management?tab=playbooks"},
                 {"label": "Обращения по документации", "path": "/management?tab=documentation-requests"},
             ],

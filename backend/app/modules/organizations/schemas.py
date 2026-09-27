@@ -105,6 +105,11 @@ class AssignmentRead(BaseModel):
     ended_at: datetime | None
 
 
+class AssignmentHistoryRead(AssignmentRead):
+    kam_name: str
+    assigned_by_name: str | None
+
+
 class StakeholderCreate(BaseModel):
     role_code: str = Field(default="other", pattern="^(vice_rector|dean|methodist|lawyer|chair|teacher|director|school_teacher|other)$")
     full_name: str = Field(min_length=1, max_length=255)

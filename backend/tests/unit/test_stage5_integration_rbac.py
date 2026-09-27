@@ -37,3 +37,22 @@ def test_non_admin_cannot_read_integration_diagnostics(role: str, path: str) -> 
     response = TestClient(app).get(path)
 
     assert response.status_code == 403
+
+
+@pytest.mark.parametrize("role", ["KAM", "MANAGER"])
+def test_non_admin_cannot_list_users(role: str) -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user(role)
+
+    response = TestClient(app).get("/api/users")
+
+    assert response.status_code == 403
+
+
+def test_kam_cannot_read_organization_assignment_history() -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user("KAM")
+
+    response = TestClient(app).get(f"/api/organizations/{uuid4()}/assignments")
+
+    assert response.status_code == 403
