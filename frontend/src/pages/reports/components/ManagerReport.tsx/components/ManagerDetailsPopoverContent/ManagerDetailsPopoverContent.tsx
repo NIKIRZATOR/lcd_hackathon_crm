@@ -1,11 +1,32 @@
 import { Badge } from 'antd';
 
-import type { ManagerReportItem } from '../../types';
+import type { ManagerProgramHealth, ManagerReportItem } from '../../types';
 
 import styles from './ManagerDetailsPopoverContent.module.scss';
 
 type ManagerDetailsPopoverContentProps = {
   item: ManagerReportItem;
+};
+
+const HEALTH_CONFIG: Record<
+  ManagerProgramHealth,
+  {
+    label: string;
+    status: 'success' | 'warning' | 'error';
+  }
+> = {
+  green: {
+    label: 'В норме',
+    status: 'success',
+  },
+  yellow: {
+    label: 'Требует внимания',
+    status: 'warning',
+  },
+  red: {
+    label: 'Критично',
+    status: 'error',
+  },
 };
 
 const ManagerDetailsPopoverContent = ({ item }: ManagerDetailsPopoverContentProps) => {
@@ -18,33 +39,33 @@ const ManagerDetailsPopoverContent = ({ item }: ManagerDetailsPopoverContentProp
 
       <div className={styles.summary}>
         <div>
-          <span>Программ</span>
-          <strong>{item.programs}</strong>
+          <span>Активные программы</span>
+          <strong>{item.activePrograms}</strong>
         </div>
 
         <div>
-          <span>Активных</span>
-          <strong>{item.activeInteractions}</strong>
+          <span>Зелёный Health</span>
+          <strong>{item.greenHealth}</strong>
         </div>
 
         <div>
-          <span>Завершённых</span>
-          <strong>{item.completedInteractions}</strong>
+          <span>Жёлтый Health</span>
+          <strong>{item.yellowHealth}</strong>
         </div>
 
         <div>
-          <span>Просроченных</span>
-          <strong>{item.overdueInteractions}</strong>
+          <span>Красный Health</span>
+          <strong>{item.redHealth}</strong>
+        </div>
+
+        <div>
+          <span>Просроченные задачи</span>
+          <strong>{item.overdueTasks}</strong>
         </div>
 
         <div>
           <span>Требуют внимания</span>
-          <strong>{item.attentionRequired}</strong>
-        </div>
-
-        <div>
-          <span>Среднее время этапа</span>
-          <strong>{item.averageStageDuration} дн.</strong>
+          <strong>{item.attentionTasks}</strong>
         </div>
       </div>
 
@@ -53,116 +74,98 @@ const ManagerDetailsPopoverContent = ({ item }: ManagerDetailsPopoverContentProp
       <div className={styles.details}>
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
-            <span className={styles.sectionTitle}>Программы</span>
+            <span className={styles.sectionTitle}>Активные программы</span>
+
             <span className={styles.sectionCount}>{item.programItems.length}</span>
           </div>
 
           <div className={styles.items}>
-            {item.programItems.map((program) => (
-              <div key={program.id} className={styles.item}>
-                <div className={styles.itemTitle}>{program.name}</div>
-                <div className={styles.itemDescription}>{program.product}</div>
-              </div>
-            ))}
+            {item.programItems.map((program) => {
+              const health = HEALTH_CONFIG[program.health];
+
+              return (
+                <div key={program.id} className={styles.item}>
+                  <div className={styles.itemHeader}>
+                    <div className={styles.itemContent}>
+                      <div className={styles.itemTitle}>{program.name}</div>
+
+                      <div className={styles.itemDescription}>{program.university}</div>
+
+                      <div className={styles.meta}>
+                        ИТ-продукт: <strong>{program.product}</strong>
+                      </div>
+                    </div>
+
+                    <Badge status={health.status} text={health.label} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
-            <span className={styles.sectionTitle}>Активные взаимодействия</span>
+            <span className={styles.sectionTitle}>Просроченные задачи</span>
 
-            <span className={styles.sectionCount}>{item.activeInteractionItems.length}</span>
+            <span className={styles.sectionCount}>{item.overdueTaskItems.length}</span>
           </div>
 
-          <div className={styles.items}>
-            {item.activeInteractionItems.map((interaction) => (
-              <div key={interaction.id} className={styles.item}>
-                <div className={styles.itemHeader}>
-                  <div>
-                    <div className={styles.itemTitle}>{interaction.university}</div>
+          {item.overdueTaskItems.length > 0 ? (
+            <div className={styles.items}>
+              {item.overdueTaskItems.map((task) => (
+                <div key={task.id} className={styles.item}>
+                  <div className={styles.itemHeader}>
+                    <div className={styles.itemContent}>
+                      <div className={styles.itemTitle}>{task.university}</div>
 
-                    <div className={styles.itemDescription}>{interaction.program}</div>
+                      <div className={styles.itemDescription}>{task.program}</div>
+                    </div>
+
+                    <Badge status="error" text={`${task.overdueDays} дн.`} />
                   </div>
 
-                  <Badge status="processing" text={interaction.stage} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionTitle}>Завершённые взаимодействия</span>
-
-            <span className={styles.sectionCount}>{item.completedInteractionItems.length}</span>
-          </div>
-
-          <div className={styles.items}>
-            {item.completedInteractionItems.map((interaction) => (
-              <div key={interaction.id} className={styles.item}>
-                <div className={styles.itemHeader}>
-                  <div>
-                    <div className={styles.itemTitle}>{interaction.university}</div>
-
-                    <div className={styles.itemDescription}>{interaction.program}</div>
+                  <div className={styles.meta}>
+                    Причина: <strong>{task.reason}</strong>
                   </div>
-
-                  <Badge status="success" text="Завершено" />
                 </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionTitle}>Просроченные этапы</span>
-
-            <span className={styles.sectionCount}>{item.overdueItems.length}</span>
-          </div>
-
-          <div className={styles.items}>
-            {item.overdueItems.map((overdueItem) => (
-              <div key={overdueItem.id} className={styles.item}>
-                <div className={styles.itemHeader}>
-                  <div>
-                    <div className={styles.itemTitle}>{overdueItem.university}</div>
-
-                    <div className={styles.itemDescription}>{overdueItem.program}</div>
-                  </div>
-
-                  <Badge status="error" text={`${overdueItem.overdueDays} дн.`} />
-                </div>
-
-                <div className={styles.meta}>
-                  Этап: <strong>{overdueItem.stage}</strong>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.empty}>Просроченных задач нет</div>
+          )}
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
             <span className={styles.sectionTitle}>Требуют внимания</span>
 
-            <span className={styles.sectionCount}>{item.attentionItems.length}</span>
+            <span className={styles.sectionCount}>{item.attentionTaskItems.length}</span>
           </div>
 
-          <div className={styles.items}>
-            {item.attentionItems.map((attentionItem) => (
-              <div key={attentionItem.id} className={styles.item}>
-                <div className={styles.itemTitle}>{attentionItem.university}</div>
+          {item.attentionTaskItems.length > 0 ? (
+            <div className={styles.items}>
+              {item.attentionTaskItems.map((task) => (
+                <div key={task.id} className={styles.item}>
+                  <div className={styles.itemHeader}>
+                    <div className={styles.itemContent}>
+                      <div className={styles.itemTitle}>{task.university}</div>
 
-                <div className={styles.itemDescription}>{attentionItem.program}</div>
+                      <div className={styles.itemDescription}>{task.program}</div>
+                    </div>
 
-                <div className={styles.meta}>
-                  Причина: <strong>{attentionItem.reason}</strong>
+                    <Badge status="warning" text="Внимание" />
+                  </div>
+
+                  <div className={styles.meta}>
+                    Причина: <strong>{task.reason}</strong>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.empty}>Задач, требующих внимания, нет</div>
+          )}
         </section>
       </div>
     </div>
@@ -170,4 +173,3 @@ const ManagerDetailsPopoverContent = ({ item }: ManagerDetailsPopoverContentProp
 };
 
 export default ManagerDetailsPopoverContent;
-

@@ -19,6 +19,21 @@
     gap: 12px;
 
     width: 100%;
+
+    &_twoRows {
+      grid-template-columns: 300px repeat(4, minmax(0, 1fr));
+      align-items: start;
+
+      margin-bottom: 24px;
+
+      .filters__item_primary {
+        grid-row: span 2;
+      }
+
+      .filters__item:nth-child(n + 6) {
+        align-self: end;
+      }
+    }
   }
 
   &__actions {

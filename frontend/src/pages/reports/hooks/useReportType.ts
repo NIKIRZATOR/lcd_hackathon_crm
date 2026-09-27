@@ -5,6 +5,8 @@ import type { ReportType } from '../types';
 
 const REPORT_QUERY_KEY = 'report';
 
+const DEFAULT_REPORT_TYPE: ReportType = 'programs';
+
 type UseReportTypeParams = {
   availableReportTypes: ReportType[];
 };
@@ -17,6 +19,10 @@ export const useReportType = ({ availableReportTypes }: UseReportTypeParams) => 
 
     if (value && availableReportTypes.includes(value)) {
       return value;
+    }
+
+    if (availableReportTypes.includes(DEFAULT_REPORT_TYPE)) {
+      return DEFAULT_REPORT_TYPE;
     }
 
     return availableReportTypes[0];
@@ -44,4 +50,3 @@ export const useReportType = ({ availableReportTypes }: UseReportTypeParams) => 
     setReportType,
   };
 };
-

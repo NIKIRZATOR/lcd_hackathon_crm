@@ -1,6 +1,6 @@
 import type { PeriodValue } from '../../components/MobilePeriodPicker/MobilePeriodPicker';
 
-export type ReportType = 'interactions' | 'programs' | 'manager';
+export type ReportType = 'programs' | 'programs-rating' | 'manager';
 
 export type ReportFilterOption = {
   id: number;
@@ -21,4 +21,3 @@ export type ReportsFiltersValues = {
   productIds: number[];
   responsibleIds: number[];
 };
-

@@ -5,923 +5,1033 @@ export const managerReportMock: ManagerReportItem[] = [
     id: 1,
     kamId: 1,
     kam: 'Иванов И.И.',
-    programs: 3,
-    activeInteractions: 3,
-    completedInteractions: 2,
-    overdueInteractions: 2,
-    attentionRequired: 2,
-    averageStageDuration: 5.4,
+
+    activePrograms: 6,
+
+    greenHealth: 3,
+    yellowHealth: 2,
+    redHealth: 1,
+
+    overdueTasks: 2,
+    attentionTasks: 3,
+
     programItems: [
       {
         id: 1,
+        university: 'МГУ им. М.В. Ломоносова',
         name: 'Python-разработчик с использованием инструментов ИИ',
         product: 'Ростелеком Лицей',
-      },
-      {
-        id: 2,
-        name: 'Введение в информационную безопасность',
-        product: 'Solar',
-      },
-      {
-        id: 3,
-        name: 'DevOps-инженер с нуля',
-        product: 'Cloud.ru',
-      },
-    ],
-    activeInteractionItems: [
-      {
-        id: 1,
-        university: 'МГУ им. М.В. Ломоносова',
-        program: 'Python-разработчик с использованием инструментов ИИ',
-        stage: 'Обмен документами',
+        health: 'green',
       },
       {
         id: 2,
         university: 'МГТУ им. Н.Э. Баумана',
-        program: 'Введение в информационную безопасность',
-        stage: 'Организация встречи',
+        name: 'Введение в информационную безопасность',
+        product: 'Solar',
+        health: 'yellow',
       },
       {
         id: 3,
         university: 'НИУ ВШЭ',
-        program: 'DevOps-инженер с нуля',
-        stage: 'Внедрение продукта',
+        name: 'DevOps-инженер с нуля',
+        product: 'Cloud.ru',
+        health: 'red',
       },
-    ],
-    completedInteractionItems: [
       {
         id: 4,
         university: 'СПбГУ',
-        program: 'Введение в информационную безопасность',
-        stage: 'Ведение занятий',
+        name: 'Основы UX/UI-дизайна',
+        product: 'Ростелеком Образование',
+        health: 'green',
       },
       {
         id: 5,
         university: 'ИТМО',
-        program: 'DevOps-инженер с нуля',
-        stage: 'Ведение занятий',
+        name: 'Инженер-тестировщик',
+        product: 'Ростелеком ИТ',
+        health: 'green',
+      },
+      {
+        id: 6,
+        university: 'РАНХиГС',
+        name: 'Промпт-инжиниринг',
+        product: 'GigaChat',
+        health: 'yellow',
       },
     ],
-    overdueItems: [
+
+    overdueTaskItems: [
       {
         id: 1,
         university: 'МГТУ им. Н.Э. Баумана',
         program: 'Введение в информационную безопасность',
-        stage: 'Организация встречи',
+        reason: 'Не завершено согласование документов',
         overdueDays: 4,
       },
       {
         id: 2,
         university: 'НИУ ВШЭ',
         program: 'DevOps-инженер с нуля',
-        stage: 'Внедрение продукта',
+        reason: 'Просрочен этап внедрения продукта',
         overdueDays: 7,
       },
     ],
-    attentionItems: [
+
+    attentionTaskItems: [
       {
         id: 1,
         university: 'МГТУ им. Н.Э. Баумана',
         program: 'Введение в информационную безопасность',
-        reason: 'Этап просрочен на 4 дня',
+        reason: 'Нет активности более 5 дней',
       },
       {
         id: 2,
         university: 'НИУ ВШЭ',
         program: 'DevOps-инженер с нуля',
-        reason: 'Нет активности более 7 дней',
+        reason: 'Требуется актуализировать статус внедрения',
+      },
+      {
+        id: 3,
+        university: 'РАНХиГС',
+        program: 'Промпт-инжиниринг',
+        reason: 'Не назначена дата следующей встречи',
       },
     ],
   },
+
   {
     id: 2,
     kamId: 2,
     kam: 'Петров П.П.',
-    programs: 3,
-    activeInteractions: 2,
-    completedInteractions: 3,
-    overdueInteractions: 1,
-    attentionRequired: 1,
-    averageStageDuration: 4.1,
+
+    activePrograms: 5,
+
+    greenHealth: 4,
+    yellowHealth: 1,
+    redHealth: 0,
+
+    overdueTasks: 1,
+    attentionTasks: 1,
+
     programItems: [
       {
-        id: 4,
+        id: 7,
+        university: 'КФУ',
         name: 'Основы UX/UI-дизайна',
         product: 'Ростелеком Образование',
+        health: 'green',
       },
-      {
-        id: 5,
-        name: 'Графический дизайн пользовательских интерфейсов',
-        product: 'Ростелеком Образование',
-      },
-      {
-        id: 6,
-        name: 'Промпт-инжиниринг',
-        product: 'GigaChat',
-      },
-    ],
-    activeInteractionItems: [
-      {
-        id: 6,
-        university: 'КФУ',
-        program: 'Основы UX/UI-дизайна',
-        stage: 'Первичная коммуникация',
-      },
-      {
-        id: 7,
-        university: 'УрФУ',
-        program: 'Промпт-инжиниринг',
-        stage: 'Передача материалов',
-      },
-    ],
-    completedInteractionItems: [
       {
         id: 8,
-        university: 'РАНХиГС',
-        program: 'Основы UX/UI-дизайна',
-        stage: 'Ведение занятий',
+        university: 'УрФУ',
+        name: 'Промпт-инжиниринг',
+        product: 'GigaChat',
+        health: 'yellow',
       },
       {
         id: 9,
-        university: 'СПбПУ',
-        program: 'Графический дизайн пользовательских интерфейсов',
-        stage: 'Ведение занятий',
+        university: 'РАНХиГС',
+        name: 'Графический дизайн пользовательских интерфейсов',
+        product: 'Ростелеком Образование',
+        health: 'green',
       },
       {
         id: 10,
-        university: 'ДВФУ',
-        program: 'Промпт-инжиниринг',
-        stage: 'Ведение занятий',
+        university: 'СПбПУ',
+        name: 'Python-разработчик с использованием инструментов ИИ',
+        product: 'Ростелеком Лицей',
+        health: 'green',
       },
-    ],
-    overdueItems: [
       {
-        id: 3,
-        university: 'УрФУ',
-        program: 'Промпт-инжиниринг',
-        stage: 'Передача материалов',
-        overdueDays: 3,
+        id: 11,
+        university: 'ДВФУ',
+        name: 'Специалист по анализу данных',
+        product: 'Data Platform',
+        health: 'green',
       },
     ],
-    attentionItems: [
+
+    overdueTaskItems: [
       {
         id: 3,
         university: 'УрФУ',
         program: 'Промпт-инжиниринг',
         reason: 'Срок передачи материалов истёк',
+        overdueDays: 3,
+      },
+    ],
+
+    attentionTaskItems: [
+      {
+        id: 4,
+        university: 'УрФУ',
+        program: 'Промпт-инжиниринг',
+        reason: 'Не подтверждена дата обучения преподавателей',
       },
     ],
   },
+
   {
     id: 3,
     kamId: 3,
     kam: 'Сидоров А.А.',
-    programs: 4,
-    activeInteractions: 4,
-    completedInteractions: 2,
-    overdueInteractions: 3,
-    attentionRequired: 3,
-    averageStageDuration: 6.8,
+
+    activePrograms: 8,
+
+    greenHealth: 3,
+    yellowHealth: 3,
+    redHealth: 2,
+
+    overdueTasks: 4,
+    attentionTasks: 5,
+
     programItems: [
       {
-        id: 7,
+        id: 12,
+        university: 'НГУ',
         name: 'Инженер-тестировщик',
         product: 'Ростелеком ИТ',
-      },
-      {
-        id: 8,
-        name: 'Анализ данных без программирования',
-        product: 'Data Platform',
-      },
-      {
-        id: 9,
-        name: 'Специалист по анализу данных',
-        product: 'Data Platform',
-      },
-      {
-        id: 10,
-        name: 'Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»',
-        product: 'Ростелеком ИТ',
-      },
-    ],
-    activeInteractionItems: [
-      {
-        id: 11,
-        university: 'НГУ',
-        program: 'Инженер-тестировщик',
-        stage: 'Подписание документов',
-      },
-      {
-        id: 12,
-        university: 'ТПУ',
-        program: 'Анализ данных без программирования',
-        stage: 'Обмен документами',
+        health: 'green',
       },
       {
         id: 13,
-        university: 'ТГУ',
-        program: 'Специалист по анализу данных',
-        stage: 'Актуализация программы',
+        university: 'ТПУ',
+        name: 'Анализ данных без программирования',
+        product: 'Data Platform',
+        health: 'red',
       },
       {
         id: 14,
-        university: 'МИФИ',
-        program: 'Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»',
-        stage: 'Организация встречи',
+        university: 'ТГУ',
+        name: 'Специалист по анализу данных',
+        product: 'Data Platform',
+        health: 'yellow',
       },
-    ],
-    completedInteractionItems: [
       {
         id: 15,
-        university: 'СФУ',
-        program: 'Инженер-тестировщик',
-        stage: 'Ведение занятий',
+        university: 'МИФИ',
+        name: 'Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»',
+        product: 'Ростелеком ИТ',
+        health: 'red',
       },
       {
         id: 16,
+        university: 'СФУ',
+        name: 'Python-разработчик с использованием инструментов ИИ',
+        product: 'Ростелеком Лицей',
+        health: 'green',
+      },
+      {
+        id: 17,
         university: 'ЮФУ',
-        program: 'Анализ данных без программирования',
-        stage: 'Ведение занятий',
+        name: 'Введение в информационную безопасность',
+        product: 'Solar',
+        health: 'yellow',
+      },
+      {
+        id: 18,
+        university: 'КубГУ',
+        name: 'DevOps-инженер с нуля',
+        product: 'Cloud.ru',
+        health: 'yellow',
+      },
+      {
+        id: 19,
+        university: 'КФУ',
+        name: 'Основы UX/UI-дизайна',
+        product: 'Ростелеком Образование',
+        health: 'green',
       },
     ],
-    overdueItems: [
+
+    overdueTaskItems: [
       {
         id: 4,
         university: 'ТПУ',
         program: 'Анализ данных без программирования',
-        stage: 'Обмен документами',
+        reason: 'Документы не согласованы в установленный срок',
         overdueDays: 5,
       },
       {
         id: 5,
         university: 'ТГУ',
         program: 'Специалист по анализу данных',
-        stage: 'Актуализация программы',
+        reason: 'Актуализация программы не завершена',
         overdueDays: 8,
       },
       {
         id: 6,
         university: 'МИФИ',
         program: 'Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»',
-        stage: 'Организация встречи',
+        reason: 'Не проведена запланированная встреча',
         overdueDays: 2,
       },
-    ],
-    attentionItems: [
       {
-        id: 4,
-        university: 'ТПУ',
-        program: 'Анализ данных без программирования',
-        reason: 'Документы не согласованы в срок',
+        id: 7,
+        university: 'КубГУ',
+        program: 'DevOps-инженер с нуля',
+        reason: 'Просрочен этап внедрения',
+        overdueDays: 4,
       },
+    ],
+
+    attentionTaskItems: [
       {
         id: 5,
-        university: 'ТГУ',
-        program: 'Специалист по анализу данных',
-        reason: 'Этап просрочен на 8 дней',
+        university: 'ТПУ',
+        program: 'Анализ данных без программирования',
+        reason: 'Документы ожидают согласования',
       },
       {
         id: 6,
+        university: 'ТГУ',
+        program: 'Специалист по анализу данных',
+        reason: 'Нет обновления статуса более 7 дней',
+      },
+      {
+        id: 7,
         university: 'МИФИ',
         program: 'Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»',
-        reason: 'Не назначена дата следующей встречи',
+        reason: 'Не назначена новая дата встречи',
+      },
+      {
+        id: 8,
+        university: 'ЮФУ',
+        program: 'Введение в информационную безопасность',
+        reason: 'Требуется подтверждение со стороны вуза',
+      },
+      {
+        id: 9,
+        university: 'КубГУ',
+        program: 'DevOps-инженер с нуля',
+        reason: 'Внедрение идёт дольше планового срока',
       },
     ],
   },
+
   {
     id: 4,
     kamId: 4,
     kam: 'Кузнецова Е.В.',
-    programs: 2,
-    activeInteractions: 2,
-    completedInteractions: 3,
-    overdueInteractions: 0,
-    attentionRequired: 1,
-    averageStageDuration: 3.9,
+
+    activePrograms: 4,
+
+    greenHealth: 3,
+    yellowHealth: 1,
+    redHealth: 0,
+
+    overdueTasks: 0,
+    attentionTasks: 1,
+
     programItems: [
       {
-        id: 11,
+        id: 20,
+        university: 'ИТМО',
         name: 'Создание мобильных приложений для ОС «Аврора» в фреймворке Qt Quick',
         product: 'Аврора',
-      },
-      {
-        id: 12,
-        name: 'Веб-разработка на платформе «Акола»',
-        product: 'Акола',
-      },
-    ],
-    activeInteractionItems: [
-      {
-        id: 17,
-        university: 'ИТМО',
-        program: 'Создание мобильных приложений для ОС «Аврора» в фреймворке Qt Quick',
-        stage: 'Обучение преподавателей',
-      },
-      {
-        id: 18,
-        university: 'СПбГУТ',
-        program: 'Веб-разработка на платформе «Акола»',
-        stage: 'Внедрение продукта',
-      },
-    ],
-    completedInteractionItems: [
-      {
-        id: 19,
-        university: 'СПбПУ',
-        program: 'Создание мобильных приложений для ОС «Аврора» в фреймворке Qt Quick',
-        stage: 'Ведение занятий',
-      },
-      {
-        id: 20,
-        university: 'ГУАП',
-        program: 'Создание мобильных приложений для ОС «Аврора» в фреймворке Qt Quick',
-        stage: 'Ведение занятий',
+        health: 'green',
       },
       {
         id: 21,
+        university: 'СПбГУТ',
+        name: 'Веб-разработка на платформе «Акола»',
+        product: 'Акола',
+        health: 'yellow',
+      },
+      {
+        id: 22,
+        university: 'СПбПУ',
+        name: 'Инженер-тестировщик',
+        product: 'Ростелеком ИТ',
+        health: 'green',
+      },
+      {
+        id: 23,
         university: 'ЛЭТИ',
-        program: 'Веб-разработка на платформе «Акола»',
-        stage: 'Ведение занятий',
+        name: 'Введение в информационную безопасность',
+        product: 'Solar',
+        health: 'green',
       },
     ],
-    overdueItems: [],
-    attentionItems: [
+
+    overdueTaskItems: [],
+
+    attentionTaskItems: [
       {
-        id: 7,
+        id: 10,
         university: 'СПбГУТ',
         program: 'Веб-разработка на платформе «Акола»',
-        reason: 'Нет активности в течение 5 дней',
+        reason: 'Нет активности по программе в течение 5 дней',
       },
     ],
   },
+
   {
     id: 5,
     kamId: 5,
     kam: 'Смирнов Д.О.',
-    programs: 3,
-    activeInteractions: 3,
-    completedInteractions: 2,
-    overdueInteractions: 2,
-    attentionRequired: 3,
-    averageStageDuration: 5.9,
+
+    activePrograms: 7,
+
+    greenHealth: 2,
+    yellowHealth: 3,
+    redHealth: 2,
+
+    overdueTasks: 3,
+    attentionTasks: 4,
+
     programItems: [
       {
-        id: 13,
+        id: 24,
+        university: 'ПНИПУ',
         name: 'DevOps-инженер с нуля',
         product: 'Cloud.ru',
+        health: 'red',
       },
-      {
-        id: 14,
-        name: 'Введение в информационную безопасность',
-        product: 'Solar',
-      },
-      {
-        id: 15,
-        name: 'Инженер-тестировщик',
-        product: 'Ростелеком ИТ',
-      },
-    ],
-    activeInteractionItems: [
-      {
-        id: 22,
-        university: 'ПНИПУ',
-        program: 'DevOps-инженер с нуля',
-        stage: 'Внедрение продукта',
-      },
-      {
-        id: 23,
-        university: 'Самарский университет',
-        program: 'Введение в информационную безопасность',
-        stage: 'Подписание документов',
-      },
-      {
-        id: 24,
-        university: 'ОмГТУ',
-        program: 'Инженер-тестировщик',
-        stage: 'Передача материалов',
-      },
-    ],
-    completedInteractionItems: [
       {
         id: 25,
-        university: 'УрФУ',
-        program: 'DevOps-инженер с нуля',
-        stage: 'Ведение занятий',
+        university: 'Самарский университет',
+        name: 'Введение в информационную безопасность',
+        product: 'Solar',
+        health: 'yellow',
       },
       {
         id: 26,
+        university: 'ОмГТУ',
+        name: 'Инженер-тестировщик',
+        product: 'Ростелеком ИТ',
+        health: 'red',
+      },
+      {
+        id: 27,
+        university: 'УрФУ',
+        name: 'Основы UX/UI-дизайна',
+        product: 'Ростелеком Образование',
+        health: 'green',
+      },
+      {
+        id: 28,
         university: 'ПГНИУ',
-        program: 'Введение в информационную безопасность',
-        stage: 'Ведение занятий',
+        name: 'Python-разработчик с использованием инструментов ИИ',
+        product: 'Ростелеком Лицей',
+        health: 'green',
+      },
+      {
+        id: 29,
+        university: 'КНИТУ',
+        name: 'Промпт-инжиниринг',
+        product: 'GigaChat',
+        health: 'yellow',
+      },
+      {
+        id: 30,
+        university: 'БашГУ',
+        name: 'Анализ данных без программирования',
+        product: 'Data Platform',
+        health: 'yellow',
       },
     ],
-    overdueItems: [
+
+    overdueTaskItems: [
       {
-        id: 7,
+        id: 8,
         university: 'ПНИПУ',
         program: 'DevOps-инженер с нуля',
-        stage: 'Внедрение продукта',
+        reason: 'Не завершено внедрение продукта',
         overdueDays: 6,
       },
       {
-        id: 8,
+        id: 9,
         university: 'ОмГТУ',
         program: 'Инженер-тестировщик',
-        stage: 'Передача материалов',
+        reason: 'Не переданы учебные материалы',
         overdueDays: 4,
       },
-    ],
-    attentionItems: [
       {
-        id: 8,
+        id: 10,
+        university: 'Самарский университет',
+        program: 'Введение в информационную безопасность',
+        reason: 'Просрочено подписание документов',
+        overdueDays: 2,
+      },
+    ],
+
+    attentionTaskItems: [
+      {
+        id: 11,
         university: 'ПНИПУ',
         program: 'DevOps-инженер с нуля',
-        reason: 'Этап внедрения просрочен',
+        reason: 'Внедрение продукта требует вмешательства KAM',
       },
       {
-        id: 9,
+        id: 12,
         university: 'Самарский университет',
         program: 'Введение в информационную безопасность',
         reason: 'Ожидается подписание документов',
       },
       {
-        id: 10,
+        id: 13,
         university: 'ОмГТУ',
         program: 'Инженер-тестировщик',
         reason: 'Материалы не переданы в срок',
       },
+      {
+        id: 14,
+        university: 'БашГУ',
+        program: 'Анализ данных без программирования',
+        reason: 'Не подтверждён следующий этап',
+      },
     ],
   },
+
   {
     id: 6,
     kamId: 6,
     kam: 'Попова М.С.',
-    programs: 2,
-    activeInteractions: 2,
-    completedInteractions: 2,
-    overdueInteractions: 1,
-    attentionRequired: 1,
-    averageStageDuration: 4.6,
+
+    activePrograms: 5,
+
+    greenHealth: 3,
+    yellowHealth: 2,
+    redHealth: 0,
+
+    overdueTasks: 1,
+    attentionTasks: 2,
+
     programItems: [
       {
-        id: 16,
+        id: 31,
+        university: 'КФУ',
         name: 'Промпт-инжиниринг',
         product: 'GigaChat',
+        health: 'yellow',
       },
       {
-        id: 17,
+        id: 32,
+        university: 'БашГУ',
         name: 'Основы UX/UI-дизайна',
         product: 'Ростелеком Образование',
-      },
-    ],
-    activeInteractionItems: [
-      {
-        id: 27,
-        university: 'КФУ',
-        program: 'Промпт-инжиниринг',
-        stage: 'Обучение преподавателей',
+        health: 'green',
       },
       {
-        id: 28,
-        university: 'БашГУ',
-        program: 'Основы UX/UI-дизайна',
-        stage: 'Первичная коммуникация',
-      },
-    ],
-    completedInteractionItems: [
-      {
-        id: 29,
+        id: 33,
         university: 'УдГУ',
-        program: 'Основы UX/UI-дизайна',
-        stage: 'Ведение занятий',
+        name: 'Графический дизайн пользовательских интерфейсов',
+        product: 'Ростелеком Образование',
+        health: 'green',
       },
       {
-        id: 30,
+        id: 34,
         university: 'КНИТУ',
-        program: 'Промпт-инжиниринг',
-        stage: 'Ведение занятий',
+        name: 'Python-разработчик с использованием инструментов ИИ',
+        product: 'Ростелеком Лицей',
+        health: 'green',
       },
-    ],
-    overdueItems: [
       {
-        id: 9,
-        university: 'КФУ',
-        program: 'Промпт-инжиниринг',
-        stage: 'Обучение преподавателей',
-        overdueDays: 2,
+        id: 35,
+        university: 'УГНТУ',
+        name: 'DevOps-инженер с нуля',
+        product: 'Cloud.ru',
+        health: 'yellow',
       },
     ],
-    attentionItems: [
+
+    overdueTaskItems: [
       {
         id: 11,
         university: 'КФУ',
         program: 'Промпт-инжиниринг',
         reason: 'Не завершено обучение преподавателей',
+        overdueDays: 2,
+      },
+    ],
+
+    attentionTaskItems: [
+      {
+        id: 15,
+        university: 'КФУ',
+        program: 'Промпт-инжиниринг',
+        reason: 'Требуется подтверждение завершения обучения',
+      },
+      {
+        id: 16,
+        university: 'УГНТУ',
+        program: 'DevOps-инженер с нуля',
+        reason: 'Нет подтверждённого срока внедрения',
       },
     ],
   },
+
   {
     id: 7,
     kamId: 7,
     kam: 'Волков Р.Н.',
-    programs: 4,
-    activeInteractions: 4,
-    completedInteractions: 3,
-    overdueInteractions: 3,
-    attentionRequired: 4,
-    averageStageDuration: 7.2,
+
+    activePrograms: 9,
+
+    greenHealth: 3,
+    yellowHealth: 3,
+    redHealth: 3,
+
+    overdueTasks: 5,
+    attentionTasks: 6,
+
     programItems: [
       {
-        id: 18,
+        id: 36,
+        university: 'ДВФУ',
         name: 'Специалист по анализу данных',
         product: 'Data Platform',
-      },
-      {
-        id: 19,
-        name: 'Анализ данных без программирования',
-        product: 'Data Platform',
-      },
-      {
-        id: 20,
-        name: 'Python-разработчик с использованием инструментов ИИ',
-        product: 'Ростелеком Лицей',
-      },
-      {
-        id: 21,
-        name: 'Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»',
-        product: 'Ростелеком ИТ',
-      },
-    ],
-    activeInteractionItems: [
-      {
-        id: 31,
-        university: 'ДВФУ',
-        program: 'Специалист по анализу данных',
-        stage: 'Обмен документами',
-      },
-      {
-        id: 32,
-        university: 'СВФУ',
-        program: 'Анализ данных без программирования',
-        stage: 'Организация встречи',
-      },
-      {
-        id: 33,
-        university: 'ТГУ',
-        program: 'Python-разработчик с использованием инструментов ИИ',
-        stage: 'Актуализация программы',
-      },
-      {
-        id: 34,
-        university: 'НГУ',
-        program: 'Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»',
-        stage: 'Подписание документов',
-      },
-    ],
-    completedInteractionItems: [
-      {
-        id: 35,
-        university: 'СФУ',
-        program: 'Специалист по анализу данных',
-        stage: 'Ведение занятий',
-      },
-      {
-        id: 36,
-        university: 'ДВГУПС',
-        program: 'Анализ данных без программирования',
-        stage: 'Ведение занятий',
+        health: 'red',
       },
       {
         id: 37,
-        university: 'ИрНИТУ',
-        program: 'Python-разработчик с использованием инструментов ИИ',
-        stage: 'Ведение занятий',
-      },
-    ],
-    overdueItems: [
-      {
-        id: 10,
-        university: 'ДВФУ',
-        program: 'Специалист по анализу данных',
-        stage: 'Обмен документами',
-        overdueDays: 9,
-      },
-      {
-        id: 11,
         university: 'СВФУ',
-        program: 'Анализ данных без программирования',
-        stage: 'Организация встречи',
-        overdueDays: 6,
+        name: 'Анализ данных без программирования',
+        product: 'Data Platform',
+        health: 'red',
       },
       {
-        id: 12,
+        id: 38,
         university: 'ТГУ',
-        program: 'Python-разработчик с использованием инструментов ИИ',
-        stage: 'Актуализация программы',
-        overdueDays: 4,
+        name: 'Python-разработчик с использованием инструментов ИИ',
+        product: 'Ростелеком Лицей',
+        health: 'yellow',
+      },
+      {
+        id: 39,
+        university: 'НГУ',
+        name: 'Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»',
+        product: 'Ростелеком ИТ',
+        health: 'yellow',
+      },
+      {
+        id: 40,
+        university: 'СФУ',
+        name: 'Инженер-тестировщик',
+        product: 'Ростелеком ИТ',
+        health: 'green',
+      },
+      {
+        id: 41,
+        university: 'ДВГУПС',
+        name: 'Введение в информационную безопасность',
+        product: 'Solar',
+        health: 'green',
+      },
+      {
+        id: 42,
+        university: 'ИрНИТУ',
+        name: 'DevOps-инженер с нуля',
+        product: 'Cloud.ru',
+        health: 'green',
+      },
+      {
+        id: 43,
+        university: 'БГУ',
+        name: 'Промпт-инжиниринг',
+        product: 'GigaChat',
+        health: 'yellow',
+      },
+      {
+        id: 44,
+        university: 'ТОГУ',
+        name: 'Основы UX/UI-дизайна',
+        product: 'Ростелеком Образование',
+        health: 'red',
       },
     ],
-    attentionItems: [
+
+    overdueTaskItems: [
       {
         id: 12,
         university: 'ДВФУ',
         program: 'Специалист по анализу данных',
-        reason: 'Документы не согласованы в срок',
+        reason: 'Документы не согласованы',
+        overdueDays: 9,
       },
       {
         id: 13,
         university: 'СВФУ',
         program: 'Анализ данных без программирования',
-        reason: 'Встреча не назначена',
+        reason: 'Не проведена запланированная встреча',
+        overdueDays: 6,
       },
       {
         id: 14,
         university: 'ТГУ',
         program: 'Python-разработчик с использованием инструментов ИИ',
-        reason: 'Актуализация программы задерживается',
+        reason: 'Актуализация программы не завершена',
+        overdueDays: 4,
       },
       {
         id: 15,
         university: 'НГУ',
         program: 'Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»',
         reason: 'Документы ожидают подписания',
+        overdueDays: 3,
+      },
+      {
+        id: 16,
+        university: 'ТОГУ',
+        program: 'Основы UX/UI-дизайна',
+        reason: 'Не переданы материалы',
+        overdueDays: 7,
+      },
+    ],
+
+    attentionTaskItems: [
+      {
+        id: 17,
+        university: 'ДВФУ',
+        program: 'Специалист по анализу данных',
+        reason: 'Требуется срочное согласование документов',
+      },
+      {
+        id: 18,
+        university: 'СВФУ',
+        program: 'Анализ данных без программирования',
+        reason: 'Встреча не назначена',
+      },
+      {
+        id: 19,
+        university: 'ТГУ',
+        program: 'Python-разработчик с использованием инструментов ИИ',
+        reason: 'Актуализация программы задерживается',
+      },
+      {
+        id: 20,
+        university: 'НГУ',
+        program: 'Управление ИТ-проектами на базе программного продукта ПАО «Ростелеком»',
+        reason: 'Документы ожидают подписания',
+      },
+      {
+        id: 21,
+        university: 'БГУ',
+        program: 'Промпт-инжиниринг',
+        reason: 'Не определена дата обучения преподавателей',
+      },
+      {
+        id: 22,
+        university: 'ТОГУ',
+        program: 'Основы UX/UI-дизайна',
+        reason: 'Материалы не переданы в срок',
       },
     ],
   },
+
   {
     id: 8,
     kamId: 8,
     kam: 'Лебедев К.А.',
-    programs: 2,
-    activeInteractions: 3,
-    completedInteractions: 2,
-    overdueInteractions: 1,
-    attentionRequired: 2,
-    averageStageDuration: 5.1,
+
+    activePrograms: 6,
+
+    greenHealth: 3,
+    yellowHealth: 2,
+    redHealth: 1,
+
+    overdueTasks: 2,
+    attentionTasks: 3,
+
     programItems: [
       {
-        id: 22,
+        id: 45,
+        university: 'МИРЭА',
         name: 'Веб-разработка на платформе «Акола»',
         product: 'Акола',
+        health: 'red',
       },
       {
-        id: 23,
+        id: 46,
+        university: 'МАИ',
         name: 'Инженер-тестировщик',
         product: 'Ростелеком ИТ',
-      },
-    ],
-    activeInteractionItems: [
-      {
-        id: 38,
-        university: 'МИРЭА',
-        program: 'Веб-разработка на платформе «Акола»',
-        stage: 'Передача материалов',
+        health: 'yellow',
       },
       {
-        id: 39,
-        university: 'МАИ',
-        program: 'Инженер-тестировщик',
-        stage: 'Обучение преподавателей',
-      },
-      {
-        id: 40,
+        id: 47,
         university: 'РТУ МИРЭА',
-        program: 'Инженер-тестировщик',
-        stage: 'Внедрение продукта',
+        name: 'DevOps-инженер с нуля',
+        product: 'Cloud.ru',
+        health: 'green',
       },
-    ],
-    completedInteractionItems: [
       {
-        id: 41,
+        id: 48,
         university: 'ГУУ',
-        program: 'Веб-разработка на платформе «Акола»',
-        stage: 'Ведение занятий',
+        name: 'Основы UX/UI-дизайна',
+        product: 'Ростелеком Образование',
+        health: 'green',
       },
       {
-        id: 42,
+        id: 49,
         university: 'МЭИ',
-        program: 'Инженер-тестировщик',
-        stage: 'Ведение занятий',
+        name: 'Введение в информационную безопасность',
+        product: 'Solar',
+        health: 'green',
+      },
+      {
+        id: 50,
+        university: 'МГТУ им. Н.Э. Баумана',
+        name: 'Python-разработчик с использованием инструментов ИИ',
+        product: 'Ростелеком Лицей',
+        health: 'yellow',
       },
     ],
-    overdueItems: [
+
+    overdueTaskItems: [
       {
-        id: 13,
-        university: 'МИРЭА',
-        program: 'Веб-разработка на платформе «Акола»',
-        stage: 'Передача материалов',
-        overdueDays: 3,
-      },
-    ],
-    attentionItems: [
-      {
-        id: 16,
+        id: 17,
         university: 'МИРЭА',
         program: 'Веб-разработка на платформе «Акола»',
         reason: 'Материалы не переданы в срок',
+        overdueDays: 3,
       },
       {
-        id: 17,
+        id: 18,
         university: 'МАИ',
         program: 'Инженер-тестировщик',
         reason: 'Обучение преподавателей не завершено',
+        overdueDays: 2,
+      },
+    ],
+
+    attentionTaskItems: [
+      {
+        id: 23,
+        university: 'МИРЭА',
+        program: 'Веб-разработка на платформе «Акола»',
+        reason: 'Передача материалов требует контроля',
+      },
+      {
+        id: 24,
+        university: 'МАИ',
+        program: 'Инженер-тестировщик',
+        reason: 'Обучение преподавателей идёт дольше планового срока',
+      },
+      {
+        id: 25,
+        university: 'МГТУ им. Н.Э. Баумана',
+        program: 'Python-разработчик с использованием инструментов ИИ',
+        reason: 'Нет подтверждения следующего этапа',
       },
     ],
   },
+
   {
     id: 9,
     kamId: 9,
     kam: 'Новикова А.П.',
-    programs: 3,
-    activeInteractions: 3,
-    completedInteractions: 3,
-    overdueInteractions: 1,
-    attentionRequired: 2,
-    averageStageDuration: 4.4,
+
+    activePrograms: 7,
+
+    greenHealth: 5,
+    yellowHealth: 2,
+    redHealth: 0,
+
+    overdueTasks: 1,
+    attentionTasks: 2,
+
     programItems: [
       {
-        id: 24,
+        id: 51,
+        university: 'РАНХиГС',
         name: 'Графический дизайн пользовательских интерфейсов',
         product: 'Ростелеком Образование',
+        health: 'green',
       },
       {
-        id: 25,
+        id: 52,
+        university: 'НИУ ВШЭ',
         name: 'Основы UX/UI-дизайна',
         product: 'Ростелеком Образование',
+        health: 'yellow',
       },
       {
-        id: 26,
+        id: 53,
+        university: 'МГИМО',
         name: 'Промпт-инжиниринг',
         product: 'GigaChat',
-      },
-    ],
-    activeInteractionItems: [
-      {
-        id: 43,
-        university: 'РАНХиГС',
-        program: 'Графический дизайн пользовательских интерфейсов',
-        stage: 'Первичная коммуникация',
+        health: 'yellow',
       },
       {
-        id: 44,
-        university: 'НИУ ВШЭ',
-        program: 'Основы UX/UI-дизайна',
-        stage: 'Обмен документами',
-      },
-      {
-        id: 45,
-        university: 'МГИМО',
-        program: 'Промпт-инжиниринг',
-        stage: 'Организация встречи',
-      },
-    ],
-    completedInteractionItems: [
-      {
-        id: 46,
+        id: 54,
         university: 'Финансовый университет',
-        program: 'Основы UX/UI-дизайна',
-        stage: 'Ведение занятий',
+        name: 'Анализ данных без программирования',
+        product: 'Data Platform',
+        health: 'green',
       },
       {
-        id: 47,
+        id: 55,
         university: 'РЭУ им. Г.В. Плеханова',
-        program: 'Графический дизайн пользовательских интерфейсов',
-        stage: 'Ведение занятий',
+        name: 'Специалист по анализу данных',
+        product: 'Data Platform',
+        health: 'green',
       },
       {
-        id: 48,
+        id: 56,
         university: 'МГПУ',
-        program: 'Промпт-инжиниринг',
-        stage: 'Ведение занятий',
+        name: 'Python-разработчик с использованием инструментов ИИ',
+        product: 'Ростелеком Лицей',
+        health: 'green',
+      },
+      {
+        id: 57,
+        university: 'МГУ им. М.В. Ломоносова',
+        name: 'Введение в информационную безопасность',
+        product: 'Solar',
+        health: 'green',
       },
     ],
-    overdueItems: [
+
+    overdueTaskItems: [
       {
-        id: 14,
-        university: 'НИУ ВШЭ',
-        program: 'Основы UX/UI-дизайна',
-        stage: 'Обмен документами',
-        overdueDays: 2,
-      },
-    ],
-    attentionItems: [
-      {
-        id: 18,
+        id: 19,
         university: 'НИУ ВШЭ',
         program: 'Основы UX/UI-дизайна',
         reason: 'Согласование документов задерживается',
+        overdueDays: 2,
+      },
+    ],
+
+    attentionTaskItems: [
+      {
+        id: 26,
+        university: 'НИУ ВШЭ',
+        program: 'Основы UX/UI-дизайна',
+        reason: 'Не завершено согласование документов',
       },
       {
-        id: 19,
+        id: 27,
         university: 'МГИМО',
         program: 'Промпт-инжиниринг',
         reason: 'Нет подтверждённой даты встречи',
       },
     ],
   },
+
   {
     id: 10,
     kamId: 10,
     kam: 'Макаров В.С.',
-    programs: 3,
-    activeInteractions: 4,
-    completedInteractions: 2,
-    overdueInteractions: 2,
-    attentionRequired: 3,
-    averageStageDuration: 6.1,
+
+    activePrograms: 8,
+
+    greenHealth: 3,
+    yellowHealth: 3,
+    redHealth: 2,
+
+    overdueTasks: 3,
+    attentionTasks: 4,
+
     programItems: [
       {
-        id: 27,
+        id: 58,
+        university: 'ЮФУ',
         name: 'Введение в информационную безопасность',
         product: 'Solar',
+        health: 'yellow',
       },
       {
-        id: 28,
+        id: 59,
+        university: 'КубГУ',
         name: 'DevOps-инженер с нуля',
         product: 'Cloud.ru',
+        health: 'red',
       },
       {
-        id: 29,
+        id: 60,
+        university: 'СКФУ',
         name: 'Создание мобильных приложений для ОС «Аврора» в фреймворке Qt Quick',
         product: 'Аврора',
-      },
-    ],
-    activeInteractionItems: [
-      {
-        id: 49,
-        university: 'ЮФУ',
-        program: 'Введение в информационную безопасность',
-        stage: 'Подписание документов',
+        health: 'yellow',
       },
       {
-        id: 50,
-        university: 'КубГУ',
-        program: 'DevOps-инженер с нуля',
-        stage: 'Внедрение продукта',
-      },
-      {
-        id: 51,
-        university: 'СКФУ',
-        program: 'Создание мобильных приложений для ОС «Аврора» в фреймворке Qt Quick',
-        stage: 'Обучение преподавателей',
-      },
-      {
-        id: 52,
+        id: 61,
         university: 'ВолГУ',
-        program: 'Введение в информационную безопасность',
-        stage: 'Передача материалов',
+        name: 'Введение в информационную безопасность',
+        product: 'Solar',
+        health: 'red',
       },
-    ],
-    completedInteractionItems: [
       {
-        id: 53,
+        id: 62,
         university: 'ДГТУ',
-        program: 'DevOps-инженер с нуля',
-        stage: 'Ведение занятий',
+        name: 'Python-разработчик с использованием инструментов ИИ',
+        product: 'Ростелеком Лицей',
+        health: 'green',
       },
       {
-        id: 54,
+        id: 63,
         university: 'КубГТУ',
-        program: 'Введение в информационную безопасность',
-        stage: 'Ведение занятий',
-      },
-    ],
-    overdueItems: [
-      {
-        id: 15,
-        university: 'КубГУ',
-        program: 'DevOps-инженер с нуля',
-        stage: 'Внедрение продукта',
-        overdueDays: 5,
+        name: 'Анализ данных без программирования',
+        product: 'Data Platform',
+        health: 'green',
       },
       {
-        id: 16,
-        university: 'ВолГУ',
-        program: 'Введение в информационную безопасность',
-        stage: 'Передача материалов',
-        overdueDays: 3,
+        id: 64,
+        university: 'СГУ',
+        name: 'Инженер-тестировщик',
+        product: 'Ростелеком ИТ',
+        health: 'green',
+      },
+      {
+        id: 65,
+        university: 'АГУ',
+        name: 'Основы UX/UI-дизайна',
+        product: 'Ростелеком Образование',
+        health: 'yellow',
       },
     ],
-    attentionItems: [
+
+    overdueTaskItems: [
       {
         id: 20,
         university: 'КубГУ',
         program: 'DevOps-инженер с нуля',
-        reason: 'Внедрение продукта просрочено',
+        reason: 'Внедрение продукта не завершено в срок',
+        overdueDays: 5,
       },
       {
         id: 21,
+        university: 'ВолГУ',
+        program: 'Введение в информационную безопасность',
+        reason: 'Передача материалов задерживается',
+        overdueDays: 3,
+      },
+      {
+        id: 22,
+        university: 'СКФУ',
+        program: 'Создание мобильных приложений для ОС «Аврора» в фреймворке Qt Quick',
+        reason: 'Просрочен контрольный срок обучения преподавателей',
+        overdueDays: 2,
+      },
+    ],
+
+    attentionTaskItems: [
+      {
+        id: 28,
+        university: 'КубГУ',
+        program: 'DevOps-инженер с нуля',
+        reason: 'Внедрение продукта требует внимания',
+      },
+      {
+        id: 29,
         university: 'СКФУ',
         program: 'Создание мобильных приложений для ОС «Аврора» в фреймворке Qt Quick',
         reason: 'Обучение преподавателей идёт дольше планового срока',
       },
       {
-        id: 22,
+        id: 30,
         university: 'ВолГУ',
         program: 'Введение в информационную безопасность',
         reason: 'Передача материалов задерживается',
       },
+      {
+        id: 31,
+        university: 'АГУ',
+        program: 'Основы UX/UI-дизайна',
+        reason: 'Не согласован следующий этап работы',
+      },
     ],
   },
 ];
-

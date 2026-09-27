@@ -6,47 +6,46 @@ export const MANAGER_REPORT_COLUMN_DEFINITIONS: ReportColumnDefinition<ManagerRe
   {
     key: 'kam',
     title: 'KAM',
-    minWidth: 150,
+    minWidth: 160,
     sorter: (a, b) => a.kam.localeCompare(b.kam, 'ru'),
   },
   {
-    key: 'programs',
-    title: 'Программ',
-    minWidth: 90,
-    sorter: (a, b) => a.programs - b.programs,
-  },
-  {
-    key: 'activeInteractions',
-    title: 'Активных взаимодействий',
+    key: 'activePrograms',
+    title: 'Активные программы',
     minWidth: 150,
-    sorter: (a, b) => a.activeInteractions - b.activeInteractions,
+    sorter: (a, b) => a.activePrograms - b.activePrograms,
   },
   {
-    key: 'completedInteractions',
-    title: 'Завершённых',
-    minWidth: 120,
-    sorter: (a, b) => a.completedInteractions - b.completedInteractions,
+    key: 'greenHealth',
+    title: 'Зелёный Health',
+    minWidth: 130,
+    sorter: (a, b) => a.greenHealth - b.greenHealth,
   },
   {
-    key: 'overdueInteractions',
-    title: 'Просроченных',
-    minWidth: 120,
-    sorter: (a, b) => a.overdueInteractions - b.overdueInteractions,
+    key: 'yellowHealth',
+    title: 'Жёлтый Health',
+    minWidth: 130,
+    sorter: (a, b) => a.yellowHealth - b.yellowHealth,
   },
   {
-    key: 'attentionRequired',
+    key: 'redHealth',
+    title: 'Красный Health',
+    minWidth: 130,
+    sorter: (a, b) => a.redHealth - b.redHealth,
+  },
+  {
+    key: 'overdueTasks',
+    title: 'Просроченные задачи',
+    minWidth: 160,
+    sorter: (a, b) => a.overdueTasks - b.overdueTasks,
+  },
+  {
+    key: 'attentionTasks',
     title: 'Требуют внимания',
-    minWidth: 140,
-    sorter: (a, b) => a.attentionRequired - b.attentionRequired,
-  },
-  {
-    key: 'averageStageDuration',
-    title: 'Среднее время этапа',
     minWidth: 150,
-    sorter: (a, b) => a.averageStageDuration - b.averageStageDuration,
+    sorter: (a, b) => a.attentionTasks - b.attentionTasks,
   },
 ];
 
 export const MANAGER_REPORT_DEFAULT_COLUMN_KEYS: ReportColumnKey<ManagerReportItem>[] =
   MANAGER_REPORT_COLUMN_DEFINITIONS.map(({ key }) => key);
-

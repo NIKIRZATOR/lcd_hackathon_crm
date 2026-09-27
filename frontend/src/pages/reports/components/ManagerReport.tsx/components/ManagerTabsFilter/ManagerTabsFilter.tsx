@@ -37,4 +37,3 @@ const ManagerTabsFilter = ({ managers, value, onChange }: ManagerTabsFilterProps
 };
 
 export default ManagerTabsFilter;
-

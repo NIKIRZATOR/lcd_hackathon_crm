@@ -6,7 +6,7 @@ import {
   UpOutlined,
 } from '@ant-design/icons';
 import { Button, Dropdown, Table } from 'antd';
-import type { MenuProps, SorterResult, TableColumnsType } from 'antd';
+import type { MenuProps, TableColumnsType } from 'antd';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 
@@ -36,8 +36,7 @@ type ReportsTableProps<T extends ReportTableItem> = {
   exportConfig: ReportTableExportConfig;
   title?: ReactNode;
   rowActions?: ReportRowActions<T>;
-  onDownload?: (format: TableExportFormat, columns: ReportColumnKey<T>[]) => Promise<void> | void;
-  onSort?: (key: ReportColumnKey<T> | null, order: 'ascend' | 'descend' | null) => void;
+  onDownload?: (format: TableExportFormat) => void;
 };
 
 const ReportsTable = <T extends ReportTableItem>({
@@ -49,7 +48,6 @@ const ReportsTable = <T extends ReportTableItem>({
   title = 'Результаты отчёта',
   rowActions,
   onDownload,
-  onSort,
 }: ReportsTableProps<T>) => {
   const [selectedColumnKeys, setSelectedColumnKeys] =
     useState<ReportColumnKey<T>[]>(defaultColumnKeys);
@@ -90,10 +88,6 @@ const ReportsTable = <T extends ReportTableItem>({
   );
 
   const handleDownload = async (format: TableExportFormat) => {
-    if (onDownload) {
-      await onDownload(format, selectedColumnKeys);
-      return;
-    }
     await exportTable<T>({
       data: items,
       columns: exportColumns,
@@ -103,6 +97,7 @@ const ReportsTable = <T extends ReportTableItem>({
       pdfTitle: exportConfig.pdfTitle,
     });
 
+    onDownload?.(format);
   };
 
   const downloadMenu: MenuProps = {
@@ -170,11 +165,6 @@ const ReportsTable = <T extends ReportTableItem>({
           pagination={false}
           size="small"
           tableLayout="auto"
-          onChange={(_, __, sorter) => {
-            if (!onSort) return;
-            const current = Array.isArray(sorter) ? sorter[0] : sorter as SorterResult<T>;
-            onSort((current?.field as ReportColumnKey<T> | undefined) ?? null, current?.order ?? null);
-          }}
           expandable={
             hiddenDefinitions.length
               ? {
@@ -214,4 +204,3 @@ const ReportsTable = <T extends ReportTableItem>({
 };
 
 export default ReportsTable;
-

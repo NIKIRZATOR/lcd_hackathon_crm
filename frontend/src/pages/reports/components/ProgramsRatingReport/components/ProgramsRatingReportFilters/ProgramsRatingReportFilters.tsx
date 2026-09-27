@@ -1,35 +1,37 @@
 import type { SelectProps } from 'antd';
 
-import Filters, { type FilterField } from '../../../../components/Filters/Filters';
-import MobilePeriodPicker from '../../../../components/MobilePeriodPicker/MobilePeriodPicker';
+import Filters, { type FilterField } from '../../../../../../components/Filters/Filters';
+import MobilePeriodPicker from '../../../../../../components/MobilePeriodPicker/MobilePeriodPicker';
 
-import { ALL_TIME_START_DATE, MAX_PERIOD_DATE, REPORT_PERIOD_PRESETS } from '../../constants';
-import type { ReportFilterOption, ReportsFilterOptions, ReportsFiltersValues } from '../../types';
+import { ALL_TIME_START_DATE, MAX_PERIOD_DATE, REPORT_PERIOD_PRESETS } from '../../../../constants';
+import type {
+  ProgramsRatingReportFilterOption,
+  ProgramsRatingReportFilterOptions,
+  ProgramsRatingReportFiltersValues,
+} from '../../types';
 
-type ReportsFiltersProps = {
-  options: ReportsFilterOptions;
-  initialValues: ReportsFiltersValues;
-  resetValues: ReportsFiltersValues;
-  showResponsible: boolean;
-  onApply: (values: ReportsFiltersValues) => void;
+type ProgramsRatingReportFiltersProps = {
+  options: ProgramsRatingReportFilterOptions;
+  initialValues: ProgramsRatingReportFiltersValues;
+  resetValues: ProgramsRatingReportFiltersValues;
+  onApply: (values: ProgramsRatingReportFiltersValues) => void;
   onReset: () => void;
 };
 
-const getSelectOptions = (options: ReportFilterOption[]): SelectProps['options'] =>
+const getSelectOptions = (options: ProgramsRatingReportFilterOption[]): SelectProps['options'] =>
   options.map(({ id, name }) => ({
     value: id,
     label: name,
   }));
 
-const ReportsFilters = ({
+const ProgramsRatingReportFilters = ({
   options,
   initialValues,
   resetValues,
-  showResponsible,
   onApply,
   onReset,
-}: ReportsFiltersProps) => {
-  const fields: FilterField<ReportsFiltersValues>[] = [
+}: ProgramsRatingReportFiltersProps) => {
+  const fields: FilterField<ProgramsRatingReportFiltersValues>[] = [
     {
       type: 'custom',
       name: 'period',
@@ -46,8 +48,8 @@ const ReportsFilters = ({
     {
       type: 'select',
       name: 'universityIds',
-      label: 'Вуз',
-      placeholder: 'Все вузы',
+      label: 'Организация',
+      placeholder: 'Организации',
       options: getSelectOptions(options.universities),
     },
     {
@@ -64,20 +66,17 @@ const ReportsFilters = ({
       placeholder: 'Все продукты',
       options: getSelectOptions(options.products),
     },
-  ];
-
-  if (showResponsible) {
-    fields.push({
+    {
       type: 'select',
       name: 'responsibleIds',
       label: 'Ответственный',
       placeholder: 'Все сотрудники',
       options: getSelectOptions(options.responsibles),
-    });
-  }
+    },
+  ];
 
   return (
-    <Filters<ReportsFiltersValues>
+    <Filters<ProgramsRatingReportFiltersValues>
       fields={fields}
       initialValues={initialValues}
       resetValues={resetValues}
@@ -89,4 +88,4 @@ const ReportsFilters = ({
   );
 };
 
-export default ReportsFilters;
+export default ProgramsRatingReportFilters;

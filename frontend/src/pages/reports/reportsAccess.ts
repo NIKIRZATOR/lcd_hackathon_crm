@@ -11,19 +11,18 @@ type ReportsAccessConfig = {
 const REPORTS_ACCESS_CONFIG: Record<ReportsAccess, ReportsAccessConfig> = {
   kam: {
     availableReportTypes: ['programs'],
-    subtitle: (userName) =>
-      `${userName} · реальный отчёт по программам вашего портфеля`,
+    subtitle: (userName) => `${userName} · формирование и скачивание отчётов по вашим программам`,
     showResponsible: false,
   },
 
   manager: {
-    availableReportTypes: ['programs', 'interactions', 'manager'],
+    availableReportTypes: ['programs', 'programs-rating', 'manager'],
     subtitle: (userName) => `${userName} · формирование и скачивание отчётов по вашей группе KAM`,
     showResponsible: true,
   },
 
   admin: {
-    availableReportTypes: ['programs', 'interactions', 'manager'],
+    availableReportTypes: ['programs', 'programs-rating', 'manager'],
     subtitle: (userName) =>
       `${userName} · формирование и скачивание отчётов по всем доступным данным`,
     showResponsible: true,
@@ -47,4 +46,3 @@ export const getReportsAccessConfig = (roles: string[]) => {
 
   return REPORTS_ACCESS_CONFIG[access];
 };
-

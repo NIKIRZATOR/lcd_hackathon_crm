@@ -1,5 +1,5 @@
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { Button, Flex, Grid, Popover, Typography } from 'antd';
+import { Button, Flex, Grid, Popover } from 'antd';
 import { useMemo, useState } from 'react';
 
 import ReportsTable from '../ReportsTable/ReportsTable';
@@ -10,43 +10,29 @@ import { MANAGER_REPORT_COLUMN_DEFINITIONS, MANAGER_REPORT_DEFAULT_COLUMN_KEYS }
 import { managerReportMock } from './mock';
 import type { ManagerReportItem } from './types';
 
-const { Title } = Typography;
+const KAM_OPTIONS = managerReportMock.map((item) => ({
+  id: item.kamId,
+  name: item.kam,
+}));
 
 const ManagerReport = () => {
   const screens = Grid.useBreakpoint();
 
   const isMobile = screens.sm === false;
 
-  const [selectedManagerId, setSelectedManagerId] = useState<number | null>(null);
-
-  const managers = useMemo(
-    () =>
-      managerReportMock.map((item) => ({
-        id: item.kamId,
-        name: item.kam,
-      })),
-    [],
-  );
+  const [selectedKamId, setSelectedKamId] = useState<number | null>(null);
 
   const filteredItems = useMemo(() => {
-    if (selectedManagerId === null) {
+    if (selectedKamId === null) {
       return managerReportMock;
     }
 
-    return managerReportMock.filter((item) => item.kamId === selectedManagerId);
-  }, [selectedManagerId]);
+    return managerReportMock.filter((item) => item.kamId === selectedKamId);
+  }, [selectedKamId]);
 
   return (
     <Flex vertical gap={20}>
-      <Title level={4} style={{ margin: 0 }}>
-        Показатели команды
-      </Title>
-
-      <ManagerTabsFilter
-        managers={managers}
-        value={selectedManagerId}
-        onChange={setSelectedManagerId}
-      />
+      <ManagerTabsFilter managers={KAM_OPTIONS} value={selectedKamId} onChange={setSelectedKamId} />
 
       <ReportsTable<ManagerReportItem>
         items={filteredItems}
@@ -54,9 +40,9 @@ const ManagerReport = () => {
         defaultColumnKeys={MANAGER_REPORT_DEFAULT_COLUMN_KEYS}
         subtitle={`Найдено KAM: ${filteredItems.length}`}
         exportConfig={{
-          fileName: 'team-performance-report',
-          sheetName: 'Показатели команды',
-          pdfTitle: 'Показатели команды',
+          fileName: 'kam-portfolio-report',
+          sheetName: 'Показатели KAM',
+          pdfTitle: 'Показатели KAM',
         }}
         rowActions={{
           title: '',
@@ -87,4 +73,3 @@ const ManagerReport = () => {
 };
 
 export default ManagerReport;
-
