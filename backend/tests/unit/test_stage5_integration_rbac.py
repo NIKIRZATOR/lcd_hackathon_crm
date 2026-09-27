@@ -27,6 +27,7 @@ def make_user(role: str) -> User:
     [
         "/api/integrations/sources",
         "/api/integrations/diagnostics",
+        "/api/integrations/packages",
         "/api/integrations/signals",
     ],
 )
@@ -55,6 +56,36 @@ def test_non_admin_cannot_list_manager_memberships(role: str) -> None:
     app.dependency_overrides[get_current_user] = lambda: make_user(role)
 
     response = TestClient(app).get("/api/users/manager-memberships")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("role", ["KAM", "MANAGER"])
+def test_non_admin_cannot_list_imports(role: str) -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user(role)
+
+    response = TestClient(app).get("/api/imports")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("role", ["KAM", "MANAGER"])
+def test_non_admin_cannot_list_audit_events(role: str) -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user(role)
+
+    response = TestClient(app).get("/api/audit/events")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("role", ["KAM", "MANAGER"])
+def test_non_admin_cannot_read_system_status(role: str) -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user(role)
+
+    response = TestClient(app).get("/api/system/status")
 
     assert response.status_code == 403
 

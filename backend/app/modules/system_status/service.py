@@ -20,7 +20,8 @@ class PlatformStatusService:
         return [
             self._ok("Backend", "API отвечает", checked_at),
             self._check("PostgreSQL", "Подключение к базе доступно", checked_at, self._check_database),
-            self._check("Redis", "Очередь отчётов доступна", checked_at, self._check_redis),
+            self._check("Redis", "Кэш и брокер очередей доступны", checked_at, self._check_redis),
+            self._report_queue_status(checked_at),
             self._check("MinIO", "Файловое хранилище доступно", checked_at, self._check_storage),
             self._check("Keycloak", "OpenID-конфигурация доступна", checked_at, self._check_keycloak),
             {"component": "Report worker", "status": "Unknown", "detail": "Heartbeat worker пока не реализован", "checked_at": checked_at},
@@ -40,7 +41,32 @@ class PlatformStatusService:
             socket_timeout=1,
         )
         client.ping()
-        client.llen(settings.report_queue_name)
+
+    @staticmethod
+    def _report_queue_status(checked_at: str) -> dict[str, str]:
+        try:
+            from redis import Redis
+
+            client = Redis.from_url(
+                settings.redis_url,
+                decode_responses=True,
+                socket_connect_timeout=1,
+                socket_timeout=1,
+            )
+            queue_size = client.llen(settings.report_queue_name)
+        except Exception:
+            return {
+                "component": "Report queue",
+                "status": "Error",
+                "detail": "Очередь отчётов недоступна",
+                "checked_at": checked_at,
+            }
+        return {
+            "component": "Report queue",
+            "status": "OK",
+            "detail": f"Заданий в очереди: {queue_size}",
+            "checked_at": checked_at,
+        }
 
     @staticmethod
     def _check_storage() -> None:

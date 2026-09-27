@@ -23,10 +23,14 @@ import { useSearchParams } from 'react-router-dom';
 
 import { apiRequest } from '../../api/client';
 import { useAuth } from '../../auth';
+import AuditTab from './AuditTab';
 import { IntegrationDiagnosticsTab } from './IntegrationDiagnosticsTab';
 import ManagerMembershipsTab from './ManagerMembershipsTab';
 import OrganizationAssignmentsTab from './OrganizationAssignmentsTab';
+import SystemStatusTab from './SystemStatusTab';
 import UserAccessTab from './UserAccessTab';
+import CatalogsTab from './catalogs/CatalogsTab';
+import ImportDataTab from './imports/ImportDataTab';
 
 type Stage = {
   id: string;
@@ -365,6 +369,10 @@ const ManagementPage = () => {
                   label: 'MANAGER и KAM',
                   children: <ManagerMembershipsTab />,
                 },
+                { key: 'catalogs', label: 'Каталоги', children: <CatalogsTab /> },
+                { key: 'imports', label: 'Импорт данных', children: <ImportDataTab /> },
+                { key: 'audit', label: 'Аудит', children: <AuditTab /> },
+                { key: 'system', label: 'Система', children: <SystemStatusTab /> },
                 { key: 'users', label: 'Пользователи и доступ', children: <UserAccessTab /> },
               ]
             : []),

@@ -14,6 +14,7 @@ from app.modules.integrations.model import IntegrationSignal
 from app.modules.integrations.schemas import (
     CourseMappingCreate,
     FixtureProcessRead,
+    IntegrationPackageRead,
     MappingApplyRequest,
     ProgramMetricRead,
     ReplayRequest,
@@ -21,6 +22,9 @@ from app.modules.integrations.schemas import (
     SyncResultRead,
 )
 from app.modules.integrations.service import IntegrationSyncService
+from app.modules.organizations.model import Organization
+from app.modules.products.model import ITProduct
+from app.modules.program_instances.model import ProgramInstance
 from app.modules.program_instances.service import ProgramInstanceService
 from app.modules.users.model import User
 
@@ -66,6 +70,11 @@ def diagnostics(db: Session = Depends(get_db_session)):
     return IntegrationSyncService(db).diagnostics()
 
 
+@router.get("/packages", response_model=list[IntegrationPackageRead], dependencies=[Depends(require_roles(*ADMIN_ROLES))])
+def packages(db: Session = Depends(get_db_session)):
+    return IntegrationSyncService(db).packages()
+
+
 @router.post(
     "/sources/{source}/process",
     response_model=FixtureProcessRead,
@@ -86,7 +95,10 @@ def process_source(
                     temp.write(chunk)
                 temp_path = Path(temp.name)
         return IntegrationSyncService(db).process_fixture(
-            source.upper(), current_user.id, temp_path
+            source.upper(),
+            current_user.id,
+            temp_path,
+            file.filename if file is not None else "TEAM DEMO fixture",
         )
     except (ValueError, FileNotFoundError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -110,8 +122,12 @@ def signals(
         statement = statement.where(IntegrationSignal.source == source.upper())
     if status:
         statement = statement.where(IntegrationSignal.status == status)
-    return [
-        {
+    result = []
+    for item in db.scalars(statement):
+        program = db.get(ProgramInstance, item.program_instance_id) if item.program_instance_id else None
+        organization = db.get(Organization, item.organization_id) if item.organization_id else None
+        product = db.get(ITProduct, program.product_id) if program else None
+        result.append({
             "id": str(item.id),
             "source": item.source,
             "external_key": item.external_key,
@@ -122,9 +138,10 @@ def signals(
             "error_code": item.error_code,
             "error_message": item.error_message,
             "match_reason": item.match_reason,
-        }
-        for item in db.scalars(statement)
-    ]
+            "organization_name": organization.name if organization else None,
+            "program_name": f"{organization.name} · {product.name}" if organization and product else None,
+        })
+    return result
 
 
 @router.get(

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.common.repository import ListResult
 from app.modules.audit.model import AuditEvent
+from app.modules.users.model import Role, User
 
 
 class AuditEventRepository:
@@ -24,6 +25,7 @@ class AuditEventRepository:
         self,
         *,
         actor_user_id: UUID | None,
+        actor_role: str | None,
         action: str | None,
         entity_type: str | None,
         entity_id: UUID | None,
@@ -36,6 +38,8 @@ class AuditEventRepository:
         sort_order: str,
     ) -> ListResult[AuditEvent]:
         statement = select(AuditEvent)
+        if actor_role:
+            statement = statement.join(User, User.id == AuditEvent.actor_user_id).join(User.roles).where(Role.name == actor_role)
         filters = {
             "actor_user_id": actor_user_id,
             "action": action,
@@ -51,10 +55,10 @@ class AuditEventRepository:
         if date_to is not None:
             statement = statement.where(AuditEvent.created_at <= date_to)
 
-        total = self.db.scalar(select(func.count()).select_from(statement.subquery())) or 0
+        total = self.db.scalar(select(func.count()).select_from(statement.distinct().subquery())) or 0
         order_column = getattr(AuditEvent, self._resolve_sort_field(sort_by))
         order_expression = desc(order_column) if sort_order == "desc" else asc(order_column)
-        items = list(self.db.scalars(statement.order_by(order_expression).limit(limit).offset(offset)).all())
+        items = list(self.db.scalars(statement.distinct().order_by(order_expression).limit(limit).offset(offset)).all())
         return ListResult(items=items, total=total)
 
     def _resolve_sort_field(self, sort_by: str | None) -> str:

@@ -23,6 +23,7 @@ from app.modules.program_instances.router import router as program_instances_rou
 from app.modules.programs.router import router as programs_router
 from app.modules.tasks.router import router as tasks_router
 from app.modules.teachers.router import router as teachers_router
+from app.modules.system_status.router import router as system_status_router
 from app.modules.universities.router import router as universities_router
 from app.modules.users.router import router as users_router
 from app.modules.workflows.router import router as workflows_router
@@ -68,6 +69,7 @@ api_router.include_router(products_router)
 api_router.include_router(program_instances_router)
 api_router.include_router(programs_router)
 api_router.include_router(tasks_router)
+api_router.include_router(system_status_router)
 api_router.include_router(teachers_router)
 api_router.include_router(universities_router)
 api_router.include_router(users_router)
