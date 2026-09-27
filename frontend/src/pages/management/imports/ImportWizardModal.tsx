@@ -69,7 +69,8 @@ const ImportWizardModal = ({ jobId, onUpdated, onClose }: Props) => {
   }, [jobId]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const updateConfig = async (values: { sheet_name?: string; header_row?: number }) => {

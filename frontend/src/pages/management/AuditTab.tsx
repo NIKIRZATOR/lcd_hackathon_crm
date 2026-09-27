@@ -89,7 +89,8 @@ const AuditTab = () => {
   );
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
   useEffect(() => {
     void apiRequest<Page<User>>('/api/users?limit=100&offset=0')

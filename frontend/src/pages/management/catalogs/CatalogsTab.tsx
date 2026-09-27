@@ -94,12 +94,18 @@ const CatalogsTab = () => {
   }, []);
 
   useEffect(() => {
-    if (kind === 'academic-windows') void loadAcademicWindows();
-    else void loadCatalog();
+    const timer = window.setTimeout(() => {
+      if (kind === 'academic-windows') void loadAcademicWindows();
+      else void loadCatalog();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [kind, loadAcademicWindows, loadCatalog]);
 
   useEffect(() => {
-    if (kind === 'products') void loadVendors();
+    const timer = window.setTimeout(() => {
+      if (kind === 'products') void loadVendors();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [kind, loadVendors]);
 
   const openCreate = () => {

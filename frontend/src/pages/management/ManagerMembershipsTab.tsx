@@ -1,4 +1,4 @@
-import { Alert, Button, Input, Modal, Select, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Modal, Select, Space, Table, Tag, Typography } from 'antd';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ApiError, apiRequest } from '../../api/client';
@@ -67,7 +67,8 @@ const ManagerMembershipsTab = () => {
   );
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   useEffect(() => {

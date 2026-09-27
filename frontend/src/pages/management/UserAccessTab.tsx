@@ -43,8 +43,9 @@ const UserAccessTab = () => {
   );
 
   useEffect(() => {
-    void load(0);
-  }, [search, status]);
+    const timer = window.setTimeout(() => void load(0), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const setUserStatus = async (user: User, isActive: boolean) => {
     try {
