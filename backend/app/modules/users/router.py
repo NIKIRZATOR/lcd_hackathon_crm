@@ -40,11 +40,18 @@ def _user_read(user: User) -> UserRead:
 def list_users(
     search: str | None = None,
     is_active: bool | None = None,
+    role: str | None = None,
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_roles(*ADMIN_ROLES)),
 ):
-    result = UserService(db).list_users(search=search, is_active=is_active, limit=pagination.limit, offset=pagination.offset)
+    result = UserService(db).list_users(
+        search=search,
+        is_active=is_active,
+        role=role,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
     return Page(items=[_user_read(user) for user in result.items], total=result.total, limit=pagination.limit, offset=pagination.offset)
 
 

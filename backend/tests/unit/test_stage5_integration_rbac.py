@@ -49,6 +49,16 @@ def test_non_admin_cannot_list_users(role: str) -> None:
     assert response.status_code == 403
 
 
+@pytest.mark.parametrize("role", ["KAM", "MANAGER"])
+def test_non_admin_cannot_list_manager_memberships(role: str) -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user(role)
+
+    response = TestClient(app).get("/api/users/manager-memberships")
+
+    assert response.status_code == 403
+
+
 def test_kam_cannot_read_organization_assignment_history() -> None:
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: make_user("KAM")

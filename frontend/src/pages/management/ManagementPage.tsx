@@ -24,6 +24,7 @@ import { useSearchParams } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { useAuth } from '../../auth';
 import { IntegrationDiagnosticsTab } from './IntegrationDiagnosticsTab';
+import ManagerMembershipsTab from './ManagerMembershipsTab';
 import OrganizationAssignmentsTab from './OrganizationAssignmentsTab';
 import UserAccessTab from './UserAccessTab';
 
@@ -358,6 +359,11 @@ const ManagementPage = () => {
                   key: 'assignments',
                   label: 'Организации и назначения',
                   children: <OrganizationAssignmentsTab />,
+                },
+                {
+                  key: 'manager-memberships',
+                  label: 'MANAGER и KAM',
+                  children: <ManagerMembershipsTab />,
                 },
                 { key: 'users', label: 'Пользователи и доступ', children: <UserAccessTab /> },
               ]

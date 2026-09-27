@@ -66,8 +66,22 @@ class UserService:
         self.db.flush()
         return [existing_roles[name] for name in sorted(existing_roles)]
 
-    def list_users(self, *, search: str | None, is_active: bool | None, limit: int, offset: int) -> ListResult[User]:
-        return self.repository.list_users(search=search, is_active=is_active, limit=limit, offset=offset)
+    def list_users(
+        self,
+        *,
+        search: str | None,
+        is_active: bool | None,
+        role: str | None,
+        limit: int,
+        offset: int,
+    ) -> ListResult[User]:
+        return self.repository.list_users(
+            search=search,
+            is_active=is_active,
+            role=role,
+            limit=limit,
+            offset=offset,
+        )
 
     def set_active(self, user_id: UUID, is_active: bool) -> User:
         user = self.db.get(User, user_id)

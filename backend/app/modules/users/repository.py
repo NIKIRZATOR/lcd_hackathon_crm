@@ -39,10 +39,13 @@ class UserRepository:
         *,
         search: str | None,
         is_active: bool | None,
+        role: str | None,
         limit: int,
         offset: int,
     ) -> ListResult[User]:
         statement = select(User)
+        if role:
+            statement = statement.join(User.roles).where(Role.name == role)
         if search:
             pattern = f"%{search.lower()}%"
             statement = statement.where(
