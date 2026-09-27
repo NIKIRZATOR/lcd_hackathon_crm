@@ -19,5 +19,8 @@ export type HomeSummary = {
     nba_today: number;
     health_attention: number;
   };
+  portfolio?: { active_programs: number; health: { green: number; yellow: number; red: number } };
+  b2c?: { applications: number; payment_records: number; students: number; streams: number };
+  academic_windows?: Array<{ title: string; plan_cutoff_on: string }>;
 };
 

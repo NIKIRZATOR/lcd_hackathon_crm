@@ -13,9 +13,11 @@ const { Text } = Typography;
 type KamSummaryCardsProps = {
   todayTasksCount?: number;
   attentionCount?: number;
+  activeProgramsCount?: number;
+  academicWindowsCount?: number;
 };
 
-const KamSummaryCards = ({ todayTasksCount, attentionCount }: KamSummaryCardsProps) => {
+const KamSummaryCards = ({ todayTasksCount, attentionCount, activeProgramsCount, academicWindowsCount }: KamSummaryCardsProps) => {
   return (
     <div className={styles.grid}>
       <Card
@@ -30,7 +32,7 @@ const KamSummaryCards = ({ todayTasksCount, attentionCount }: KamSummaryCardsPro
           </div>
 
           <div className={styles.content}>
-            <Text className={styles.value}>11*</Text>
+            <Text className={styles.value}>{activeProgramsCount ?? '—'}</Text>
             <Text type="secondary" className={styles.label}>
               Активных программ
             </Text>
@@ -91,8 +93,8 @@ const KamSummaryCards = ({ todayTasksCount, attentionCount }: KamSummaryCardsPro
 
           <div className={styles.content}>
             <Flex align="baseline" gap={4}>
-              <Text className={styles.value}>34*</Text>
-              <Text className={styles.valueSuffix}>дня</Text>
+              <Text className={styles.value}>{academicWindowsCount ?? '—'}</Text>
+              <Text className={styles.valueSuffix}>окна</Text>
             </Flex>
 
             <Text type="secondary" className={styles.label}>
