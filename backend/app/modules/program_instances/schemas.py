@@ -60,6 +60,11 @@ class WorkflowJournalRead(BaseModel):
     kam_name: str | None
     students_count: int | None
     applications_count: int | None
+    payment_records_count: int | None
+    streams_count: int | None
+    last_b2c_signal_at: datetime | None
+    status: str
+    academic_window_title: str | None
 
 
 class ProgramInstanceStart(BaseModel):

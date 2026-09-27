@@ -93,7 +93,9 @@ const OrganizationsPage = () => {
 
     Promise.all([
       loadAllOrganizations(),
-      apiRequest<JournalRow[]>('/api/workflow-journal?preset=all').catch(() => []),
+      apiRequest<{ items: JournalRow[] }>('/api/workflow-journal?preset=all&limit=100&offset=0')
+        .then((page) => page.items)
+        .catch(() => []),
     ])
       .then(([organizations, journal]) => {
         if (cancelled) return;

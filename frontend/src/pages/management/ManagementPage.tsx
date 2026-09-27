@@ -1,6 +1,7 @@
 import { Alert, Button, Card, Checkbox, DatePicker, Descriptions, Input, InputNumber, List, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { apiRequest } from '../../api/client';
 import { useAuth } from '../../auth';
@@ -16,6 +17,7 @@ type DocumentationRequest = { id: string; author_name: string | null; subject: s
 
 const ManagementPage = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = Boolean(user?.roles.includes('ADMIN'));
   const [catalogStages, setCatalogStages] = useState<CatalogStage[]>([]);
   const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
@@ -125,7 +127,7 @@ const ManagementPage = () => {
 
   return <Card title="Управление">
     {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
-    <Tabs items={[
+    <Tabs activeKey={searchParams.get('tab') ?? 'playbooks'} onChange={(tab) => setSearchParams(tab === 'playbooks' ? {} : { tab }, { replace: true })} items={[
       { key: 'playbooks', label: 'Плейбуки', children: <>
         <Space style={{ marginBottom: 16 }}><Input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Название нового эталона" /><Button type="primary" loading={creating} onClick={() => void createTemplate()}>Создать эталон</Button></Space>
         <Table<Playbook> rowKey="id" dataSource={playbooks} pagination={false} columns={[

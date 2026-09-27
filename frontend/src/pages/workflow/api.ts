@@ -42,6 +42,13 @@ type JournalRow = {
   health_score: number | null;
   health_band: string | null;
   kam_name: string | null;
+  students_count: number | null;
+  applications_count: number | null;
+  payment_records_count: number | null;
+  streams_count: number | null;
+  last_b2c_signal_at: string | null;
+  status: string;
+  academic_window_title: string | null;
 };
 
 type ApiStage = {
@@ -298,6 +305,11 @@ export type JournalProgram = {
   kam: string;
   students: number;
   applications: number;
+  payments: number;
+  streams: number;
+  lastB2cSignal: string;
+  status: string;
+  academicWindow: string;
 };
 
 export type DeskStage = {
@@ -365,15 +377,14 @@ const shortNameByOrganization = async () => {
   return new Map(page.items.map((item) => [item.name.trim().toLowerCase().replace(/ё/g, 'е'), item.short_name?.trim() || item.name]));
 };
 
-export const loadJournal = async (preset: JournalPreset): Promise<JournalProgram[]> => {
+export const loadJournal = async (preset: JournalPreset, search = ''): Promise<JournalProgram[]> => {
+  const query = new URLSearchParams({ preset, limit: '50', offset: '0' });
+  if (search.trim()) query.set('search', search.trim());
   const [rows, shortNames] = await Promise.all([
-    apiRequest<Array<JournalRow & { playbook_name?: string; students_count?: number | null; applications_count?: number | null }>>(`/api/workflow-journal?preset=${preset}`),
+    apiRequest<{ items: Array<JournalRow & { playbook_name?: string }>; total: number }>(`/api/workflow-journal?${query.toString()}`),
     shortNameByOrganization(),
   ]);
-  if (rows.length === 0 && preset === 'all') {
-    return sampleJournal().map((row) => ({ ...row, organization: row.organization.includes('Южный') ? 'ЮФУ' : 'СПбПУ', healthScore: row.healthScore }));
-  }
-  return rows.map((row) => ({
+  return rows.items.map((row) => ({
     id: row.id,
     organization: shortNames.get(row.organization_name.trim().toLowerCase().replace(/ё/g, 'е')) || text(row.organization_name),
     direction: text(row.direction_name),
@@ -384,8 +395,13 @@ export const loadJournal = async (preset: JournalPreset): Promise<JournalProgram
     healthScore: row.health_score,
     healthBand: bandOf(row.health_score, row.health_band),
     kam: text(row.kam_name),
-    students: filledCount(row.id, row.students_count, 0),
-    applications: filledCount(row.id, row.applications_count, 7),
+    students: row.students_count ?? 0,
+    applications: row.applications_count ?? 0,
+    payments: row.payment_records_count ?? 0,
+    streams: row.streams_count ?? 0,
+    lastB2cSignal: isoDate(row.last_b2c_signal_at),
+    status: row.status,
+    academicWindow: row.academic_window_title?.trim() || dash,
   }));
 };
 

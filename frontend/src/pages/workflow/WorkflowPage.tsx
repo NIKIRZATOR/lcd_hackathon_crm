@@ -53,7 +53,7 @@ const WorkflowPage = () => {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadJournal(preset), preset === 'all' ? Promise.resolve(null) : loadJournal('all')])
+    Promise.all([loadJournal(preset, search), preset === 'all' ? Promise.resolve(null) : loadJournal('all', search)])
       .then(([current, all]) => {
         if (cancelled) return;
         setRows(current);
@@ -63,7 +63,7 @@ const WorkflowPage = () => {
       .catch(() => { if (!cancelled) setError('Не удалось загрузить журнал'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [preset]);
+  }, [preset, search]);
 
   const update = (patch: Record<string, string>) => {
     if ('preset' in patch) setLoading(true);
@@ -113,6 +113,9 @@ const WorkflowPage = () => {
     { title: 'Здоровье', show: ['wide', 'mid', 'narrow'], width: 150, render: (_, row) => <HealthMark score={row.healthScore} band={row.healthBand} empty="Нет оценки" /> },
     { title: 'Студенты', dataIndex: 'students', show: ['wide'], width: 110 },
     { title: 'Заявки', dataIndex: 'applications', show: ['wide'], width: 100 },
+    { title: '* Оплаты', dataIndex: 'payments', show: ['wide'], width: 100 },
+    { title: '* Потоки', dataIndex: 'streams', show: ['wide'], width: 100 },
+    { title: '* Последний B2C', dataIndex: 'lastB2cSignal', show: ['wide'], width: 135, render: (value: string) => value || '—' },
     ...(seesKam ? [{ title: 'KAM', dataIndex: 'kam', show: ['wide', 'mid'] } satisfies ResponsiveColumn<JournalProgram>] : []),
   ];
 
@@ -160,6 +163,8 @@ const WorkflowPage = () => {
                   <div><span>Срок</span><strong>{row.due || 'Срок не задан'}</strong></div>
                   <div><span>Студенты</span><strong>{row.students}</strong></div>
                   <div><span>Заявки</span><strong>{row.applications}</strong></div>
+                  <div><span>* Оплаты</span><strong>{row.payments}</strong></div>
+                  <div><span>* Потоки</span><strong>{row.streams}</strong></div>
                   {seesKam && layout === 'narrow' && <div><span>KAM</span><strong>{row.kam}</strong></div>}
                 </div>
               ))}

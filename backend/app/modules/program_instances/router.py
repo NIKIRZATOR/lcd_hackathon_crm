@@ -40,11 +40,12 @@ def list_academic_windows(db: Session = Depends(get_db_session)):
         ).all()
     )
 
-@router.get("/workflow-journal", response_model=list[WorkflowJournalRead])
-def workflow_journal(preset: str = "all", db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+@router.get("/workflow-journal", response_model=Page[WorkflowJournalRead])
+def workflow_journal(preset: str = "all", search: str | None = None, organization_id: UUID | None = None, direction_id: UUID | None = None, product_id: UUID | None = None, playbook_id: UUID | None = None, kam_user_id: UUID | None = None, stage_id: UUID | None = None, academic_window_id: UUID | None = None, status: str | None = None, health_band: str | None = None, overdue: bool | None = None, pagination: PaginationParams = Depends(), db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
     if preset not in {"all", "overdue", "semester", "renewal", "lms_silence"}:
         raise HTTPException(status_code=422, detail="Unknown journal preset")
-    return ProgramInstanceService(db).workflow_journal(current_user, preset)
+    items, total = ProgramInstanceService(db).workflow_journal(current_user, preset, limit=pagination.limit, offset=pagination.offset, sort_by=pagination.sort_by or "organization", sort_order=pagination.sort_order, search=search, organization_id=organization_id, direction_id=direction_id, product_id=product_id, playbook_id=playbook_id, kam_user_id=kam_user_id, stage_id=stage_id, academic_window_id=academic_window_id, status=status, health_band=health_band, overdue=overdue)
+    return Page(items=items, total=total, limit=pagination.limit, offset=pagination.offset)
 
 
 @router.get(

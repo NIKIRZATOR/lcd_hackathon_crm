@@ -241,7 +241,7 @@ class NbaService:
                 item = self.db.scalar(select(NbaItem).where(NbaItem.rule_id == rules[code].id, NbaItem.entity_key == entity_key))
                 if present:
                     if item is None:
-                        item = NbaItem(rule_id=rules[code].id, organization_id=organization.id, program_instance_id=None, product_id=None, entity_key=entity_key, severity="medium", reason=reason, action="Открыть площадку", priority="P3", action_target="organization", due_at=None, status="active")
+                        item = NbaItem(rule_id=rules[code].id, organization_id=organization.id, program_instance_id=None, product_id=None, entity_key=entity_key, severity="medium", reason=reason, action="Открыть вуз / + программа" if code == "demand_without_program" else "Открыть площадку", priority="P4" if code == "demand_without_program" else "P3", action_target="organization", due_at=None, status="active")
                         self.db.add(item)
                     else:
                         item.status, item.reason, item.resolved_at = "active", reason, None

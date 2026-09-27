@@ -163,8 +163,7 @@ const KamActionQueue = ({ items }: KamActionQueueProps) => {
                   item.severity === 'critical' || item.severity === 'high' ? 'primary' : 'default'
                 }
                 className={styles.action}
-                disabled={!item.program_instance_id}
-                onClick={() => item.program_instance_id && navigate(`/programs/${item.program_instance_id}?focus=${item.action_target ?? 'program'}`)}
+                onClick={() => navigate(item.program_instance_id ? `/programs/${item.program_instance_id}?focus=${item.action_target ?? 'program'}` : `/organizations/${item.organization_id}`)}
               >
                 {item.action}
               </Button>

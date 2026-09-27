@@ -13,31 +13,16 @@ type HealthItem = {
   progress: number;
 };
 
-const HEALTH_ITEMS: HealthItem[] = [
-  {
-    key: 'green',
-    label: 'Зелёные',
-    count: 4,
-    progress: 68,
-  },
-  {
-    key: 'yellow',
-    label: 'Жёлтые',
-    count: 4,
-    progress: 68,
-  },
-  {
-    key: 'red',
-    label: 'Красные',
-    count: 3,
-    progress: 48,
-  },
-];
+type KamPortfolioHealthProps = { health?: Partial<Record<HealthItem['key'], number>>; activePrograms?: number };
 
-const ACTIVE_PROGRAMS_COUNT = 11;
-
-const KamPortfolioHealth = () => {
+const KamPortfolioHealth = ({ health = {}, activePrograms = 0 }: KamPortfolioHealthProps) => {
   const navigate = useNavigate();
+  const total = Math.max(activePrograms, 1);
+  const items: HealthItem[] = [
+    { key: 'green', label: 'Зелёные', count: health.green ?? 0, progress: ((health.green ?? 0) / total) * 100 },
+    { key: 'yellow', label: 'Жёлтые', count: health.yellow ?? 0, progress: ((health.yellow ?? 0) / total) * 100 },
+    { key: 'red', label: 'Красные', count: health.red ?? 0, progress: ((health.red ?? 0) / total) * 100 },
+  ];
 
   const handleOpenReports = () => {
     navigate('/reports');
@@ -45,7 +30,6 @@ const KamPortfolioHealth = () => {
 
   return (
     <Card
-      extra={<Text type="warning">* Демо</Text>}
       className={styles.card}
       classNames={{
         body: styles.cardBody,
@@ -75,7 +59,7 @@ const KamPortfolioHealth = () => {
       </div>
 
       <div className={styles.healthList}>
-        {HEALTH_ITEMS.map((item) => (
+        {items.map((item) => (
           <div key={item.key} className={styles.healthRow}>
             <Text className={styles.label}>{item.label}</Text>
 
@@ -94,7 +78,7 @@ const KamPortfolioHealth = () => {
       </div>
 
       <div className={styles.summary}>
-        <Text className={styles.summaryText}>{ACTIVE_PROGRAMS_COUNT} активных программ</Text>
+        <Text className={styles.summaryText}>{activePrograms} активных программ</Text>
       </div>
     </Card>
   );

@@ -374,9 +374,34 @@ class ProgramInstanceService:
             "worst_program_instance_id": worst.id if worst else None,
         }
 
-    def workflow_journal(self, current_user: User, preset: str) -> list[WorkflowJournalRead]:
+    def workflow_journal(
+        self,
+        current_user: User,
+        preset: str,
+        *,
+        limit: int,
+        offset: int,
+        sort_by: str,
+        sort_order: str,
+        search: str | None = None,
+        organization_id: UUID | None = None,
+        direction_id: UUID | None = None,
+        product_id: UUID | None = None,
+        playbook_id: UUID | None = None,
+        kam_user_id: UUID | None = None,
+        stage_id: UUID | None = None,
+        academic_window_id: UUID | None = None,
+        status: str | None = None,
+        health_band: str | None = None,
+        overdue: bool | None = None,
+    ) -> tuple[list[WorkflowJournalRead], int]:
+        last_b2c_signal_at = func.greatest(
+            ProgramMetric.last_website_signal_at,
+            ProgramMetric.last_payment_signal_at,
+            ProgramMetric.last_lms_signal_at,
+        ).label("last_b2c_signal_at")
         statement = (
-            select(ProgramInstance, Organization.name, ITDirection.name, ITProduct.name, WorkflowTemplate.name, WorkflowStage.name, User.full_name, WorkflowStageInstance.due_at, ProgramMetric.students_count, ProgramMetric.applications_count)
+            select(ProgramInstance, Organization.name, ITDirection.name, ITProduct.name, WorkflowTemplate.name, WorkflowStage.name, User.full_name, WorkflowStageInstance.due_at, ProgramMetric.students_count, ProgramMetric.applications_count, ProgramMetric.payment_records_count, ProgramMetric.streams_count, last_b2c_signal_at, AcademicWindow.title)
             .join(Organization, Organization.id == ProgramInstance.organization_id)
             .join(ITDirection, ITDirection.id == ProgramInstance.direction_id)
             .join(ITProduct, ITProduct.id == ProgramInstance.product_id)
@@ -385,31 +410,66 @@ class ProgramInstanceService:
             .outerjoin(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id)
             .outerjoin(User, User.id == ProgramInstance.kam_user_id)
             .outerjoin(ProgramMetric, ProgramMetric.program_instance_id == ProgramInstance.id)
+            .outerjoin(AcademicWindow, AcademicWindow.id == ProgramInstance.academic_window_id)
         )
-        rows = self.db.execute(statement).all()
-        result = []
+
+        if not is_admin(current_user):
+            kam_ids = get_subordinate_kam_ids(self.db, current_user.id) if has_any_role(current_user, "MANAGER") else {current_user.id}
+            statement = statement.where(
+                select(OrgAssignment.id)
+                .where(OrgAssignment.organization_id == ProgramInstance.organization_id, OrgAssignment.user_id.in_(kam_ids), OrgAssignment.status == "active")
+                .exists()
+            )
+        if search:
+            pattern = f"%{search.strip()}%"
+            statement = statement.where(
+                Organization.name.ilike(pattern) | ITDirection.name.ilike(pattern) | ITProduct.name.ilike(pattern)
+            )
+        for column, value in ((ProgramInstance.organization_id, organization_id), (ProgramInstance.direction_id, direction_id), (ProgramInstance.product_id, product_id), (ProgramInstance.playbook_template_id, playbook_id), (ProgramInstance.kam_user_id, kam_user_id), (WorkflowStage.id, stage_id), (ProgramInstance.academic_window_id, academic_window_id), (ProgramInstance.status, status), (ProgramInstance.health_band, health_band)):
+            if value is not None:
+                statement = statement.where(column == value)
         now = datetime.now(timezone.utc)
-        for program, org_name, direction_name, product_name, playbook_name, stage_name, kam_name, due_at, students, applications in rows:
-            try:
-                OrganizationService(self.db).get(program.organization_id, current_user)
-            except HTTPException as error:
-                if error.status_code == 403:
-                    continue
-                raise
-            if preset == "overdue" and not (due_at and due_at < now):
-                continue
-            if preset == "renewal":
-                license_record = self.db.scalar(select(License).where(License.program_instance_id == program.id, License.valid_until.is_not(None)))
-                if not license_record or (license_record.valid_until.date() - date.today()).days > 90:
-                    continue
-            if preset == "lms_silence":
-                teacher = self.db.scalar(select(TeacherCarrier).where(TeacherCarrier.program_instance_id == program.id, TeacherCarrier.status == "active"))
-                if teacher and teacher.last_lms_activity_on and (date.today() - teacher.last_lms_activity_on).days <= 30:
-                    continue
-            if preset == "semester" and not (program.academic_window_id and (window := self.db.get(AcademicWindow, program.academic_window_id)) and 0 <= (window.plan_cutoff_on - date.today()).days <= 21):
-                continue
-            result.append(WorkflowJournalRead(id=program.id, organization_name=org_name, direction_name=direction_name, product_name=product_name, playbook_name=playbook_name, current_stage_name=stage_name, due_at=due_at, health_score=program.health_score, health_band=program.health_band, kam_name=kam_name, students_count=students, applications_count=applications))
-        return result
+        if overdue is True:
+            statement = statement.where(WorkflowStageInstance.due_at < now)
+        elif overdue is False:
+            statement = statement.where((WorkflowStageInstance.due_at.is_(None)) | (WorkflowStageInstance.due_at >= now))
+        if preset == "overdue":
+            statement = statement.where(WorkflowStageInstance.due_at < now)
+        elif preset == "renewal":
+            statement = statement.where(
+                select(License.id)
+                .where(
+                    License.program_instance_id == ProgramInstance.id,
+                    License.valid_until.is_not(None),
+                    License.valid_until <= datetime.combine(date.today() + timedelta(days=90), datetime.max.time(), timezone.utc),
+                )
+                .exists()
+            )
+        elif preset == "lms_silence":
+            statement = statement.where(
+                ~select(TeacherCarrier.id)
+                .where(
+                    TeacherCarrier.program_instance_id == ProgramInstance.id,
+                    TeacherCarrier.status == "active",
+                    TeacherCarrier.last_lms_activity_on.is_not(None),
+                    TeacherCarrier.last_lms_activity_on >= date.today() - timedelta(days=30),
+                )
+                .exists()
+            )
+        elif preset == "semester":
+            statement = statement.where(
+                AcademicWindow.plan_cutoff_on >= date.today(),
+                AcademicWindow.plan_cutoff_on <= date.today() + timedelta(days=21),
+            )
+        sort_columns = {"organization": Organization.name, "direction": ITDirection.name, "product": ITProduct.name, "stage": WorkflowStage.name, "due_at": WorkflowStageInstance.due_at, "health": ProgramInstance.health_score, "last_b2c_signal_at": last_b2c_signal_at}
+        sort_column = sort_columns.get(sort_by, Organization.name)
+        ordered = statement.order_by(sort_column.desc() if sort_order == "desc" else sort_column.asc())
+        total = self.db.scalar(select(func.count()).select_from(statement.subquery())) or 0
+        rows = self.db.execute(ordered.limit(limit).offset(offset)).all()
+        result = []
+        for program, org_name, direction_name, product_name, playbook_name, stage_name, kam_name, due_at, students, applications, payments, streams, last_signal, window_title in rows:
+            result.append(WorkflowJournalRead(id=program.id, organization_name=org_name, direction_name=direction_name, product_name=product_name, playbook_name=playbook_name, current_stage_name=stage_name, due_at=due_at, health_score=program.health_score, health_band=program.health_band, kam_name=kam_name, students_count=students, applications_count=applications, payment_records_count=payments, streams_count=streams, last_b2c_signal_at=last_signal, status=program.status, academic_window_title=window_title))
+        return result, total
 
     def _recompute_missing_health(self, organization_id: UUID) -> None:
         program_ids = self.db.scalars(

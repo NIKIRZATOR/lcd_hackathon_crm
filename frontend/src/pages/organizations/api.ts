@@ -177,7 +177,9 @@ const journalByOrganization = (rows: JournalRow[]) => {
 export const loadPortfolio = async (): Promise<PortfolioOrganization[]> => {
   const [organizations, journal] = await Promise.all([
     loadPage<OrganizationListItem>('/api/organizations'),
-    apiRequest<JournalRow[]>('/api/workflow-journal?preset=all').catch(() => []),
+    apiRequest<Page<JournalRow>>('/api/workflow-journal?preset=all&limit=100&offset=0')
+      .then((page) => page.items)
+      .catch(() => []),
   ]);
   const grouped = journalByOrganization(journal);
 
@@ -297,7 +299,9 @@ export const loadUniversityCard = async (id: string): Promise<UniversityCard> =>
     apiRequest<Teacher[]>(`/api/organizations/${id}/teachers`).catch(() => []),
     apiRequest<Contract[]>(`/api/organizations/${id}/contracts`).catch(() => []),
     apiRequest<License[]>(`/api/organizations/${id}/licenses`).catch(() => []),
-    apiRequest<JournalRow[]>('/api/workflow-journal?preset=all').catch(() => []),
+    apiRequest<Page<JournalRow>>('/api/workflow-journal?preset=all&limit=100&offset=0')
+      .then((page) => page.items)
+      .catch(() => []),
   ]);
   const journalById = new Map(journal.map((row) => [row.id, row]));
   const metrics = await Promise.all(programsPage.items.map(async (program) => {
