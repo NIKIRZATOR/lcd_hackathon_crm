@@ -3,6 +3,7 @@
 ## Target
 
 V2 uses `ProgramInstance`, its immutable workflow snapshot, organization-level framework contracts, program-level licenses, and the five canonical playbooks.
+Integration processing uses a single `IntegrationSignal` contour with fixture adapters today and an HTTP-adapter extension point later.
 
 ## Legacy
 

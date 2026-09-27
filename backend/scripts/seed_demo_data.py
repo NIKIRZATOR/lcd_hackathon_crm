@@ -24,7 +24,7 @@ from app.modules.workflow_catalog.model import WorkflowPhase, WorkflowStageCatal
 from app.modules.checklists.model import PlaybookChecklistItem, ProgramChecklistValue
 from app.modules.health.service import HealthService
 from app.modules.integrations.service import IntegrationSyncService
-from app.modules.integrations.model import IntegrationSignal
+from app.modules.integrations.model import ExternalCourseMapping, ExternalStreamMapping, IntegrationSignal
 from app.modules.nba.service import NbaService
 from app.modules.users.model import ManagerMembership, Role, User
 from app.modules.workflows.model import WorkflowStage, WorkflowStageInstance, WorkflowTemplate, WorkflowTransition, WorkflowVersion
@@ -1255,8 +1255,10 @@ def seed_program_instances(db: Session) -> None:
                 .where(ProgramChecklistValue.stage_instance_id == previous.id)
             ):
                 value.is_done = True
-                if item.item_type == "text": value.value_text = "Демо-факт подтверждён для завершённого этапа."
-                elif item.item_type == "date": value.value_date = date.today() - timedelta(days=3)
+                if item.item_type == "text":
+                    value.value_text = "Демо-факт подтверждён для завершённого этапа."
+                elif item.item_type == "date":
+                    value.value_date = date.today() - timedelta(days=3)
         target.status = "IN_PROGRESS"
         target.started_at = datetime.now(timezone.utc) - timedelta(days=10 if overdue else 1)
         target.due_at = datetime.now(timezone.utc) - timedelta(days=2) if overdue else datetime.now(timezone.utc) + timedelta(days=7)
@@ -1298,6 +1300,33 @@ def seed_program_instances(db: Session) -> None:
                 health_band="green",
                 comment="Second demo program for organization 360.",
             ))
+
+
+def seed_stage5_integration_demo(db: Session) -> None:
+    """Map one provided B2C course for the demo and intentionally leave the rest unmatched."""
+    course = "Инженер-тестировщик"
+    stream = "1"
+    product = get_by_field(db, ITProduct, "name", course)
+    if product is None:
+        return
+    program = db.scalar(
+        select(ProgramInstance)
+        .where(ProgramInstance.product_id == product.id, ProgramInstance.status == "active")
+        .order_by(ProgramInstance.created_at)
+    )
+    if program is None:
+        return
+    course_mapping = db.scalar(select(ExternalCourseMapping).where(ExternalCourseMapping.source == "PAYMENT", ExternalCourseMapping.external_course_name == course))
+    if course_mapping is None:
+        course_mapping = ExternalCourseMapping(source="PAYMENT", external_course_name=course, direction_id=program.direction_id, product_id=program.product_id, status="active")
+        db.add(course_mapping)
+    else:
+        course_mapping.direction_id, course_mapping.product_id, course_mapping.status = program.direction_id, program.product_id, "active"
+    stream_mapping = db.scalar(select(ExternalStreamMapping).where(ExternalStreamMapping.source == "PAYMENT", ExternalStreamMapping.external_course_name == course, ExternalStreamMapping.external_stream_id == stream))
+    if stream_mapping is None:
+        db.add(ExternalStreamMapping(source="PAYMENT", external_course_name=course, external_stream_id=stream, program_instance_id=program.id))
+    else:
+        stream_mapping.program_instance_id = program.id
 
 
 def seed_contracts_licenses_and_teachers(db: Session) -> None:
@@ -1429,6 +1458,7 @@ def main() -> None:
         seed_organization_core(db, universities, users)
         seed_program_instances(db)
         db.flush()
+        seed_stage5_integration_demo(db)
         seed_contracts_licenses_and_teachers(db)
         db.commit()
         for program in db.scalars(select(ProgramInstance)).all():

@@ -235,7 +235,7 @@ class NbaService:
         rules = self._rules()
         for organization in self.db.scalars(select(Organization)).all():
             live = self.db.scalar(select(ProgramInstance.id).where(ProgramInstance.organization_id == organization.id, ProgramInstance.status.in_(["draft", "active", "paused"])).limit(1))
-            demand = self.db.scalar(select(IntegrationSignal.id).where(IntegrationSignal.organization_id == organization.id, IntegrationSignal.program_instance_id.is_(None), IntegrationSignal.source == "website").limit(1))
+            demand = self.db.scalar(select(IntegrationSignal.id).where(IntegrationSignal.organization_id == organization.id, IntegrationSignal.program_instance_id.is_(None), IntegrationSignal.source.in_(("WEBSITE", "website"))).limit(1))
             for code, present, reason in (("organization_without_program", live is None, "У площадки нет активной программы."), ("demand_without_program", demand is not None and live is None, "Есть спрос с сайта без запущенной программы.")):
                 entity_key = f"organization:{organization.id}:{code}"
                 item = self.db.scalar(select(NbaItem).where(NbaItem.rule_id == rules[code].id, NbaItem.entity_key == entity_key))
