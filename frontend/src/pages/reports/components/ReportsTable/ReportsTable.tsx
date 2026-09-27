@@ -36,7 +36,7 @@ type ReportsTableProps<T extends ReportTableItem> = {
   exportConfig: ReportTableExportConfig;
   title?: ReactNode;
   rowActions?: ReportRowActions<T>;
-  onDownload?: (format: TableExportFormat) => void;
+  onDownload?: (format: TableExportFormat, columns: ReportColumnKey<T>[]) => Promise<void> | void;
 };
 
 const ReportsTable = <T extends ReportTableItem>({
@@ -88,6 +88,10 @@ const ReportsTable = <T extends ReportTableItem>({
   );
 
   const handleDownload = async (format: TableExportFormat) => {
+    if (onDownload) {
+      await onDownload(format, selectedColumnKeys);
+      return;
+    }
     await exportTable<T>({
       data: items,
       columns: exportColumns,
@@ -97,7 +101,6 @@ const ReportsTable = <T extends ReportTableItem>({
       pdfTitle: exportConfig.pdfTitle,
     });
 
-    onDownload?.(format);
   };
 
   const downloadMenu: MenuProps = {

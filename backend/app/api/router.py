@@ -28,7 +28,6 @@ from app.modules.users.router import router as users_router
 from app.modules.workflows.router import router as workflows_router
 from app.modules.workflow_catalog.router import router as workflow_catalog_router
 from app.modules.checklists.router import router as checklists_router
-from app.modules.search.router import router as search_router
 from app.modules.reports.program_router import router as reports_router
 
 api_router = APIRouter()
@@ -75,5 +74,4 @@ api_router.include_router(users_router)
 api_router.include_router(workflows_router)
 api_router.include_router(workflow_catalog_router)
 api_router.include_router(checklists_router)
-api_router.include_router(search_router)
 api_router.include_router(reports_router)
