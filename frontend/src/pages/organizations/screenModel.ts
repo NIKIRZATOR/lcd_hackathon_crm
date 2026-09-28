@@ -28,6 +28,7 @@ export const emptyPortfolioFilters: PortfolioFilters = {
 
 export type PortfolioOrganization = {
   id: string;
+  logoFileId: string | null;
   name: string;
   shortName: string;
   city: string;
@@ -131,6 +132,7 @@ export type UniversityFeedEvent = {
 
 export type UniversityCard = {
   id: string;
+  logoFileId: string | null;
   name: string;
   shortName: string;
   typeName: string;

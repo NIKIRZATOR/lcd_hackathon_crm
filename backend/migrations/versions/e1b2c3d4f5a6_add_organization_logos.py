@@ -16,15 +16,25 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("organizations", sa.Column("logo_file_id", sa.UUID(), nullable=True))
-    op.create_foreign_key(
-        "fk_organizations_logo_file_id_files",
-        "organizations",
-        "files",
-        ["logo_file_id"],
-        ["id"],
-        ondelete="SET NULL",
+    inspector = sa.inspect(op.get_bind())
+    columns = {column["name"] for column in inspector.get_columns("organizations")}
+    if "logo_file_id" not in columns:
+        op.add_column("organizations", sa.Column("logo_file_id", sa.UUID(), nullable=True))
+
+    has_logo_foreign_key = any(
+        foreign_key["constrained_columns"] == ["logo_file_id"]
+        and foreign_key["referred_table"] == "files"
+        for foreign_key in inspector.get_foreign_keys("organizations")
     )
+    if not has_logo_foreign_key:
+        op.create_foreign_key(
+            "fk_organizations_logo_file_id_files",
+            "organizations",
+            "files",
+            ["logo_file_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
 
 
 def downgrade() -> None:

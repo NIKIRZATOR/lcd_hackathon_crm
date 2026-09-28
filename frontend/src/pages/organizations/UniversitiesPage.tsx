@@ -10,6 +10,7 @@ import PageLayout from '../../components/pageLayout/PageLayout';
 import { loadPortfolio } from './api';
 import CatalogImportModal from './components/CatalogImportModal';
 import HealthMark from './components/HealthMark';
+import OrganizationLogo from './components/OrganizationLogo';
 import { hiddenRowDetails, useTableLayout, visibleColumns, type ResponsiveColumn } from './components/tableLayout';
 import type { PortfolioFilters, PortfolioOrganization } from './screenModel';
 import { emptyPortfolioFilters } from './screenModel';
@@ -196,7 +197,13 @@ const UniversitiesPage = () => {
                     const palette = badgePalette[paletteIndex(item.id) % badgePalette.length];
                     return (
                       <div className={styles.universityCell}>
-                        <span className={styles.badge} style={{ color: palette.color, background: palette.background }}>{initials(value)}</span>
+                        <OrganizationLogo
+                          organizationId={item.id}
+                          logoFileId={item.logoFileId}
+                          fallback={initials(value)}
+                          className={styles.badge}
+                          style={{ color: palette.color, background: palette.background }}
+                        />
                         <span className={styles.universityName}>{value}</span>
                       </div>
                     );

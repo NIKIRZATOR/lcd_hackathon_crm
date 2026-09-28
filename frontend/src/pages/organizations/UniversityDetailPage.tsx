@@ -6,6 +6,7 @@ import { useAuth } from '../../auth';
 import PageLayout from '../../components/pageLayout/PageLayout';
 import { assignOrganizationKam, listEligibleKams, loadUniversityCard, syncOrganizationPrograms } from './api';
 import HealthMark from './components/HealthMark';
+import OrganizationLogo from './components/OrganizationLogo';
 import ProgramMasterModal from './components/ProgramMasterModal';
 import UniversityTabBar from './components/UniversityTabBar';
 import UniversityWorkspace from './components/UniversityWorkspace';
@@ -128,7 +129,12 @@ const UniversityDetailPage = () => {
         {error && <Alert type="error" showIcon message={error} />}
         <section className={styles.hero}>
           <div className={styles.identity}>
-            <div className={styles.logo} aria-hidden>{initials(card.shortName)}</div>
+            <OrganizationLogo
+              organizationId={card.id}
+              logoFileId={card.logoFileId}
+              fallback={initials(card.shortName)}
+              className={styles.logo}
+            />
             <div className={styles.identityBody}>
               <h1>{card.shortName}</h1>
               <p>{[card.typeName, card.region, card.city].filter(Boolean).join(' · ')}</p>

@@ -37,6 +37,7 @@ type Page<T> = { items: T[]; total: number };
 
 type OrganizationListItem = {
   id: string;
+  logo_file_id?: string | null;
   name: string;
   short_name: string | null;
   region: string | null;
@@ -195,6 +196,7 @@ export const loadPortfolio = async (): Promise<PortfolioOrganization[]> => {
 
     return {
       id: organization.id,
+      logoFileId: organization.logo_file_id ?? null,
       name: organization.name,
       shortName: text(organization.short_name, organization.name),
       city: filledCity(organization.city),
@@ -259,6 +261,7 @@ const withSamples = (card: UniversityCard): UniversityCard => {
 
 const gapCard = (organization: PortfolioOrganization): UniversityCard => withSamples({
   id: organization.id,
+  logoFileId: organization.logoFileId,
   name: organization.name,
   shortName: organization.shortName,
   typeName: organization.typeName,
@@ -317,6 +320,7 @@ export const loadUniversityCard = async (id: string): Promise<UniversityCard> =>
 
   return withSamples({
     id: organization.id,
+    logoFileId: organization.logo_file_id ?? null,
     name: organization.name,
     shortName: text(organization.short_name, organization.name),
     typeName: text(summary.type_name, 'Площадка'),

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from uuid import UUID
+from datetime import datetime, timedelta, timezone
+from hashlib import sha256
+from io import BytesIO
+from pathlib import Path
+from uuid import UUID, uuid4
 
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session, aliased
 
 from app.common.repository import ListResult
+from app.core.config import settings
 from app.modules.auth.access import forbidden, get_subordinate_kam_ids, has_any_role, is_admin
 from app.modules.audit.model import AuditEvent
 from app.modules.documents.model import File
@@ -19,6 +23,7 @@ from app.modules.program_instances.model import ProgramInstance
 from app.modules.organizations.schemas import AssignmentCreate, OrganizationCreate, OrganizationUpdate, StakeholderCreate, StakeholderUpdate
 from app.modules.users.model import Role, User
 from app.modules.workflows.model import WorkflowStage, WorkflowStageAttachment, WorkflowStageComment, WorkflowStageInstance, WorkflowTransitionHistory
+from app.storage import get_storage_adapter
 
 
 class OrganizationService:
@@ -76,6 +81,94 @@ class OrganizationService:
         ):
             raise HTTPException(status_code=404, detail="Organization logo not found")
         return file_record
+
+    def upload_logo(self, organization_id: UUID, upload: UploadFile, current_user: User) -> Organization:
+        organization = self.get(organization_id, current_user)
+        original_name = Path(upload.filename or "").name
+        extension = Path(original_name).suffix.lower()
+        allowed_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+        if extension not in allowed_types or upload.content_type != allowed_types[extension]:
+            raise HTTPException(status_code=422, detail="Supported logo formats: PNG, JPG")
+
+        content = upload.file.read()
+        if not content:
+            raise HTTPException(status_code=422, detail="Logo file is empty")
+        if len(content) > settings.file_max_upload_bytes:
+            raise HTTPException(status_code=413, detail="Logo file is too large")
+
+        object_name = f"{uuid4()}{extension}"
+        bucket = settings.s3_bucket_organization_logos
+        object_key = f"organizations/{organization.id}/logos/{object_name}"
+        storage = get_storage_adapter()
+        storage.put(
+            bucket=bucket,
+            object_key=object_key,
+            data=BytesIO(content),
+            length=len(content),
+            content_type=upload.content_type,
+        )
+        try:
+            previous_logo_id = organization.logo_file_id
+            logo = File(
+                original_name=original_name,
+                storage_name=object_name,
+                storage_path=f"{bucket}/{object_key}",
+                mime_type=upload.content_type,
+                extension=extension.lstrip("."),
+                size_bytes=len(content),
+                checksum=sha256(content).hexdigest(),
+                provider="S3",
+                bucket=bucket,
+                object_key=object_key,
+                attachment_kind="organization_logo",
+                uploaded_by=current_user.id,
+                scan_status="NOT_SCANNED",
+            )
+            self.db.add(logo)
+            self.db.flush()
+            organization.logo_file_id = logo.id
+            self._soft_delete_logo(previous_logo_id, current_user.id)
+            self.db.add(AuditEvent(
+                actor_user_id=current_user.id,
+                action="organization.logo.uploaded",
+                entity_type="organization",
+                entity_id=organization.id,
+                event_metadata={"file_id": str(logo.id), "replaced_file_id": str(previous_logo_id) if previous_logo_id else None},
+            ))
+            self.db.commit()
+            self.db.refresh(organization)
+            return organization
+        except Exception:
+            self.db.rollback()
+            storage.delete(bucket=bucket, object_key=object_key)
+            raise
+
+    def delete_logo(self, organization_id: UUID, current_user: User) -> None:
+        organization = self.get(organization_id, current_user)
+        logo_id = organization.logo_file_id
+        if logo_id is None:
+            raise HTTPException(status_code=404, detail="Organization logo not found")
+        organization.logo_file_id = None
+        self._soft_delete_logo(logo_id, current_user.id)
+        self.db.add(AuditEvent(
+            actor_user_id=current_user.id,
+            action="organization.logo.deleted",
+            entity_type="organization",
+            entity_id=organization.id,
+            event_metadata={"file_id": str(logo_id)},
+        ))
+        self.db.commit()
+
+    def _soft_delete_logo(self, logo_id: UUID | None, actor_user_id: UUID) -> None:
+        if logo_id is None:
+            return
+        logo = self.db.get(File, logo_id)
+        if logo is None:
+            return
+        now = datetime.now(timezone.utc)
+        logo.deleted_at = now
+        logo.delete_after = now + timedelta(days=settings.file_retention_days)
+        logo.deleted_by = actor_user_id
 
     def create(self, payload: OrganizationCreate, current_user: User) -> Organization:
         if not is_admin(current_user):
