@@ -17,7 +17,7 @@ export const stageBlueprints: Record<string, { title: string; note: string; fact
   first_meeting: {
     title: 'Первая встреча',
     note: 'Нужны дата, участник и протокол или заметка не короче 40 символов.',
-    aside: 'people',
+    aside: 'none',
     facts: [
       { code: 'meeting_date', label: 'Дата первой встречи', itemType: 'date' },
       { code: 'meeting_participant', label: 'Участник встречи со стороны площадки', itemType: 'stakeholder_role', role: 'other' },
@@ -43,7 +43,7 @@ export const stageBlueprints: Record<string, { title: string; note: string; fact
   sign_contract: {
     title: 'Подписание договора',
     note: 'Номер, дата и файл подписанного договора.',
-    aside: 'license',
+    aside: 'none',
     facts: [
       { code: 'contract_number', label: 'Номер договора', itemType: 'text' },
       { code: 'contract_signed_on', label: 'Дата подписания', itemType: 'date' },
@@ -53,7 +53,7 @@ export const stageBlueprints: Record<string, { title: string; note: string; fact
   sign_license: {
     title: 'Подписание лицензии',
     note: 'Номер, срок и файл. Срок нужен датой, иначе напоминание за 90 дней не посчитается.',
-    aside: 'license',
+    aside: 'none',
     facts: [
       { code: 'license_number', label: 'Номер лицензии', itemType: 'text' },
       { code: 'license_valid_until', label: 'Срок действия', itemType: 'date' },
@@ -63,7 +63,7 @@ export const stageBlueprints: Record<string, { title: string; note: string; fact
   transfer_access: {
     title: 'Передача и доступ',
     note: 'Статус передачи, непустое поле доступа и файл. Сопровождение внедрения живёт здесь, отдельной клетки нет.',
-    aside: 'license',
+    aside: 'none',
     facts: [
       { code: 'transfer_status', label: 'Подтверждение передачи', itemType: 'text' },
       { code: 'product_access', label: 'Доступ к продукту', itemType: 'text' },
@@ -73,7 +73,7 @@ export const stageBlueprints: Record<string, { title: string; note: string; fact
   train_teacher: {
     title: 'Обучение преподавателя',
     note: 'Носитель именно этого продукта на этой площадке, плюс дата обучения.',
-    aside: 'people',
+    aside: 'none',
     facts: [
       { code: 'teacher', label: 'Преподаватель-носитель', itemType: 'stakeholder_role', role: 'teacher' },
       { code: 'trained_on', label: 'Дата обучения', itemType: 'date' },
@@ -82,7 +82,7 @@ export const stageBlueprints: Record<string, { title: string; note: string; fact
   confirm_teacher: {
     title: 'Подтверждение преподавателя',
     note: 'Человек обучен или уже ведёт. Пока этого нет, старт занятий не открываем.',
-    aside: 'people',
+    aside: 'none',
     facts: [{ code: 'teacher_ready', label: 'Подтверждение готовности', itemType: 'text' }],
   },
   curriculum: {
@@ -94,7 +94,7 @@ export const stageBlueprints: Record<string, { title: string; note: string; fact
   start_classes: {
     title: 'Старт занятий',
     note: 'Дата и ручное подтверждение. Сигнал LMS только подсказывает и сам этап не закрывает.',
-    aside: 'lms',
+    aside: 'none',
     facts: [
       { code: 'classes_started_on', label: 'Дата старта занятий', itemType: 'date' },
       { code: 'classes_started', label: 'Подтверждение старта', itemType: 'text' },
@@ -103,13 +103,13 @@ export const stageBlueprints: Record<string, { title: string; note: string; fact
   classes_running: {
     title: 'Ведение занятий',
     note: 'Пока учебное окно живо, этап не торопится закрываться. LMS показывает студентов, но решение за менеджером.',
-    aside: 'lms',
+    aside: 'none',
     facts: [],
   },
   period_results: {
     title: 'Итоги периода',
     note: 'Файл или комментарий итога. Это не отдельный вечный этап актуализации документации.',
-    aside: 'lms',
+    aside: 'none',
     facts: [{ code: 'period_result', label: 'Итог периода', itemType: 'text' }],
   },
 };
@@ -118,10 +118,12 @@ const nameToCode: Record<string, string> = {
   'Поиск контакта': 'find_contact',
   'Первая встреча': 'first_meeting',
   'Потребность': 'identify_need',
+  'Выявление потребности': 'identify_need',
   'Пакет документов': 'document_package',
   'Подписание договора': 'sign_contract',
   'Подписание лицензии': 'sign_license',
   'Передача и доступ': 'transfer_access',
+  'Передача и доступ к продукту': 'transfer_access',
   'Обучение преподавателя': 'train_teacher',
   'Подтверждение преподавателя': 'confirm_teacher',
   'Учебный план': 'curriculum',

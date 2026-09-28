@@ -119,7 +119,8 @@ def update_checklist(
             owner_organization_id = interaction.university_id if interaction is not None else None
         if owner_organization_id is None or stakeholder.organization_id != owner_organization_id:
             raise HTTPException(status_code=422, detail="Stakeholder belongs to another organization")
-        if item.required_stakeholder_role and stakeholder.role_code != item.required_stakeholder_role:
+        required_role = item.required_stakeholder_role
+        if required_role and required_role != "other" and stakeholder.role_code != required_role:
             raise HTTPException(status_code=422, detail="Stakeholder role does not satisfy checklist item")
     if payload.attachment_id is not None:
         attachment = db.get(File, payload.attachment_id)

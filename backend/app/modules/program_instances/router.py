@@ -24,7 +24,7 @@ from app.modules.program_instances.service import ProgramInstanceService
 from app.modules.users.model import User
 from app.modules.workflow_catalog.model import WorkflowPhase, WorkflowStageCatalog
 from app.modules.workflows.model import WorkflowStage, WorkflowStageInstance, WorkflowTransitionHistory
-from app.modules.workflows.schemas import WorkflowTransitionExecute
+from app.modules.workflows.schemas import ProgramRefuse, ProgramReopen, WorkflowTransitionExecute
 from app.modules.workflows.service import TransitionService, WorkflowRuntimeService
 
 router = APIRouter(
@@ -283,6 +283,46 @@ def get_program_instance_workflow(
             for transition in transitions
         ],
     }
+
+
+@router.post("/program-instances/{program_instance_id}/refuse")
+def refuse_program_instance(
+    program_instance_id: UUID,
+    payload: ProgramRefuse,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    program = ProgramInstanceService(db).get(program_instance_id, current_user)
+    model = db.get(ProgramInstance, program_instance_id)
+    scoped = payload.model_copy(update={"performed_by": current_user.id})
+    if program.legacy_interaction_id is not None:
+        result = TransitionService(db).refuse_interaction(program.legacy_interaction_id, scoped)
+    else:
+        result = TransitionService(db).refuse_program(model, scoped)
+    model.status = "cancelled"
+    model.comment = scoped.comment.strip()
+    HealthService(db).recompute(program_instance_id)
+    NbaService(db).recompute_program(program_instance_id)
+    db.commit()
+    return result
+
+
+@router.post("/program-instances/{program_instance_id}/reopen")
+def reopen_program_stage(
+    program_instance_id: UUID,
+    payload: ProgramReopen,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    ProgramInstanceService(db).get(program_instance_id, current_user)
+    model = db.get(ProgramInstance, program_instance_id)
+    if model is None or model.status in {"completed", "cancelled"}:
+        raise HTTPException(status_code=409, detail="Program workflow is not active")
+    TransitionService(db).reopen_program_stage(model, payload.stage_instance_id)
+    HealthService(db).recompute(program_instance_id)
+    NbaService(db).recompute_program(program_instance_id)
+    db.commit()
+    return {"current_stage_instance_id": str(model.current_stage_instance_id)}
 
 
 @router.post("/program-instances/{program_instance_id}/transition")

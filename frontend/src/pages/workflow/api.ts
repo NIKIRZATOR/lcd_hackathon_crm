@@ -38,10 +38,36 @@ type JournalRow = {
   direction_name: string;
   product_name: string;
   current_stage_name: string | null;
+  status?: string | null;
   due_at: string | null;
   health_score: number | null;
   health_band: string | null;
   kam_name: string | null;
+};
+
+export const CLOSED_STAGE_LABEL = 'Заход закрыт';
+
+const closedProgramsKey = 'rtk-eduflow:closed-programs';
+
+const readClosedPrograms = () => {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = JSON.parse(localStorage.getItem(closedProgramsKey) ?? '[]') as unknown;
+    return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
+export const rememberClosedProgram = (id: string) => {
+  const ids = new Set(readClosedPrograms());
+  ids.add(id);
+  localStorage.setItem(closedProgramsKey, JSON.stringify([...ids]));
+};
+
+export const journalStageName = (row: { id: string; current_stage_name?: string | null; status?: string | null }) => {
+  if ((row.status ?? '').toLowerCase() === 'cancelled' || readClosedPrograms().includes(row.id)) return CLOSED_STAGE_LABEL;
+  return row.current_stage_name?.trim() || 'Этап не передан';
 };
 
 type ApiStage = {
@@ -337,6 +363,7 @@ export type ProgramDesk = {
   product: string;
   playbook: string;
   windowTitle: string;
+  windowId: string | null;
   kam: string;
   status: string;
   healthScore: number | null;
@@ -379,7 +406,7 @@ export const loadJournal = async (preset: JournalPreset): Promise<JournalProgram
     direction: text(row.direction_name),
     product: text(row.product_name),
     playbook: row.playbook_name?.trim() || 'Плейбук не передан',
-    stage: row.current_stage_name?.trim() || 'Этап не передан',
+    stage: journalStageName(row),
     due: isoDate(row.due_at),
     healthScore: row.health_score,
     healthBand: bandOf(row.health_score, row.health_band),
@@ -397,6 +424,7 @@ const gapDesk = (row: ReturnType<typeof sampleJournal>[number]): ProgramDesk => 
   product: row.product,
   playbook: row.playbook,
   windowTitle: 'Осень 2026',
+  windowId: null,
   kam: row.kam,
   status: 'active',
   healthScore: row.healthScore,
@@ -445,6 +473,7 @@ export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
       direction_name: string;
       product_name: string;
       playbook_name: string;
+      academic_window_id: string | null;
       academic_window_title: string | null;
       kam_name: string | null;
       status: string;
@@ -474,6 +503,7 @@ export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
     product: program.product_name,
     playbook: program.playbook_name,
     windowTitle: program.academic_window_title?.trim() || 'Окно не выбрано',
+    windowId: program.academic_window_id,
     kam: program.kam_name?.trim() || 'KAM не назначен',
     status: program.status,
     healthScore: program.health_score,
@@ -556,6 +586,19 @@ export const updateStageComment = (stageId: string, commentId: string, textValue
 });
 
 export const deleteStageComment = (stageId: string, commentId: string) => apiRequest(`/api/workflows/stage-instances/${stageId}/comments/${commentId}`, { method: 'DELETE' });
+
+export const refuseProgram = (programId: string, payload: { stageId: string; comment: string }) => apiRequest(`/api/program-instances/${programId}/refuse`, {
+  method: 'POST',
+  body: JSON.stringify({
+    comment: payload.comment,
+    expected_current_stage_instance_id: payload.stageId,
+  }),
+});
+
+export const reopenProgramStage = (programId: string, stageId: string) => apiRequest(`/api/program-instances/${programId}/reopen`, {
+  method: 'POST',
+  body: JSON.stringify({ stage_instance_id: stageId }),
+});
 
 export const moveProgram = (programId: string, payload: { transitionId?: string; comment?: string; stageId?: string; skip?: boolean }) => apiRequest(`/api/program-instances/${programId}/transition`, {
   method: 'POST',

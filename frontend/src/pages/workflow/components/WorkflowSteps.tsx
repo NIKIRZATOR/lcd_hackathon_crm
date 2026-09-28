@@ -15,6 +15,7 @@ type WorkflowStepsProps = {
   currentStep: number;
   selectedStep?: number;
   horizontal?: boolean;
+  mutedAfter?: number;
   onStepChange?: (index: number, step: WorkflowStep) => void;
 };
 
@@ -46,7 +47,7 @@ const getStepStatus = (index: number, currentStep: number): StepMarkerStatus => 
   return 'wait';
 };
 
-const WorkflowSteps = ({ steps, currentStep, selectedStep = currentStep, horizontal = false, onStepChange }: WorkflowStepsProps) => {
+const WorkflowSteps = ({ steps, currentStep, selectedStep = currentStep, horizontal = false, mutedAfter, onStepChange }: WorkflowStepsProps) => {
   const { token } = theme.useToken();
 
   return (
@@ -63,7 +64,9 @@ const WorkflowSteps = ({ steps, currentStep, selectedStep = currentStep, horizon
       aria-label="Этапы workflow"
     >
       {steps.map((step, index) => {
-        const status = getStepStatus(index, currentStep);
+        const status = mutedAfter == null
+          ? getStepStatus(index, currentStep)
+          : index <= mutedAfter ? 'finish' : 'wait';
         const isClickable = Boolean(onStepChange) && !step.disabled;
         const isSelected = index === selectedStep;
 
@@ -88,11 +91,8 @@ const WorkflowSteps = ({ steps, currentStep, selectedStep = currentStep, horizon
             <span className={styles.stepNumber}>{String(index + 1).padStart(2, '0')}</span>
             <span className={styles.markerColumn}>
               <StepMarker status={status} />
-              {index < steps.length - 1 && (
-                <span className={`${styles.connector} ${index < currentStep ? styles.connectorFinished : ''}`} aria-hidden="true" />
-              )}
             </span>
-            <span className={`${styles.stepTitle} ${status === 'process' ? styles.currentTitle : ''}`}>
+            <span className={`${styles.stepTitle} ${status === 'process' ? styles.currentTitle : ''} ${mutedAfter != null && index > mutedAfter ? styles.mutedTitle : ''}`}>
               {step.title}
             </span>
           </button>
