@@ -1,5 +1,5 @@
 import { findUniversity, rememberUniversity, universityItemsMock, universityManagers, universityProfiles } from './mocks';
-import { listUniversityWorkflows } from './workflowLink';
+import { listUniversityWorkflows } from './domain/workflowLink';
 
 // Страницы ходят только сюда. Сейчас под функциями моки, запросы встанут на их место.
 

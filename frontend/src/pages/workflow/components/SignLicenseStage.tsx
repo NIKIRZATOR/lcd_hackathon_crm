@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 
 import { apiDownload, apiRequest } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
 import type { DeskChecklistItem, DeskFile } from '../api';
-import { stageDeadline } from '../firstMeeting';
+import { stageDeadline } from '../stages/firstMeeting';
 import {
   LICENSE_FILE_KIND,
   SIGN_LICENSE_SLA_DAYS,
@@ -19,8 +19,8 @@ import {
   signLicensePlan,
   type LicenseDraft,
   type LicenseStatus,
-} from '../signLicense';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+} from '../stages/signLicense';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import formStyles from './FirstMeetingStage.module.scss';
 import tileStyles from './ContactSearchStage.module.scss';

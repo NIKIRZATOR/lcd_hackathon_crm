@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { advanceWorkflowStage, createUniversityWorkflow, nextWorkflowStepName, workflowItemsMock } from '../workflow/mocks';
-import { universityItemsMock } from './mocks';
+import { advanceWorkflowStage, createUniversityWorkflow, nextWorkflowStepName, workflowItemsMock } from '../../workflow/mocks';
+import { universityItemsMock } from '../mocks';
 import { linkWorkflowsToUniversities, listUniversityWorkflows } from './workflowLink';
 
 describe('связь вуза и workflow', () => {

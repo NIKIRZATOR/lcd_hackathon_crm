@@ -43,22 +43,22 @@ import ControlExecutionStage from './components/ControlExecutionStage';
 import IdentifyNeedStage from './components/IdentifyNeedStage';
 import StageWorkspace from './components/StageWorkspace';
 import WorkflowSteps from './components/WorkflowSteps';
-import { findContactChecklistItem } from './contactSearch';
-import { hasEnteredControl, rememberControlEntered } from './controlExecution';
-import type { MeetingClosePlan } from './firstMeeting';
-import { documentClosePlan } from './documentPackage';
-import { signClosePlan, type SignClosePlan } from './signContract';
-import { signLicensePlan, type SignLicensePlan } from './signLicense';
-import { transferClosePlan, type TransferClosePlan } from './transferAccess';
-import { trainClosePlan, type TrainClosePlan } from './trainTeacher';
-import { confirmClosePlan, type ConfirmClosePlan } from './confirmTeacher';
-import { curriculumClosePlan, type CurriculumClosePlan } from './curriculum';
-import { startClosePlan, type StartClosePlan } from './startClasses';
-import { classesClosePlan, type ClassesClosePlan } from './classesRunning';
-import type { PeriodClosePlan } from './periodResults';
-import { identifyClosePlan } from './identifyNeed';
-import { stageBlueprints, stageCodeOf } from './stageBlueprints';
-import { emptyActionText } from './workflowBackendFieldGaps';
+import { findContactChecklistItem } from './stages/contactSearch';
+import { hasEnteredControl, rememberControlEntered } from './stages/controlExecution';
+import type { MeetingClosePlan } from './stages/firstMeeting';
+import { documentClosePlan } from './stages/documentPackage';
+import type { SignClosePlan } from './stages/signContract';
+import type { SignLicensePlan } from './stages/signLicense';
+import type { TransferClosePlan } from './stages/transferAccess';
+import type { TrainClosePlan } from './stages/trainTeacher';
+import type { ConfirmClosePlan } from './stages/confirmTeacher';
+import type { CurriculumClosePlan } from './stages/curriculum';
+import type { StartClosePlan } from './stages/startClasses';
+import type { ClassesClosePlan } from './stages/classesRunning';
+import type { PeriodClosePlan } from './stages/periodResults';
+import { identifyClosePlan } from './stages/identifyNeed';
+import { stageBlueprints, stageCodeOf } from './shared/stageBlueprints';
+import { emptyActionText } from './backend/workflowBackendFieldGaps';
 
 
 import styles from './WorkflowDetailPage.module.scss';
@@ -127,8 +127,11 @@ const WorkflowDetailPage = () => {
 
   useEffect(() => {
     const entered = hasEnteredControl(id);
-    setControlEntered(entered);
-    setSelectedId(entered || new URLSearchParams(window.location.search).get('stage') === 'control' ? 'control' : '');
+    const timer = window.setTimeout(() => {
+      setControlEntered(entered);
+      setSelectedId(entered || new URLSearchParams(window.location.search).get('stage') === 'control' ? 'control' : '');
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [id]);
 
   useEffect(() => {
@@ -158,11 +161,13 @@ const WorkflowDetailPage = () => {
       stageCodeOf(stage.code, stage.name) === 'control'
       || stage.name.trim().toLowerCase() === 'контроль исполнения'
     ))) {
-      setChecklist([]);
-      setComments([]);
-      setFiles([]);
-      setFactsStageId(selectedId);
-      return;
+      const timer = window.setTimeout(() => {
+        setChecklist([]);
+        setComments([]);
+        setFiles([]);
+        setFactsStageId(selectedId);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
     if (!selectedId || selectedId.startsWith('gap-')) {
       const code = stageCodeOf(stage?.code, stage?.name);
@@ -216,20 +221,23 @@ const WorkflowDetailPage = () => {
   }, [desk?.stages, selectedId]);
 
   useEffect(() => {
-    setStageBlockers(null);
-    setCloseHint(false);
-    setMeetingPlan(null);
-    setIdentifyPlan(null);
-    setPackagePlan(null);
-    setSignPlan(null);
-    setLicensePlan(null);
-    setTransferPlan(null);
-    setTrainPlan(null);
-    setConfirmPlan(null);
-    setCurriculumPlan(null);
-    setStartPlan(null);
-    setRunningPlan(null);
-    setPeriodPlan(null);
+    const timer = window.setTimeout(() => {
+      setStageBlockers(null);
+      setCloseHint(false);
+      setMeetingPlan(null);
+      setIdentifyPlan(null);
+      setPackagePlan(null);
+      setSignPlan(null);
+      setLicensePlan(null);
+      setTransferPlan(null);
+      setTrainPlan(null);
+      setConfirmPlan(null);
+      setCurriculumPlan(null);
+      setStartPlan(null);
+      setRunningPlan(null);
+      setPeriodPlan(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [selectedId]);
 
   useEffect(() => {

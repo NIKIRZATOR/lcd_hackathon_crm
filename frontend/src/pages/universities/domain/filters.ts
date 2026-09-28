@@ -1,4 +1,4 @@
-import type { UniversityFilters, UniversityItem } from './types';
+import type { UniversityFilters, UniversityItem } from '../types';
 
 export const filterUniversities = (items: UniversityItem[], filters: UniversityFilters) => {
   const query = filters.search.trim().toLowerCase();

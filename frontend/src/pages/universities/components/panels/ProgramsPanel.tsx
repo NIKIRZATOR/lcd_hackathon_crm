@@ -2,7 +2,7 @@ import { PlusOutlined } from '@ant-design/icons';
 import { Button, Form, Input, Modal, Select, Table } from 'antd';
 import { useState } from 'react';
 
-import type { SectionProgram, UniversitySections } from '../../sectionData';
+import type { SectionProgram, UniversitySections } from '../../domain/sectionData';
 import { byNumber, byText, shownColumns, styles, useCompact } from './panelShared';
 import { Details, Pill } from './panelUi';
 

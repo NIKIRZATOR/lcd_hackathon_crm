@@ -7,8 +7,8 @@ import { apiDownload } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
 import type { DeskChecklistItem, DeskFile } from '../api';
 import { loadStageFacts } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
-import { stageDeadline } from '../firstMeeting';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
+import { stageDeadline } from '../stages/firstMeeting';
 import {
   SIGN_CONTRACT_SLA_DAYS,
   SIGNED_CONTRACT_KIND,
@@ -20,8 +20,8 @@ import {
   signContractChecks,
   type ContractStatus,
   type SignDraft,
-} from '../signContract';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+} from '../stages/signContract';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import formStyles from './FirstMeetingStage.module.scss';
 import tileStyles from './ContactSearchStage.module.scss';

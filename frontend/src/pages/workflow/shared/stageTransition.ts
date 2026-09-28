@@ -1,4 +1,4 @@
-import type { WorkflowStatus } from './types';
+import type { WorkflowStatus } from '../types';
 
 export type WorkflowStageRef = {
   id: number;

@@ -6,7 +6,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Button, Checkbox, Input, Popconfirm } from 'antd';
 import { useState } from 'react';
 
-import type { CustomChecklistItem } from '../contactSearch';
+import type { CustomChecklistItem } from '../stages/contactSearch';
 
 import styles from './ContactSearchStage.module.scss';
 

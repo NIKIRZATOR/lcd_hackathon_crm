@@ -7,7 +7,7 @@ import { apiDownload, apiRequest } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
 import type { DeskChecklistItem, DeskFile } from '../api';
 import { loadStageFacts } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
 import {
   CONFIRM_TEACHER_SLA_DAYS,
   confirmChecks,
@@ -17,10 +17,10 @@ import {
   qualificationOpen,
   serializeConfirmDraft,
   type ConfirmDraft,
-} from '../confirmTeacher';
-import { stageDeadline } from '../firstMeeting';
-import { CERTIFICATE_KIND } from '../trainTeacher';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+} from '../stages/confirmTeacher';
+import { stageDeadline } from '../stages/firstMeeting';
+import { CERTIFICATE_KIND } from '../stages/trainTeacher';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import tileStyles from './ContactSearchStage.module.scss';
 import formStyles from './FirstMeetingStage.module.scss';

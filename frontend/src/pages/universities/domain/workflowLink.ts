@@ -1,9 +1,9 @@
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 
-import { universityItemsMock } from './mocks';
-import { nextWorkflowStepName, workflowItemsMock } from '../workflow/mocks';
-import type { WorkflowItem, WorkflowStatus } from '../workflow/types';
+import { universityItemsMock } from '../mocks';
+import { nextWorkflowStepName, workflowItemsMock } from '../../workflow/mocks';
+import type { WorkflowItem, WorkflowStatus } from '../../workflow/types';
 import type { StageTone } from './universityCard';
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/ё/g, 'е').replace(/[«»"']/g, '');

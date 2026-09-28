@@ -1,7 +1,7 @@
 import { RightOutlined } from '@ant-design/icons';
 import { Button, Card, Tag } from 'antd';
 
-import type { CardInteraction, TaskPriority, UniversityCard } from '../universityCard';
+import type { CardInteraction, TaskPriority, UniversityCard } from '../domain/universityCard';
 import UniversityInteractionTable from './UniversityInteractionTable';
 
 import styles from './UniversityOverview.module.scss';

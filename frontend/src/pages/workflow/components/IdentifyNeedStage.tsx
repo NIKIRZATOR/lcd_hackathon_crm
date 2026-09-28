@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
 import { loadStageFacts, type DeskChecklistItem } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
-import { isGeneratedProtocolText, parseMeetingNote, stageDeadline } from '../firstMeeting';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
+import { isGeneratedProtocolText, parseMeetingNote, stageDeadline } from '../stages/firstMeeting';
 import {
   IDENTIFY_NEED_SLA_DAYS,
   identifyCheckState,
@@ -16,7 +16,7 @@ import {
   parseIdentifyNote,
   serializeIdentifyNote,
   type IdentifyNote,
-} from '../identifyNeed';
+} from '../stages/identifyNeed';
 
 import formStyles from './FirstMeetingStage.module.scss';
 import tileStyles from './ContactSearchStage.module.scss';

@@ -23,7 +23,7 @@ import {
   writeContactNoteCache,
   type ContactNote,
   type SiteContact,
-} from '../contactSearch';
+} from '../stages/contactSearch';
 
 import SiteContactModal, { type SiteContactFormValues } from './SiteContactModal';
 import StageFactTiles from './StageFactTiles';

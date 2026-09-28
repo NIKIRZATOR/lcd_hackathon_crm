@@ -7,8 +7,8 @@ import { apiDownload, apiRequest } from '../../../api/client';
 import { createStakeholder } from '../../organizations/api';
 import { roleLabel } from '../../organizations/screenModel';
 import type { DeskChecklistItem, DeskFile } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
-import { stageDeadline } from '../firstMeeting';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
+import { stageDeadline } from '../stages/firstMeeting';
 import {
   CERTIFICATE_KIND,
   TRAIN_TEACHER_SLA_DAYS,
@@ -22,8 +22,8 @@ import {
   type CarrierStatus,
   type TrainDraft,
   type TrainFormat,
-} from '../trainTeacher';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+} from '../stages/trainTeacher';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import tileStyles from './ContactSearchStage.module.scss';
 import formStyles from './FirstMeetingStage.module.scss';

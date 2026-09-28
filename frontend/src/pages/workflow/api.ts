@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 
 import { apiRequest } from '../../api/client';
-import { emptyActionText, filledCount, filledPhase, isGapProgram, sampleJournal } from './workflowBackendFieldGaps';
+import { emptyActionText, filledCount, filledPhase, isGapProgram, sampleJournal } from './backend/workflowBackendFieldGaps';
 import {
   addWorkflowStageComment as addMockComment,
   addWorkflowStageFile as addMockFile,

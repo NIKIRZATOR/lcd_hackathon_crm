@@ -6,10 +6,10 @@ import { useEffect, useState } from 'react';
 import { apiDownload, apiRequest } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
 import type { DeskFile } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
-import { classesClosePlan, emptyRunningDraft, signalTone, streamStatuses, CLASSES_RUNNING_SLA_DAYS, type RunningDraft, type StreamStatus } from '../classesRunning';
-import { stageDeadline } from '../firstMeeting';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
+import { classesClosePlan, emptyRunningDraft, signalTone, streamStatuses, CLASSES_RUNNING_SLA_DAYS, type RunningDraft, type StreamStatus } from '../stages/classesRunning';
+import { stageDeadline } from '../stages/firstMeeting';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import tileStyles from './ContactSearchStage.module.scss';
 import formStyles from './FirstMeetingStage.module.scss';

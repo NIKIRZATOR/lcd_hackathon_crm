@@ -1,8 +1,8 @@
 import { Checkbox, Form, Input, Modal, Select } from 'antd';
 
 import { stakeholderRoles } from '../../organizations/screenModel';
-import { contactSources } from '../contactSearch';
-import type { SiteContact } from '../contactSearch';
+import { contactSources } from '../stages/contactSearch';
+import type { SiteContact } from '../stages/contactSearch';
 
 import styles from './ContactSearchStage.module.scss';
 

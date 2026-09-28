@@ -1,8 +1,8 @@
 import { Grid, Table, Tag, Tooltip } from 'antd';
 import type { TableColumnsType } from 'antd';
 
-import { isInPeriod, usePeriod } from '../period';
-import type { CardInteraction, StageTone } from '../universityCard';
+import { isInPeriod, usePeriod } from '../domain/period';
+import type { CardInteraction, StageTone } from '../domain/universityCard';
 
 import styles from './UniversityInteractionTable.module.scss';
 

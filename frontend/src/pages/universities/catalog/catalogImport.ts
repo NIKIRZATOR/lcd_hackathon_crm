@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 
-import { universityItemsMock } from './mocks';
-import type { UniversityCatalog, UniversityItem, UniversityResponsible, UniversityType } from './types';
+import { universityItemsMock } from '../mocks';
+import type { UniversityCatalog, UniversityItem, UniversityResponsible, UniversityType } from '../types';
 
 export const catalogFields = [
   { key: 'name', title: 'Название ВУЗа', required: true, aliases: ['название вуза', 'вуз', 'университет'] },

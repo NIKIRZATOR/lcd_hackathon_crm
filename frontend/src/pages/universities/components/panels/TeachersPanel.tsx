@@ -2,8 +2,8 @@ import { SearchOutlined } from '@ant-design/icons';
 import { Input, Select, Table } from 'antd';
 import { useState } from 'react';
 
-import type { Readiness, SectionTeacher, TrainingStatus, UniversitySections } from '../../sectionData';
-import { readinessSlices } from '../../sectionData';
+import type { Readiness, SectionTeacher, TrainingStatus, UniversitySections } from '../../domain/sectionData';
+import { readinessSlices } from '../../domain/sectionData';
 import { byText, shownColumns, styles, unique, useCompact } from './panelShared';
 import { Details, Pill } from './panelUi';
 

@@ -1,7 +1,7 @@
 import { Select, Table } from 'antd';
 import { useState } from 'react';
 
-import type { UniversitySections } from '../../sectionData';
+import type { UniversitySections } from '../../domain/sectionData';
 import { byNumber, byText, styles, unique, workClass, workLabel } from './panelShared';
 import { Pill } from './panelUi';
 

@@ -7,7 +7,7 @@ import { ApiError, apiDownload, apiRequest } from '../../../api/client';
 import { createStakeholder } from '../../organizations/api';
 import { roleLabel } from '../../organizations/screenModel';
 import type { DeskChecklistItem, DeskFile } from '../api';
-import type { SiteContact } from '../contactSearch';
+import type { SiteContact } from '../stages/contactSearch';
 import {
   MEETING_NOTE_MIN,
   MEETING_PROTOCOL_KIND,
@@ -24,8 +24,8 @@ import {
   serializeMeetingNote,
   type MeetingNote,
   type MeetingOutcome,
-} from '../firstMeeting';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+} from '../stages/firstMeeting';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import SiteContactModal, { type SiteContactFormValues } from './SiteContactModal';
 import StageFactTiles from './StageFactTiles';

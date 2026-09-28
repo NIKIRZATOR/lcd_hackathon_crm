@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { apiRequest } from '../../../api/client';
-import { buildControlSignals, controlLevel, type ControlSignal } from '../controlExecution';
+import { buildControlSignals, controlLevel, type ControlSignal } from '../stages/controlExecution';
 
 import formStyles from './FirstMeetingStage.module.scss';
 import tileStyles from './ContactSearchStage.module.scss';

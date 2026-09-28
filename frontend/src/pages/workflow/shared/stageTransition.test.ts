@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { advanceWorkflowStage, getWorkflowDetailMock, getWorkflowStepConfigs, moveWorkflowToStage, workflowItemsMock } from './mocks';
+import { advanceWorkflowStage, getWorkflowDetailMock, getWorkflowStepConfigs, moveWorkflowToStage, workflowItemsMock } from '../mocks';
 import { resolveCurrentStageIndex, transitionToNextStage, transitionToStage } from './stageTransition';
 
 const stages = [

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addWorkflowStageComment, addWorkflowStageFile, getWorkflowDetailMock, getWorkflowStageActivity } from './mocks';
+import { addWorkflowStageComment, addWorkflowStageFile, getWorkflowDetailMock, getWorkflowStageActivity } from '../mocks';
 
 describe('активность этапа', () => {
   it('хранит комментарий и файл на своём этапе', () => {
