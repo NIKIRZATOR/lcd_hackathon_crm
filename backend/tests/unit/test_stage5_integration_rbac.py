@@ -27,6 +27,7 @@ def make_user(role: str) -> User:
     [
         "/api/integrations/sources",
         "/api/integrations/diagnostics",
+        "/api/integrations/packages",
         "/api/integrations/signals",
     ],
 )
@@ -35,5 +36,64 @@ def test_non_admin_cannot_read_integration_diagnostics(role: str, path: str) -> 
     app.dependency_overrides[get_current_user] = lambda: make_user(role)
 
     response = TestClient(app).get(path)
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("role", ["KAM", "MANAGER"])
+def test_non_admin_cannot_list_users(role: str) -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user(role)
+
+    response = TestClient(app).get("/api/users")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("role", ["KAM", "MANAGER"])
+def test_non_admin_cannot_list_manager_memberships(role: str) -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user(role)
+
+    response = TestClient(app).get("/api/users/manager-memberships")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("role", ["KAM", "MANAGER"])
+def test_non_admin_cannot_list_imports(role: str) -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user(role)
+
+    response = TestClient(app).get("/api/imports")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("role", ["KAM", "MANAGER"])
+def test_non_admin_cannot_list_audit_events(role: str) -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user(role)
+
+    response = TestClient(app).get("/api/audit/events")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("role", ["KAM", "MANAGER"])
+def test_non_admin_cannot_read_system_status(role: str) -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user(role)
+
+    response = TestClient(app).get("/api/system/status")
+
+    assert response.status_code == 403
+
+
+def test_kam_cannot_read_organization_assignment_history() -> None:
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: make_user("KAM")
+
+    response = TestClient(app).get(f"/api/organizations/{uuid4()}/assignments")
 
     assert response.status_code == 403

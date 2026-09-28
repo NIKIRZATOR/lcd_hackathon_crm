@@ -3169,6 +3169,9 @@ def main() -> None:
         seed_full_field_enrichment(db, users)
         seed_auxiliary_relations(db, users)
         seed_stage5_integration_mappings(db)
+
+        db.flush()
+        
         seed_integration_signals_full(db)
         seed_contracts_licenses_and_teachers(db)
         seed_contracts_full(db)

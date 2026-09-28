@@ -38,6 +38,17 @@ class FixtureProcessRead(BaseModel):
     ignored: int
 
 
+class IntegrationPackageRead(BaseModel):
+    source: str
+    package_label: str | None
+    processed_at: datetime
+    processed: int
+    mapped: int
+    unmatched: int
+    errors: int
+    ignored: int
+
+
 class CourseMappingCreate(BaseModel):
     source: str = "PAYMENT"
     external_course_name: str

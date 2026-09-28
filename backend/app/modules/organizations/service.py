@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import exists, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.common.repository import ListResult
 from app.modules.auth.access import forbidden, get_subordinate_kam_ids, has_any_role, is_admin
@@ -25,13 +25,29 @@ class OrganizationService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def list(self, current_user: User, search: str | None, limit: int, offset: int) -> ListResult[dict]:
+    def list(
+        self,
+        current_user: User,
+        search: str | None,
+        limit: int,
+        offset: int,
+        unassigned_only: bool = False,
+    ) -> ListResult[dict]:
         statement = select(Organization)
+        if unassigned_only and not is_admin(current_user):
+            raise forbidden("Only ADMIN can filter unassigned organizations")
         if not is_admin(current_user):
             kam_ids = get_subordinate_kam_ids(self.db, current_user.id) if has_any_role(current_user, "MANAGER") else {current_user.id}
             statement = statement.where(exists().where(OrgAssignment.organization_id == Organization.id, OrgAssignment.user_id.in_(kam_ids), OrgAssignment.status == "active"))
         if search:
             statement = statement.where(Organization.name.ilike(f"%{search}%"))
+        if unassigned_only:
+            statement = statement.where(
+                ~exists().where(
+                    OrgAssignment.organization_id == Organization.id,
+                    OrgAssignment.status == "active",
+                )
+            )
         total = self.db.scalar(select(func.count()).select_from(statement.subquery())) or 0
         organizations = list(self.db.scalars(statement.order_by(Organization.name).limit(limit).offset(offset)).all())
         return ListResult([self._list_row(organization) for organization in organizations], total)
@@ -91,6 +107,25 @@ class OrganizationService:
         self.db.commit()
         self.db.refresh(assignment)
         return assignment
+
+    def assignment_history(self, organization_id: UUID, current_user: User) -> list[dict]:
+        self.get(organization_id, current_user)
+        assigned_by = aliased(User)
+        rows = self.db.execute(
+            select(OrgAssignment, User.full_name, assigned_by.full_name)
+            .join(User, User.id == OrgAssignment.user_id)
+            .outerjoin(assigned_by, assigned_by.id == OrgAssignment.assigned_by)
+            .where(OrgAssignment.organization_id == organization_id)
+            .order_by(OrgAssignment.assigned_at.desc())
+        ).all()
+        return [
+            {
+                **{field: getattr(assignment, field) for field in OrgAssignment.__table__.columns.keys()},
+                "kam_name": kam_name,
+                "assigned_by_name": assigned_by_name,
+            }
+            for assignment, kam_name, assigned_by_name in rows
+        ]
 
     def stakeholders(self, organization_id: UUID, current_user: User) -> list[Stakeholder]:
         self.get(organization_id, current_user)

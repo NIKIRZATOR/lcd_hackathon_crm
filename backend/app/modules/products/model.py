@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Index, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -9,10 +9,18 @@ from app.core.database import ModelBase
 
 class Vendor(ModelBase):
     __tablename__ = "vendors"
+    __table_args__ = (
+        Index(
+            "uq_vendors_business_key",
+            "business_key",
+            unique=True,
+            postgresql_where=text("business_key IS NOT NULL"),
+        ),
+    )
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     business_key: Mapped[str | None] = mapped_column(
-        String(512), nullable=True, unique=True
+        String(512), nullable=True
     )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -20,6 +28,14 @@ class Vendor(ModelBase):
 
 class ITProduct(ModelBase):
     __tablename__ = "it_products"
+    __table_args__ = (
+        Index(
+            "uq_it_products_business_key",
+            "business_key",
+            unique=True,
+            postgresql_where=text("business_key IS NOT NULL"),
+        ),
+    )
 
     vendor_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
@@ -28,7 +44,7 @@ class ITProduct(ModelBase):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     business_key: Mapped[str | None] = mapped_column(
-        String(768), nullable=True, unique=True
+        String(768), nullable=True
     )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     documentation_url: Mapped[str | None] = mapped_column(String(512), nullable=True)

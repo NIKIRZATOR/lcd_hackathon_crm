@@ -24,3 +24,5 @@ class AuditEventRead(BaseModel):
     )
     request_id: str | None = Field(default=None, description="Request identifier propagated from `X-Request-ID`.")
     created_at: datetime = Field(description="Audit event creation timestamp.")
+    actor_name: str | None = None
+    actor_roles: list[str] = []

@@ -28,3 +28,21 @@ class ManagerMembershipRead(BaseModel):
     is_active: bool = Field(description="Whether this manager-to-KAM relation is active.")
     created_at: datetime = Field(description="Creation timestamp.")
     updated_at: datetime = Field(description="Last update timestamp.")
+
+
+class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    keycloak_user_id: UUID | None
+    username: str | None
+    full_name: str
+    email: str | None
+    roles: list[str]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool

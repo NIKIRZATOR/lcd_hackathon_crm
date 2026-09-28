@@ -34,6 +34,31 @@ class UserRepository:
         self.db.flush()
         return user
 
+    def list_users(
+        self,
+        *,
+        search: str | None,
+        is_active: bool | None,
+        role: str | None,
+        limit: int,
+        offset: int,
+    ) -> ListResult[User]:
+        statement = select(User)
+        if role:
+            statement = statement.join(User.roles).where(Role.name == role)
+        if search:
+            pattern = f"%{search.lower()}%"
+            statement = statement.where(
+                func.lower(User.full_name).like(pattern)
+                | func.lower(User.email).like(pattern)
+                | func.lower(User.username).like(pattern)
+            )
+        if is_active is not None:
+            statement = statement.where(User.is_active.is_(is_active))
+        total = self.db.scalar(select(func.count()).select_from(statement.subquery())) or 0
+        items = list(self.db.scalars(statement.order_by(User.full_name, User.username).limit(limit).offset(offset)).all())
+        return ListResult(items=items, total=total)
+
 
 class ManagerMembershipRepository:
     sortable_fields = {"created_at", "updated_at", "valid_from", "valid_to"}

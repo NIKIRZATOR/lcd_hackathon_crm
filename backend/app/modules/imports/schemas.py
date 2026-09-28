@@ -37,6 +37,8 @@ class ImportJobRead(BaseModel):
     error_message: str | None
     created_at: datetime
     updated_at: datetime
+    source_file_name: str | None = None
+    created_by_name: str | None = None
 
 
 class ImportPreviewRead(BaseModel):
