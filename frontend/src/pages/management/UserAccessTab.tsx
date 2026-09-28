@@ -2,6 +2,7 @@ import { Alert, Button, Input, Select, Space, Table, Tag, Typography } from 'ant
 import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, apiRequest } from '../../api/client';
+import InfiniteScrollTrigger from './InfiniteScrollTrigger';
 
 type User = {
   id: string;
@@ -23,14 +24,19 @@ const UserAccessTab = () => {
   const [error, setError] = useState<string>();
 
   const load = useCallback(
-    async (offset = page.offset) => {
+    async (offset = 0, append = false) => {
       setLoading(true);
       setError(undefined);
       try {
         const query = new URLSearchParams({ limit: '20', offset: String(offset) });
         if (search.trim()) query.set('search', search.trim());
         if (status !== 'all') query.set('is_active', status);
-        setPage(await apiRequest<Page<User>>(`/api/users?${query}`));
+        const nextPage = await apiRequest<Page<User>>(`/api/users?${query}`);
+        setPage((current) =>
+          append
+            ? { ...nextPage, items: [...current.items, ...nextPage.items], offset: 0 }
+            : nextPage,
+        );
       } catch (caught) {
         setError(
           caught instanceof ApiError ? caught.message : 'Не удалось загрузить пользователей.',
@@ -39,7 +45,7 @@ const UserAccessTab = () => {
         setLoading(false);
       }
     },
-    [page.offset, search, status],
+    [search, status],
   );
 
   useEffect(() => {
@@ -53,7 +59,7 @@ const UserAccessTab = () => {
         method: 'PATCH',
         body: JSON.stringify({ is_active: isActive }),
       });
-      await load();
+      await load(0);
     } catch (caught) {
       setError(
         caught instanceof ApiError ? caught.message : 'Не удалось изменить статус пользователя.',
@@ -92,13 +98,7 @@ const UserAccessTab = () => {
         rowKey="id"
         loading={loading}
         dataSource={page.items}
-        pagination={{
-          current: page.offset / page.limit + 1,
-          pageSize: page.limit,
-          total: page.total,
-          showSizeChanger: false,
-          onChange: (nextPage) => void load((nextPage - 1) * page.limit),
-        }}
+        pagination={false}
         columns={[
           {
             title: 'Пользователь',
@@ -147,6 +147,11 @@ const UserAccessTab = () => {
             ),
           },
         ]}
+      />
+      <InfiniteScrollTrigger
+        hasMore={page.items.length < page.total}
+        loading={loading}
+        onLoadMore={() => void load(page.items.length, true)}
       />
     </>
   );

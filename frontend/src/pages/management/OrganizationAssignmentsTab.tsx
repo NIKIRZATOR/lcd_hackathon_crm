@@ -2,6 +2,7 @@ import { Alert, Button, Input, Modal, Select, Space, Table, Tag, Typography } fr
 import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, apiRequest } from '../../api/client';
+import InfiniteScrollTrigger from './InfiniteScrollTrigger';
 
 type Organization = {
   id: string;
@@ -41,14 +42,19 @@ const OrganizationAssignmentsTab = () => {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(
-    async (offset = 0) => {
+    async (offset = 0, append = false) => {
       setLoading(true);
       setError(undefined);
       try {
         const query = new URLSearchParams({ limit: '20', offset: String(offset) });
         if (search.trim()) query.set('search', search.trim());
         if (onlyUnassigned) query.set('unassigned_only', 'true');
-        setPage(await apiRequest<Page<Organization>>(`/api/organizations?${query}`));
+        const nextPage = await apiRequest<Page<Organization>>(`/api/organizations?${query}`);
+        setPage((current) =>
+          append
+            ? { ...nextPage, items: [...current.items, ...nextPage.items], offset: 0 }
+            : nextPage,
+        );
       } catch (caught) {
         setError(caught instanceof ApiError ? caught.message : 'Не удалось загрузить организации.');
       } finally {
@@ -92,7 +98,7 @@ const OrganizationAssignmentsTab = () => {
         body: JSON.stringify({ kam_user_id: kamUserId, reason: reason.trim() || null }),
       });
       setSelected(undefined);
-      await load(page.offset);
+      await load();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Не удалось сохранить назначение.');
     } finally {
@@ -131,13 +137,7 @@ const OrganizationAssignmentsTab = () => {
         loading={loading}
         dataSource={page.items}
         locale={{ emptyText: 'Организации не найдены' }}
-        pagination={{
-          current: page.offset / page.limit + 1,
-          pageSize: page.limit,
-          total: page.total,
-          showSizeChanger: false,
-          onChange: (nextPage) => void load((nextPage - 1) * page.limit),
-        }}
+        pagination={false}
         columns={[
           {
             title: 'Организация',
@@ -173,6 +173,11 @@ const OrganizationAssignmentsTab = () => {
             ),
           },
         ]}
+      />
+      <InfiniteScrollTrigger
+        hasMore={page.items.length < page.total}
+        loading={loading}
+        onLoadMore={() => void load(page.items.length, true)}
       />
       <Modal
         title={selected ? `Назначение KAM: ${selected.name}` : 'Назначение KAM'}

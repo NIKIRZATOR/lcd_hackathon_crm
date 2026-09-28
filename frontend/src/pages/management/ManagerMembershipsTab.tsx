@@ -2,6 +2,7 @@ import { Alert, Button, Modal, Select, Space, Table, Tag, Typography } from 'ant
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ApiError, apiRequest } from '../../api/client';
+import InfiniteScrollTrigger from './InfiniteScrollTrigger';
 
 type User = {
   id: string;
@@ -46,13 +47,20 @@ const ManagerMembershipsTab = () => {
   );
 
   const load = useCallback(
-    async (offset = 0) => {
+    async (offset = 0, append = false) => {
       setLoading(true);
       setError(undefined);
       try {
         const query = new URLSearchParams({ limit: '20', offset: String(offset) });
         if (status === 'active') query.set('is_active', 'true');
-        setPage(await apiRequest<Page<Membership>>(`/api/users/manager-memberships?${query}`));
+        const nextPage = await apiRequest<Page<Membership>>(
+          `/api/users/manager-memberships?${query}`,
+        );
+        setPage((current) =>
+          append
+            ? { ...nextPage, items: [...current.items, ...nextPage.items], offset: 0 }
+            : nextPage,
+        );
       } catch (caught) {
         setError(
           caught instanceof ApiError
@@ -118,7 +126,7 @@ const ManagerMembershipsTab = () => {
       await apiRequest(`/api/users/manager-memberships/${membership.id}/deactivate`, {
         method: 'PATCH',
       });
-      await load(page.offset);
+      await load();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Не удалось завершить связь.');
     }
@@ -154,13 +162,7 @@ const ManagerMembershipsTab = () => {
         loading={loading}
         dataSource={page.items}
         locale={{ emptyText: 'Связи не найдены' }}
-        pagination={{
-          current: page.offset / page.limit + 1,
-          pageSize: page.limit,
-          total: page.total,
-          showSizeChanger: false,
-          onChange: (nextPage) => void load((nextPage - 1) * page.limit),
-        }}
+        pagination={false}
         columns={[
           { title: 'MANAGER', render: (_, membership) => userName(membership.manager_user_id) },
           { title: 'KAM', render: (_, membership) => userName(membership.kam_user_id) },
@@ -196,6 +198,11 @@ const ManagerMembershipsTab = () => {
               ),
           },
         ]}
+      />
+      <InfiniteScrollTrigger
+        hasMore={page.items.length < page.total}
+        loading={loading}
+        onLoadMore={() => void load(page.items.length, true)}
       />
       <Modal
         title="Назначить KAM менеджеру"

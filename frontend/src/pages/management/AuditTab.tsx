@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ApiError, apiRequest } from '../../api/client';
+import InfiniteScrollTrigger from './InfiniteScrollTrigger';
 
 type AuditEvent = {
   id: string;
@@ -66,7 +67,7 @@ const AuditTab = () => {
   const [error, setError] = useState<string>();
 
   const load = useCallback(
-    async (offset = 0) => {
+    async (offset = 0, append = false) => {
       setLoading(true);
       setError(undefined);
       try {
@@ -78,7 +79,12 @@ const AuditTab = () => {
         if (result) query.set('result', result);
         if (range?.[0]) query.set('date_from', range[0].startOf('day').toISOString());
         if (range?.[1]) query.set('date_to', range[1].endOf('day').toISOString());
-        setPage(await apiRequest<Page<AuditEvent>>(`/api/audit/events?${query}`));
+        const nextPage = await apiRequest<Page<AuditEvent>>(`/api/audit/events?${query}`);
+        setPage((current) =>
+          append
+            ? { ...nextPage, items: [...current.items, ...nextPage.items], offset: 0 }
+            : nextPage,
+        );
       } catch (caught) {
         setError(caught instanceof ApiError ? caught.message : 'Не удалось загрузить аудит.');
       } finally {
@@ -177,13 +183,7 @@ const AuditTab = () => {
         loading={loading}
         dataSource={page.items}
         locale={{ emptyText: 'События не найдены' }}
-        pagination={{
-          current: page.offset / page.limit + 1,
-          pageSize: page.limit,
-          total: page.total,
-          showSizeChanger: false,
-          onChange: (nextPage) => void load((nextPage - 1) * page.limit),
-        }}
+        pagination={false}
         columns={[
           {
             title: 'Время',
@@ -254,6 +254,11 @@ const AuditTab = () => {
             ),
           },
         ]}
+      />
+      <InfiniteScrollTrigger
+        hasMore={page.items.length < page.total}
+        loading={loading}
+        onLoadMore={() => void load(page.items.length, true)}
       />
     </>
   );

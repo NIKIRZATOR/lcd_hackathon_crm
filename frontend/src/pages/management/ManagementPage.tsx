@@ -32,6 +32,8 @@ import UserAccessTab from './UserAccessTab';
 import CatalogsTab from './catalogs/CatalogsTab';
 import ImportDataTab from './imports/ImportDataTab';
 
+import styles from './ManagementPage.module.scss';
+
 type Stage = {
   id: string;
   name: string;
@@ -279,7 +281,13 @@ const ManagementPage = () => {
   };
 
   return (
-    <Card title="Управление">
+    <section className={styles.page}>
+      <header className={styles.heading}>
+        <div>
+          <h1>Управление</h1>
+          <p>Каталоги, доступы, интеграции и технические операции CRM.</p>
+        </div>
+      </header>
       {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
       <Tabs
         activeKey={searchParams.get('tab') ?? 'playbooks'}
@@ -428,7 +436,7 @@ const ManagementPage = () => {
                         rowKey="id"
                         tableLayout="fixed"
                         dataSource={filteredDocumentationRequests}
-                        pagination={{ pageSize: 10, showSizeChanger: false }}
+                        pagination={false}
                         onRow={(record) => ({
                           onClick: () => setRequestDetail(record),
                           style: { cursor: 'pointer' },
@@ -679,7 +687,7 @@ const ManagementPage = () => {
           </>
         )}
       </Modal>
-    </Card>
+    </section>
   );
 };
 

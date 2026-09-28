@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.api.router import health_check, readiness_check
@@ -15,6 +18,11 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         debug=settings.debug,
     )
+    application.mount(
+        "/images",
+        StaticFiles(directory=Path(__file__).resolve().parents[1] / "images"),
+        name="images",
+    )
 
     application.add_middleware(
         CORSMiddleware,
@@ -27,6 +35,8 @@ def create_app() -> FastAPI:
     @application.middleware("http")
     async def add_optional_diagnostic_header(request: Request, call_next):
         response = await call_next(request)
+        if request.url.path.startswith("/images/"):
+            response.headers["Cache-Control"] = "no-cache, max-age=0"
         if settings.enable_diagnostic_headers:
             import os
 

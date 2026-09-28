@@ -3,6 +3,7 @@ import { UploadOutlined } from '@ant-design/icons';
 import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, apiDownload, apiRequest } from '../../../api/client';
+import InfiniteScrollTrigger from '../InfiniteScrollTrigger';
 import ImportWizardModal from './ImportWizardModal';
 import type { ImportJob, Page } from './types';
 
@@ -30,11 +31,16 @@ const ImportDataTab = () => {
   const [error, setError] = useState<string>();
   const [selectedJobId, setSelectedJobId] = useState<string>();
 
-  const load = useCallback(async (offset = 0) => {
+  const load = useCallback(async (offset = 0, append = false) => {
     setLoading(true);
     setError(undefined);
     try {
-      setPage(await apiRequest<Page<ImportJob>>(`/api/imports?limit=20&offset=${offset}`));
+      const nextPage = await apiRequest<Page<ImportJob>>(`/api/imports?limit=20&offset=${offset}`);
+      setPage((current) =>
+        append
+          ? { ...nextPage, items: [...current.items, ...nextPage.items], offset: 0 }
+          : nextPage,
+      );
     } catch (caught) {
       setError(
         caught instanceof ApiError ? caught.message : 'Не удалось загрузить историю импортов.',
@@ -94,13 +100,7 @@ const ImportDataTab = () => {
         loading={loading}
         dataSource={page.items}
         locale={{ emptyText: 'Импортов пока нет' }}
-        pagination={{
-          current: page.offset / page.limit + 1,
-          pageSize: page.limit,
-          total: page.total,
-          showSizeChanger: false,
-          onChange: (nextPage) => void load((nextPage - 1) * page.limit),
-        }}
+        pagination={false}
         columns={[
           {
             title: 'Файл',
@@ -155,10 +155,15 @@ const ImportDataTab = () => {
           },
         ]}
       />
+      <InfiniteScrollTrigger
+        hasMore={page.items.length < page.total}
+        loading={loading}
+        onLoadMore={() => void load(page.items.length, true)}
+      />
       <ImportWizardModal
         jobId={selectedJobId}
         onClose={() => setSelectedJobId(undefined)}
-        onUpdated={() => void load(page.offset)}
+        onUpdated={() => void load()}
       />
     </>
   );
