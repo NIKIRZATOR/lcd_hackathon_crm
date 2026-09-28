@@ -42,6 +42,7 @@ class OrganizationRead(BaseModel):
     city: str | None
     status: str
     comment: str | None
+    logo_file_id: UUID | None
     created_at: datetime
     updated_at: datetime
 

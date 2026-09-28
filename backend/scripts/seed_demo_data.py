@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import sys
@@ -207,6 +206,29 @@ UNIVERSITIES = [
         "website": "https://www.mirea.ru",
     },
 ]
+
+ORGANIZATION_LOGO_FILES = {
+    "МГУ": "01_МГУ.png",
+    "ИТМО": "02_ИТМО.png",
+    "НИУ ВШЭ": "03_НИУ ВШЭ.png",
+    "МГТУ": "04_МГТУ.png",
+    "МФТИ": "05_МФТИ.png",
+    "НГУ": "06_НГУ.png",
+    "ТГУ": "07_ТГУ.jpg",
+    "ТПУ": "08_ТПУ.png",
+    "КФУ": "09_КФУ.png",
+    "УрФУ": "10_УрФУ.png",
+    "СПбПУ": "11_СПбПУ.png",
+    "СПбГУ": "12_СПбГУ.png",
+    "НИЯУ МИФИ": "13_НИЯУ МИФИ.png",
+    "НИТУ МИСИС": "14_НИТУ МИСИС.png",
+    "МАИ": "15_МАИ.png",
+    "ННГУ": "16_ННГУ.png",
+    "Самарский университет": "17_Самарский университет.png",
+    "ДВФУ": "18_ДВФУ.png",
+    "ЮФУ": "19_ЮФУ.png",
+    "РТУ МИРЭА": "20_РТУ МИРЭА.png",
+}
 
 DIRECTIONS = [
     {"name": "DevOps и инфраструктура", "code": "DEVOPS", "description": "CI/CD, Linux, контейнеризация и эксплуатация."},
@@ -3101,6 +3123,37 @@ def seed_object_storage_records(db: Session, users: dict[str, User]) -> None:
                 {"report_job_id": job_row["id"], "file_id": report_file["id"]},
                 {"artifact_type": "RESULT", "format": "csv", "row_count": 1},
             )
+
+    logo_dir = Path(
+        os.getenv(
+            "ORGANIZATION_LOGO_PRELOAD_DIR",
+            str(Path(__file__).resolve().parents[2] / "preload_data" / "organization_logo"),
+        )
+    )
+    logo_bucket = os.getenv("S3_BUCKET_ORGANIZATION_LOGOS", "organization-logos")
+    if not logo_dir.is_dir():
+        print(f"[seed] organization logo directory is missing: {logo_dir}")
+    else:
+        for short_name, filename in ORGANIZATION_LOGO_FILES.items():
+            organization = db.scalar(select(Organization).where(Organization.short_name == short_name))
+            if organization is None or organization.logo_file_id is not None:
+                continue
+            source = logo_dir / filename
+            if not source.is_file():
+                print(f"[seed] organization logo is missing: {source}")
+                continue
+            extension = source.suffix.lower()
+            mime_type = "image/jpeg" if extension in {".jpg", ".jpeg"} else "image/png"
+            logo_file = ensure_file(
+                logo_bucket,
+                f"organizations/{organization.id}/logo{extension}",
+                filename,
+                mime_type,
+                "organization_logo",
+                source.read_bytes(),
+            )
+            if logo_file is not None:
+                organization.logo_file_id = logo_file["id"]
 
     db.flush()
 

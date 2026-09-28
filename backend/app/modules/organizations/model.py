@@ -27,6 +27,11 @@ class Organization(ModelBase):
     city: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    logo_file_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("files.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
 
 class OrgAssignment(ModelBase):
