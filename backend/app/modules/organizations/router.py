@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -42,6 +42,32 @@ def get_organization_logo(organization_id: UUID, db: Session = Depends(get_db_se
         media_type=file_record.mime_type or "application/octet-stream",
         headers={"Cache-Control": "private, max-age=3600"},
     )
+
+@router.post("/{organization_id}/logo", response_model=OrganizationRead, summary="Upload organization logo")
+def upload_organization_logo(
+    organization_id: UUID,
+    file: UploadFile = File(..., description="PNG or JPG logo file."),
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return OrganizationService(db).upload_logo(organization_id, file, current_user)
+
+@router.put("/{organization_id}/logo", response_model=OrganizationRead, summary="Replace organization logo")
+def replace_organization_logo(
+    organization_id: UUID,
+    file: UploadFile = File(..., description="PNG or JPG logo file."),
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    return OrganizationService(db).upload_logo(organization_id, file, current_user)
+
+@router.delete("/{organization_id}/logo", status_code=status.HTTP_204_NO_CONTENT, summary="Delete organization logo")
+def delete_organization_logo(
+    organization_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*ADMIN_ROLES)),
+):
+    OrganizationService(db).delete_logo(organization_id, current_user)
 
 @router.get("/{organization_id}/360", response_model=Organization360Read)
 def get_organization_360(organization_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):

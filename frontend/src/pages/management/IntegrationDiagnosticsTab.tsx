@@ -283,7 +283,7 @@ export const IntegrationDiagnosticsTab = () => {
           size="small"
           rowKey={(item) => `${item.source}:${item.processed_at}`}
           dataSource={packages}
-          pagination={{ pageSize: 10 }}
+          pagination={false}
           locale={{ emptyText: 'Обработок ещё не было' }}
           columns={[
             {
@@ -318,7 +318,7 @@ export const IntegrationDiagnosticsTab = () => {
           size="small"
           rowKey="id"
           dataSource={signals}
-          pagination={{ pageSize: 10 }}
+          pagination={false}
           columns={[
             {
               title: 'Источник',
@@ -360,7 +360,7 @@ export const IntegrationDiagnosticsTab = () => {
             `${item.source}:${item.external_course_name}:${item.external_stream_id}:${item.status}:${item.program_instance_id}`
           }
           dataSource={diagnostics}
-          pagination={{ pageSize: 10 }}
+          pagination={false}
           columns={[
             {
               title: 'Источник',
@@ -395,7 +395,7 @@ export const IntegrationDiagnosticsTab = () => {
           dataSource={signals.filter(
             (item) => item.status === 'unmatched' || item.status === 'error',
           )}
-          pagination={{ pageSize: 10 }}
+          pagination={false}
           columns={[
             {
               title: 'Источник',

@@ -294,7 +294,7 @@ const ImportWizardModal = ({ jobId, onUpdated, onClose }: Props) => {
               <Table<ImportError>
                 size="small"
                 rowKey="id"
-                pagination={{ pageSize: 10 }}
+                pagination={false}
                 dataSource={errors}
                 columns={[
                   { title: 'Строка', dataIndex: 'row' },
@@ -316,7 +316,7 @@ const ImportWizardModal = ({ jobId, onUpdated, onClose }: Props) => {
               <Table
                 size="small"
                 rowKey="row"
-                pagination={{ pageSize: 10 }}
+                pagination={false}
                 dataSource={diff.items}
                 columns={[
                   { title: 'Строка', dataIndex: 'row' },

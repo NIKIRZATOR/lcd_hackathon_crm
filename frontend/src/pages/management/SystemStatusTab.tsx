@@ -1,13 +1,10 @@
 import { Alert, Button, Card, Col, Row, Space, Tag, Typography } from 'antd';
-import {
-  DatabaseOutlined,
-  ExclamationCircleOutlined,
-  SafetyCertificateOutlined,
-} from '@ant-design/icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ApiError, apiRequest } from '../../api/client';
+
+import styles from './SystemStatusTab.module.scss';
 
 type SystemStatus = {
   component: string;
@@ -23,6 +20,16 @@ const relatedPath: Record<string, string> = {
   'Report queue': '/reports',
   'Report worker': '/reports',
 };
+const imageNames: Record<string, string> = {
+  Backend: 'backend.png',
+  PostgreSQL: 'postgresql.png',
+  Redis: 'Simpleicons-Team-Simple-Redis.512 (1).png',
+  'Report queue': 'reports.png',
+  'Report worker': 'reports.png',
+  MinIO: 'Minio_logo_light.png',
+  Keycloak: 'keycloak-logo-png_seeklogo-505405.png',
+};
+const imageBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
 const SystemStatusTab = () => {
   const navigate = useNavigate();
@@ -75,23 +82,24 @@ const SystemStatusTab = () => {
       <Row gutter={[16, 16]}>
         {items.map((item) => {
           const path = relatedPath[item.component];
-          const icon =
-            item.status === 'Error' ? (
-              <ExclamationCircleOutlined />
-            ) : item.status === 'OK' ? (
-              <SafetyCertificateOutlined />
-            ) : (
-              <DatabaseOutlined />
-            );
+          const imageName = imageNames[item.component];
           return (
             <Col xs={24} md={12} xl={8} key={item.component}>
               <Card
+                className={styles.statusCard}
                 size="small"
                 title={
-                  <Space>
-                    {icon}
+                  <span className={styles.cardTitle}>
+                    <span className={styles.componentImage}>
+                      {imageName && (
+                        <img
+                          src={`${imageBaseUrl}/images/${encodeURIComponent(imageName)}`}
+                          alt=""
+                        />
+                      )}
+                    </span>
                     <span>{item.component}</span>
-                  </Space>
+                  </span>
                 }
                 extra={<Tag color={statusColor[item.status]}>{item.status.toUpperCase()}</Tag>}
               >

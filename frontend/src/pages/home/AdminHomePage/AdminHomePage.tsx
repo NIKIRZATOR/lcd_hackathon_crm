@@ -15,28 +15,34 @@ const AdminHomePage = () => {
 
   return (
     <PageLayout>
-      <Flex justify="space-between" align="start" gap={16} className={styles.pageHeader}>
-        <div>
-          <Typography.Title level={2} style={{ margin: 0 }}>
-            Платформа
-          </Typography.Title>
-          <Typography.Paragraph type="secondary" className={styles.pageSubtitle}>
-            Контроль данных, интеграций, пользователей и технического состояния RTK EduFlow.
-            Операционная работа KAM по вузам не управляется с этой страницы.
-          </Typography.Paragraph>
+      <div className={styles.page}>
+        <Flex justify="space-between" align="start" gap={16} className={styles.pageHeader}>
+          <div>
+            <Typography.Title level={2} className={styles.pageTitle}>
+              Платформа
+            </Typography.Title>
+            <Typography.Paragraph type="secondary" className={styles.pageSubtitle}>
+              Контроль данных, интеграций, пользователей и технического состояния RTK EduFlow.
+              Операционная работа KAM по вузам не управляется с этой страницы.
+            </Typography.Paragraph>
+          </div>
+          <Button
+            className={styles.actionButton}
+            loading={refreshing}
+            onClick={() => void refresh()}
+          >
+            Обновить
+          </Button>
+        </Flex>
+        <AdminSummaryCards cards={summary.cards} />
+        <div className={styles.dashboard}>
+          <AdminAttentionQueue
+            items={summary.attention_items}
+            activity={summary.recent_activity}
+            jobs={summary.recent_jobs}
+          />
+          <AdminSidebar summary={summary} />
         </div>
-        <Button loading={refreshing} onClick={() => void refresh()}>
-          Обновить
-        </Button>
-      </Flex>
-      <AdminSummaryCards cards={summary.cards} />
-      <div className={styles.dashboard}>
-        <AdminAttentionQueue
-          items={summary.attention_items}
-          activity={summary.recent_activity}
-          jobs={summary.recent_jobs}
-        />
-        <AdminSidebar summary={summary} />
       </div>
     </PageLayout>
   );

@@ -1,22 +1,29 @@
-import { DatabaseOutlined } from '@ant-design/icons';
-import { Button, Card, List, Tag, Typography } from 'antd';
+import { Button, Card, List, Tag, Tooltip, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 import styles from '../AdminHomePage.module.scss';
 import type { AdminHomeSummary } from '../types';
 
-const statusColor = { OK: 'green', Warning: 'gold', Error: 'red', Unknown: 'default' };
+const imageNames: Record<string, string> = {
+  Backend: 'backend.png',
+  PostgreSQL: 'postgresql.png',
+  Redis: 'Simpleicons-Team-Simple-Redis.512 (1).png',
+  'Report queue': 'reports.png',
+  'Report worker': 'reports.png',
+  MinIO: 'Minio_logo_light.png',
+  Keycloak: 'keycloak-logo-png_seeklogo-505405.png',
+};
+const imageBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
 const AdminSidebar = ({ summary }: { summary: AdminHomeSummary }) => {
   const navigate = useNavigate();
+
   return (
     <aside className={styles.sidebar}>
       <Card
         title="Интеграции"
         extra={
-          <Button type="link" onClick={() => navigate('/management?tab=integrations')}>
-            Все интеграции
-          </Button>
+          <Button onClick={() => navigate('/management?tab=integrations')}>Все интеграции</Button>
         }
       >
         <List
@@ -46,42 +53,47 @@ const AdminSidebar = ({ summary }: { summary: AdminHomeSummary }) => {
         />
       </Card>
       <Card title="Быстрые действия">
-        <List
-          size="small"
-          dataSource={summary.quick_actions}
-          renderItem={(item) => (
-            <List.Item>
-              <Button type="link" onClick={() => navigate(item.path)}>
-                {item.label}
-              </Button>
-            </List.Item>
-          )}
-        />
+        <div className={styles.quickActions}>
+          {summary.quick_actions.map((item) => (
+            <Button key={item.path} onClick={() => navigate(item.path)}>
+              {item.label}
+            </Button>
+          ))}
+        </div>
       </Card>
       <Card title="Состояние платформы">
-        <List
-          size="small"
-          dataSource={summary.system_status}
-          renderItem={(item) => (
-            <List.Item>
-              <DatabaseOutlined className={styles.systemIcon} />
-              <div>
-                <Typography.Text>{item.component}</Typography.Text>
-                <br />
-                <Typography.Text type="secondary">{item.detail}</Typography.Text>
-              </div>
-              <span className={styles.status}>
-                <Tag color={statusColor[item.status]}>{item.status}</Tag>
-                <Typography.Text type="secondary">
+        <div className={styles.platformStatus} aria-label="Состояние сервисов">
+          {summary.system_status.map((item) => (
+            <Tooltip
+              key={item.component}
+              title={
+                <div>
+                  <strong>{item.component}</strong>
+                  <br />
+                  {item.detail}
+                  <br />
+                  {item.status} ·{' '}
                   {new Date(item.checked_at).toLocaleTimeString('ru-RU', {
                     hour: '2-digit',
                     minute: '2-digit',
                   })}
-                </Typography.Text>
+                </div>
+              }
+            >
+              <span
+                className={`${styles.systemImage} ${styles[`systemStatus${item.status}`]}`}
+                aria-label={`${item.component}: ${item.status}. ${item.detail}`}
+              >
+                {imageNames[item.component] && (
+                  <img
+                    src={`${imageBaseUrl}/images/${encodeURIComponent(imageNames[item.component])}`}
+                    alt=""
+                  />
+                )}
               </span>
-            </List.Item>
-          )}
-        />
+            </Tooltip>
+          ))}
+        </div>
       </Card>
     </aside>
   );
