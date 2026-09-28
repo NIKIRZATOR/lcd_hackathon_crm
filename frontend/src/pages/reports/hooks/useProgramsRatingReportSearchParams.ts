@@ -2,31 +2,32 @@ import dayjs from 'dayjs';
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import type { ProgramsReportFiltersValues } from '../types';
+import type { ProgramsRatingReportFiltersValues } from '../components/ProgramsRatingReport/types';
 
 const QUERY_KEYS = {
   from: 'from',
   to: 'to',
   universities: 'universities',
-  directions: 'directions',
+  programs: 'programs',
   products: 'products',
   responsibles: 'responsibles',
 } as const;
 
-const parseIds = (value: string | null): string[] => {
+const parseIds = (value: string | null): number[] => {
   if (!value) {
     return [];
   }
 
   return value
     .split(',')
-    .filter(Boolean);
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id > 0);
 };
 
 const parsePeriod = (
   from: string | null,
   to: string | null,
-): ProgramsReportFiltersValues['period'] => {
+): ProgramsRatingReportFiltersValues['period'] => {
   const fromDate = from ? dayjs(from) : null;
   const toDate = to ? dayjs(to) : null;
 
@@ -37,31 +38,29 @@ const parsePeriod = (
   return [fromDate, toDate];
 };
 
-export const useProgramsReportSearchParams = () => {
+export const useProgramsRatingReportSearchParams = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const filters = useMemo<ProgramsReportFiltersValues>(
+  const filters = useMemo<ProgramsRatingReportFiltersValues>(
     () => ({
       period: parsePeriod(searchParams.get(QUERY_KEYS.from), searchParams.get(QUERY_KEYS.to)),
       universityIds: parseIds(searchParams.get(QUERY_KEYS.universities)),
-      directionIds: parseIds(searchParams.get(QUERY_KEYS.directions)),
+      programIds: parseIds(searchParams.get(QUERY_KEYS.programs)),
       productIds: parseIds(searchParams.get(QUERY_KEYS.products)),
       responsibleIds: parseIds(searchParams.get(QUERY_KEYS.responsibles)),
-      playbookIds: parseIds(searchParams.get('playbooks')),
     }),
     [searchParams],
   );
 
   const setFilters = useCallback(
-    (values: ProgramsReportFiltersValues) => {
+    (values: ProgramsRatingReportFiltersValues) => {
       setSearchParams((currentParams) => {
         const params = new URLSearchParams(currentParams);
 
         params.delete(QUERY_KEYS.from);
         params.delete(QUERY_KEYS.to);
         params.delete(QUERY_KEYS.universities);
-        params.delete(QUERY_KEYS.directions);
-        params.delete('playbooks');
+        params.delete(QUERY_KEYS.programs);
         params.delete(QUERY_KEYS.products);
         params.delete(QUERY_KEYS.responsibles);
 
@@ -74,8 +73,8 @@ export const useProgramsReportSearchParams = () => {
           params.set(QUERY_KEYS.universities, values.universityIds.join(','));
         }
 
-        if (values.directionIds.length) {
-          params.set(QUERY_KEYS.directions, values.directionIds.join(','));
+        if (values.programIds.length) {
+          params.set(QUERY_KEYS.programs, values.programIds.join(','));
         }
 
         if (values.productIds.length) {
@@ -85,7 +84,6 @@ export const useProgramsReportSearchParams = () => {
         if (values.responsibleIds.length) {
           params.set(QUERY_KEYS.responsibles, values.responsibleIds.join(','));
         }
-        if (values.playbookIds.length) params.set('playbooks', values.playbookIds.join(','));
 
         return params;
       });
@@ -98,4 +96,3 @@ export const useProgramsReportSearchParams = () => {
     setFilters,
   };
 };
-

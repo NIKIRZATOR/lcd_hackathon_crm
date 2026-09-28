@@ -24,4 +24,3 @@ export const REPORT_PERIOD_PRESETS: PeriodPreset[] = [
     value: [MAX_PERIOD_DATE.startOf('year'), MAX_PERIOD_DATE],
   },
 ];
-

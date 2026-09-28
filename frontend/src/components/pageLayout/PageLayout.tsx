@@ -1,20 +1,28 @@
-import { Typography } from 'antd';
+import { Flex, Typography } from 'antd';
 import type { PropsWithChildren } from 'react';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 interface PageLayoutProps extends PropsWithChildren {
   title?: string;
+  subtitle?: string;
 }
 
-const PageLayout = ({ title, children }: PageLayoutProps) => {
+const PageLayout = ({ title, subtitle, children }: PageLayoutProps) => {
   return (
     <>
-      {title && (
-        <Title level={2} style={{ margin: 0 }}>
-          {title}
-        </Title>
+      {(title || subtitle) && (
+        <Flex vertical gap={6}>
+          {title && (
+            <Title level={1} style={{ margin: 0 }}>
+              {title}
+            </Title>
+          )}
+
+          {subtitle && <Text type="secondary">{subtitle}</Text>}
+        </Flex>
       )}
+
       {children}
     </>
   );

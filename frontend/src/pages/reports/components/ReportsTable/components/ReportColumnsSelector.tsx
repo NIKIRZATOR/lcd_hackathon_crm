@@ -90,4 +90,3 @@ const ReportColumnsSelector = <T extends ReportTableItem>({
 };
 
 export default ReportColumnsSelector;
-

@@ -106,4 +106,3 @@ export const useResponsiveReportColumns = <T extends ReportTableItem>(
     hiddenDefinitions: hidden,
   };
 };
-

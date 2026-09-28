@@ -1,29 +1,22 @@
+export type ManagerProgramHealth = 'green' | 'yellow' | 'red';
+
 export type ManagerProgramItem = {
   id: number;
+  university: string;
   name: string;
   product: string;
+  health: ManagerProgramHealth;
 };
 
-export type ManagerInteractionItem = {
-  id: number;
-  university: string;
-  program: string;
-  stage: string;
-};
-
-export type ManagerOverdueItem = {
-  id: number;
-  university: string;
-  program: string;
-  stage: string;
-  overdueDays: number;
-};
-
-export type ManagerAttentionItem = {
+export type ManagerTaskItem = {
   id: number;
   university: string;
   program: string;
   reason: string;
+};
+
+export type ManagerOverdueTaskItem = ManagerTaskItem & {
+  overdueDays: number;
 };
 
 export type ManagerReportItem = {
@@ -31,17 +24,16 @@ export type ManagerReportItem = {
   kamId: number;
   kam: string;
 
-  programs: number;
-  activeInteractions: number;
-  completedInteractions: number;
-  overdueInteractions: number;
-  attentionRequired: number;
-  averageStageDuration: number;
+  activePrograms: number;
+
+  greenHealth: number;
+  yellowHealth: number;
+  redHealth: number;
+
+  overdueTasks: number;
+  attentionTasks: number;
 
   programItems: ManagerProgramItem[];
-  activeInteractionItems: ManagerInteractionItem[];
-  completedInteractionItems: ManagerInteractionItem[];
-  overdueItems: ManagerOverdueItem[];
-  attentionItems: ManagerAttentionItem[];
+  overdueTaskItems: ManagerOverdueTaskItem[];
+  attentionTaskItems: ManagerTaskItem[];
 };
-
