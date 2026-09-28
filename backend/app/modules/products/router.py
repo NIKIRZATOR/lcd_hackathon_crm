@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.common.schemas.pagination import Page, PaginationParams
@@ -15,10 +16,14 @@ from app.modules.products.schemas import (
     ProgramProductRead,
     ProgramProductUpdate,
     VendorCreate,
+    VendorContactCreate,
+    VendorContactRead,
+    VendorContactUpdate,
     VendorRead,
     VendorUpdate,
 )
 from app.modules.products.service import ITProductService, ProgramProductService, VendorService
+from app.modules.products.model import Vendor, VendorContact
 from app.modules.users.model import User
 
 router = APIRouter(tags=["products"], dependencies=[Depends(require_roles(*CRM_ROLES))])
@@ -73,6 +78,38 @@ def deactivate_vendor(
     current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES)),
 ):
     return VendorService(db).deactivate_vendor(vendor_id)
+
+
+@router.get("/vendors/{vendor_id}/contacts", response_model=list[VendorContactRead])
+def list_vendor_contacts(vendor_id: UUID, db: Session = Depends(get_db_session)):
+    if db.get(Vendor, vendor_id) is None:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    return list(db.scalars(select(VendorContact).where(VendorContact.vendor_id == vendor_id).order_by(VendorContact.full_name)).all())
+
+
+@router.post("/vendors/{vendor_id}/contacts", response_model=VendorContactRead, status_code=201)
+def create_vendor_contact(vendor_id: UUID, payload: VendorContactCreate, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES))):
+    if db.get(Vendor, vendor_id) is None:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    if db.scalar(select(VendorContact.id).where(VendorContact.vendor_id == vendor_id, VendorContact.business_key == payload.business_key)):
+        raise HTTPException(status_code=409, detail="Vendor contact business key already exists")
+    contact = VendorContact(vendor_id=vendor_id, **payload.model_dump())
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+@router.patch("/vendor-contacts/{contact_id}", response_model=VendorContactRead)
+def update_vendor_contact(contact_id: UUID, payload: VendorContactUpdate, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CATALOG_WRITE_ROLES))):
+    contact = db.get(VendorContact, contact_id)
+    if contact is None:
+        raise HTTPException(status_code=404, detail="Vendor contact not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(contact, field, value)
+    db.commit()
+    db.refresh(contact)
+    return contact
 
 
 @router.get("/it-products", response_model=Page[ITProductRead])

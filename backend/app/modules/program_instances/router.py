@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,7 @@ from app.modules.interactions.model import UniversityInteraction
 from app.modules.program_instances.model import AcademicWindow, ProgramInstance
 from app.modules.program_instances.schemas import (
     AcademicWindowRead,
+    ProgramAcademicWindowUpdate,
     OrganizationHealthRead,
     WorkflowJournalRead,
     ProgramInstanceRead,
@@ -23,13 +25,25 @@ from app.modules.program_instances.schemas import (
 from app.modules.program_instances.service import ProgramInstanceService
 from app.modules.users.model import User
 from app.modules.workflow_catalog.model import WorkflowPhase, WorkflowStageCatalog
-from app.modules.workflows.model import WorkflowStage, WorkflowStageInstance, WorkflowTransitionHistory
+from app.modules.workflows.model import ProgramWorkflowControl, WorkflowStage, WorkflowStageInstance, WorkflowTransitionHistory
 from app.modules.workflows.schemas import ProgramRefuse, ProgramReopen, WorkflowTransitionExecute
 from app.modules.workflows.service import TransitionService, WorkflowRuntimeService
 
 router = APIRouter(
     tags=["program_instances"], dependencies=[Depends(require_roles(*CRM_ROLES))]
 )
+
+
+class ProgramControlUpdate(BaseModel):
+    status: str = "active"
+    payload: dict = Field(default_factory=dict)
+
+
+class ProgramControlRead(ProgramControlUpdate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    program_instance_id: UUID
 
 
 @router.get("/academic-windows", response_model=list[AcademicWindowRead])
@@ -91,6 +105,53 @@ def get_program_instance(
     current_user: User = Depends(require_roles(*CRM_ROLES)),
 ):
     return ProgramInstanceService(db).get(program_instance_id, current_user)
+
+
+@router.patch(
+    "/program-instances/{program_instance_id}/academic-window",
+    response_model=ProgramInstanceRead,
+)
+def update_program_academic_window(
+    program_instance_id: UUID,
+    payload: ProgramAcademicWindowUpdate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    ProgramInstanceService(db).get(program_instance_id, current_user)
+    program = db.get(ProgramInstance, program_instance_id)
+    window = db.get(AcademicWindow, payload.academic_window_id)
+    if program is None:
+        raise HTTPException(status_code=404, detail="Program instance not found")
+    if window is None:
+        raise HTTPException(status_code=422, detail="Academic window not found")
+    program.academic_window_id = window.id
+    db.flush()
+    HealthService(db).recompute(program.id)
+    NbaService(db).recompute_program(program.id)
+    db.commit()
+    return ProgramInstanceService(db).get(program_instance_id, current_user)
+
+
+@router.get("/program-instances/{program_instance_id}/control", response_model=ProgramControlRead | None)
+def get_program_control(program_instance_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+    ProgramInstanceService(db).get(program_instance_id, current_user)
+    return db.scalar(select(ProgramWorkflowControl).where(ProgramWorkflowControl.program_instance_id == program_instance_id))
+
+
+@router.put("/program-instances/{program_instance_id}/control", response_model=ProgramControlRead)
+def replace_program_control(program_instance_id: UUID, payload: ProgramControlUpdate, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+    ProgramInstanceService(db).get(program_instance_id, current_user)
+    if payload.status not in {"active", "frozen"}:
+        raise HTTPException(status_code=422, detail="Control status must be active or frozen")
+    control = db.scalar(select(ProgramWorkflowControl).where(ProgramWorkflowControl.program_instance_id == program_instance_id))
+    if control is None:
+        control = ProgramWorkflowControl(program_instance_id=program_instance_id, status=payload.status, payload=payload.payload)
+        db.add(control)
+    else:
+        control.status, control.payload = payload.status, payload.payload
+    db.commit()
+    db.refresh(control)
+    return control
 
 
 @router.post(

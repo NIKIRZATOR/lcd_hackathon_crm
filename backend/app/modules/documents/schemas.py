@@ -2,7 +2,41 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class DocumentTemplateCreate(BaseModel):
+    kind: str
+    name: str
+    file_id: UUID | None = None
+    external_url: str | None = None
+    is_active: bool = True
+
+    @model_validator(mode="after")
+    def validate_source(self):
+        if self.file_id is None and self.external_url is None:
+            raise ValueError("file_id or external_url is required")
+        return self
+
+
+class DocumentTemplateUpdate(BaseModel):
+    kind: str | None = None
+    name: str | None = None
+    file_id: UUID | None = None
+    external_url: str | None = None
+    is_active: bool | None = None
+
+
+class DocumentTemplateRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    kind: str
+    name: str
+    file_id: UUID | None
+    external_url: str | None
+    download_url: str
+    is_active: bool
 
 
 class WorkflowAttachmentRead(BaseModel):

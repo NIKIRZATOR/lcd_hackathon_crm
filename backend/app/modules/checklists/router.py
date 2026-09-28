@@ -13,7 +13,7 @@ from app.modules.organizations.model import Stakeholder
 from app.modules.documents.model import File
 from app.modules.interactions.model import UniversityInteraction
 from app.modules.program_instances.model import ProgramInstance
-from app.modules.workflows.model import WorkflowStageAttachment, WorkflowStageInstance
+from app.modules.workflows.model import WorkflowChecklistExtra, WorkflowStageAttachment, WorkflowStageInstance
 from app.modules.users.model import User
 from app.modules.workflows.access import ensure_can_access_stage_instance
 
@@ -33,9 +33,24 @@ class ChecklistUpdate(BaseModel):
     attachment_id: UUID | None = None
 
 
+class ChecklistExtraCreate(BaseModel):
+    label: str
+    is_done: bool = False
+
+
+class ChecklistExtraUpdate(BaseModel):
+    label: str | None = None
+    is_done: bool | None = None
+
+
+class ChecklistExtrasOrder(BaseModel):
+    ids: list[UUID]
+
+
 def checklist_read(value: ProgramChecklistValue, item: PlaybookChecklistItem) -> dict:
     return {
         "id": str(value.id),
+        "code": item.code,
         "label": item.label,
         "item_type": item.item_type,
         "required": item.required,
@@ -138,3 +153,55 @@ def update_checklist(
     value.is_done = payload.is_done
     db.commit()
     return checklist_read(value, item)
+
+
+@router.get("/{stage_instance_id}/checklist-extras")
+def list_checklist_extras(stage_instance_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+    ensure_can_access_stage_instance(db, current_user, stage_instance_id)
+    return list(db.scalars(select(WorkflowChecklistExtra).where(WorkflowChecklistExtra.stage_instance_id == stage_instance_id).order_by(WorkflowChecklistExtra.sort_order, WorkflowChecklistExtra.created_at)).all())
+
+
+@router.post("/{stage_instance_id}/checklist-extras", status_code=201)
+def create_checklist_extra(stage_instance_id: UUID, payload: ChecklistExtraCreate, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+    ensure_can_access_stage_instance(db, current_user, stage_instance_id)
+    sort_order = db.scalar(select(WorkflowChecklistExtra.sort_order).where(WorkflowChecklistExtra.stage_instance_id == stage_instance_id).order_by(WorkflowChecklistExtra.sort_order.desc()).limit(1))
+    extra = WorkflowChecklistExtra(stage_instance_id=stage_instance_id, label=payload.label.strip(), is_done=payload.is_done, sort_order=(sort_order or 0) + 1)
+    db.add(extra)
+    db.commit()
+    db.refresh(extra)
+    return extra
+
+
+@router.patch("/checklist-extras/{extra_id}")
+def update_checklist_extra(extra_id: UUID, payload: ChecklistExtraUpdate, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+    extra = db.get(WorkflowChecklistExtra, extra_id)
+    if extra is None:
+        raise HTTPException(status_code=404, detail="Checklist extra not found")
+    ensure_can_access_stage_instance(db, current_user, extra.stage_instance_id)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(extra, field, value.strip() if field == "label" and value is not None else value)
+    db.commit()
+    db.refresh(extra)
+    return extra
+
+
+@router.put("/{stage_instance_id}/checklist-extras/order")
+def reorder_checklist_extras(stage_instance_id: UUID, payload: ChecklistExtrasOrder, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+    ensure_can_access_stage_instance(db, current_user, stage_instance_id)
+    extras = {item.id: item for item in db.scalars(select(WorkflowChecklistExtra).where(WorkflowChecklistExtra.stage_instance_id == stage_instance_id)).all()}
+    if set(payload.ids) != set(extras):
+        raise HTTPException(status_code=422, detail="Order must contain every checklist extra exactly once")
+    for index, extra_id in enumerate(payload.ids):
+        extras[extra_id].sort_order = index
+    db.commit()
+    return list(db.scalars(select(WorkflowChecklistExtra).where(WorkflowChecklistExtra.stage_instance_id == stage_instance_id).order_by(WorkflowChecklistExtra.sort_order)).all())
+
+
+@router.delete("/checklist-extras/{extra_id}", status_code=204)
+def delete_checklist_extra(extra_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+    extra = db.get(WorkflowChecklistExtra, extra_id)
+    if extra is None:
+        raise HTTPException(status_code=404, detail="Checklist extra not found")
+    ensure_can_access_stage_instance(db, current_user, extra.stage_instance_id)
+    db.delete(extra)
+    db.commit()

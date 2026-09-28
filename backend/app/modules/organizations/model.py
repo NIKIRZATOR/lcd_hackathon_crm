@@ -65,6 +65,7 @@ class Stakeholder(ModelBase):
     position: Mapped[str | None] = mapped_column(String(255), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    contact_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     program_instance_id: Mapped[UUID | None] = mapped_column(

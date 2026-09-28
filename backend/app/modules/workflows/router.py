@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,7 +19,7 @@ from app.modules.documents.schemas import WorkflowAttachmentRead
 from app.modules.checklists.model import PlaybookChecklistItem
 from app.modules.interactions.model import UniversityInteraction
 from app.modules.users.model import User
-from app.modules.workflows.model import WorkflowStage, WorkflowStageAttachment, WorkflowStageComment, WorkflowStageInstance, WorkflowVersion
+from app.modules.workflows.model import WorkflowStage, WorkflowStageAttachment, WorkflowStageComment, WorkflowStageData, WorkflowStageInstance, WorkflowVersion
 from app.modules.workflows.access import ensure_can_access_stage_instance
 from app.modules.workflows.schemas import (
     WorkflowAvailableTransitionRead,
@@ -58,12 +59,30 @@ from app.modules.workflows.service import (
     WorkflowTransitionService,
     WorkflowVersionService,
 )
+from app.modules.workflows.stage_data_schemas import stage_data_json_schemas, validate_stage_payload
+from app.modules.workflow_catalog.model import WorkflowStageCatalog
 
 router = APIRouter(
     prefix="/workflows",
     tags=["workflows"],
     dependencies=[Depends(require_roles(*CRM_ROLES))],
 )
+
+
+class WorkflowStageDataUpdate(BaseModel):
+    payload: dict = Field(default_factory=dict)
+
+
+class WorkflowStageDataRead(WorkflowStageDataUpdate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    stage_instance_id: UUID
+
+
+@router.get("/stage-data/schemas", response_model=dict[str, dict])
+def get_stage_data_schemas():
+    return stage_data_json_schemas()
 
 
 def _ensure_can_access_interaction(db: Session, current_user: User, interaction_id: UUID) -> UniversityInteraction:
@@ -78,6 +97,34 @@ def _ensure_can_access_interaction(db: Session, current_user: User, interaction_
 
 def _ensure_can_access_stage_instance(db: Session, current_user: User, stage_instance_id: UUID) -> WorkflowStageInstance:
     return ensure_can_access_stage_instance(db, current_user, stage_instance_id)
+
+
+@router.get("/stage-instances/{stage_instance_id}/data", response_model=WorkflowStageDataRead | None)
+def get_stage_data(stage_instance_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+    _ensure_can_access_stage_instance(db, current_user, stage_instance_id)
+    return db.scalar(select(WorkflowStageData).where(WorkflowStageData.stage_instance_id == stage_instance_id))
+
+
+@router.put("/stage-instances/{stage_instance_id}/data", response_model=WorkflowStageDataRead)
+def replace_stage_data(stage_instance_id: UUID, payload: WorkflowStageDataUpdate, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+    stage_instance = _ensure_can_access_stage_instance(db, current_user, stage_instance_id)
+    stage_code = db.scalar(
+        select(WorkflowStageCatalog.code)
+        .join(WorkflowStage, WorkflowStage.stage_catalog_id == WorkflowStageCatalog.id)
+        .where(WorkflowStage.id == stage_instance.workflow_stage_id)
+    )
+    if stage_code is None:
+        raise HTTPException(status_code=422, detail="Workflow stage has no catalog code")
+    validated_payload = validate_stage_payload(stage_code, payload.payload)
+    data = db.scalar(select(WorkflowStageData).where(WorkflowStageData.stage_instance_id == stage_instance_id))
+    if data is None:
+        data = WorkflowStageData(stage_instance_id=stage_instance_id, payload=validated_payload)
+        db.add(data)
+    else:
+        data.payload = validated_payload
+    db.commit()
+    db.refresh(data)
+    return data
 
 
 def _ensure_can_access_attachment(

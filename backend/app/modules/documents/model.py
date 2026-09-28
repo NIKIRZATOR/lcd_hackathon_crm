@@ -2,11 +2,11 @@ from uuid import UUID
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base, TimestampCreateMixin, UUIDPrimaryKeyMixin
+from app.core.database import Base, ModelBase, TimestampCreateMixin, UUIDPrimaryKeyMixin
 
 
 class File(UUIDPrimaryKeyMixin, TimestampCreateMixin, Base):
@@ -41,3 +41,21 @@ class File(UUIDPrimaryKeyMixin, TimestampCreateMixin, Base):
         nullable=True,
     )
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DocumentTemplate(ModelBase):
+    __tablename__ = "document_templates"
+    __table_args__ = (
+        CheckConstraint(
+            "file_id IS NOT NULL OR external_url IS NOT NULL",
+            name="document_template_source_required",
+        ),
+    )
+
+    kind: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("files.id"), nullable=True
+    )
+    external_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

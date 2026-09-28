@@ -15,6 +15,10 @@ class AcademicWindowRead(BaseModel):
     is_current: bool
 
 
+class ProgramAcademicWindowUpdate(BaseModel):
+    academic_window_id: UUID
+
+
 class ProgramInstanceRead(BaseModel):
     id: UUID
     organization_id: UUID
@@ -36,6 +40,7 @@ class ProgramInstanceRead(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     comment: str | None
+    parent_program_id: UUID | None = None
     legacy_interaction_id: UUID | None = None
 
 
@@ -60,6 +65,7 @@ class WorkflowJournalRead(BaseModel):
     kam_name: str | None
     students_count: int | None
     applications_count: int | None
+    status: str
 
 
 class ProgramInstanceStart(BaseModel):

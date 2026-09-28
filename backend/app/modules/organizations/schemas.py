@@ -116,6 +116,7 @@ class StakeholderCreate(BaseModel):
     position: str | None = None
     email: str | None = None
     phone: str | None = None
+    contact_source: str | None = Field(default=None, pattern="^(university_card|call|email|site|event|referral|other)$")
     is_primary: bool = False
     comment: str | None = None
     program_instance_id: UUID | None = None
@@ -127,6 +128,7 @@ class StakeholderUpdate(BaseModel):
     position: str | None = None
     email: str | None = None
     phone: str | None = None
+    contact_source: str | None = Field(default=None, pattern="^(university_card|call|email|site|event|referral|other)$")
     is_primary: bool | None = None
     is_active: bool | None = None
     comment: str | None = None

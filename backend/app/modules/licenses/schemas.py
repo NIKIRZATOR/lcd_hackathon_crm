@@ -10,6 +10,7 @@ class ContractCreate(BaseModel):
     signed_on: date | None = None
     valid_until: datetime | None = None
     status: str | None = None
+    signer: str | None = None
     attachment_id: UUID | None = None
     comment: str | None = None
 
@@ -19,6 +20,7 @@ class ContractUpdate(BaseModel):
     signed_on: date | None = None
     valid_until: datetime | None = None
     status: str | None = None
+    signer: str | None = None
     attachment_id: UUID | None = None
     comment: str | None = None
 
@@ -27,6 +29,8 @@ class ContractRead(ContractCreate):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     organization_id: UUID | None
+    attachment_name: str | None = None
+    attachment_download_url: str | None = None
 
 
 class LicenseCreate(BaseModel):
@@ -39,6 +43,7 @@ class LicenseCreate(BaseModel):
     product_access: str | None = None
     transferred_on: date | None = None
     attachment_id: UUID | None = None
+    recipient_stakeholder_id: UUID | None = None
     comment: str | None = None
 
 
@@ -51,6 +56,7 @@ class LicenseUpdate(BaseModel):
     product_access: str | None = None
     transferred_on: date | None = None
     attachment_id: UUID | None = None
+    recipient_stakeholder_id: UUID | None = None
     comment: str | None = None
 
 
@@ -58,3 +64,5 @@ class LicenseRead(LicenseCreate):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     product_name: str
+    attachment_name: str | None = None
+    attachment_download_url: str | None = None

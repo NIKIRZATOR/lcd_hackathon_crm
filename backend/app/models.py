@@ -2,7 +2,7 @@
 
 from app.modules.contacts.model import UniversityContact
 from app.modules.audit.model import AuditEvent
-from app.modules.documents.model import File
+from app.modules.documents.model import DocumentTemplate, File
 from app.modules.documentation.model import (
     DocumentationImage,
     DocumentationPage,
@@ -49,6 +49,9 @@ from app.modules.workflows.model import (
     WorkflowStage,
     WorkflowStageAttachment,
     WorkflowStageComment,
+    WorkflowStageData,
+    WorkflowChecklistExtra,
+    ProgramWorkflowControl,
     WorkflowStageInstance,
     WorkflowStageMapping,
     WorkflowTemplate,
@@ -62,6 +65,7 @@ from app.modules.teachers.model import TeacherCarrier
 
 __all__ = [
     "File",
+    "DocumentTemplate",
     "DocumentationPage",
     "DocumentationRequest",
     "DocumentationImage",
@@ -106,6 +110,9 @@ __all__ = [
     "WorkflowStage",
     "WorkflowStageAttachment",
     "WorkflowStageComment",
+    "WorkflowStageData",
+    "WorkflowChecklistExtra",
+    "ProgramWorkflowControl",
     "WorkflowStageInstance",
     "WorkflowStageMapping",
     "WorkflowTemplate",

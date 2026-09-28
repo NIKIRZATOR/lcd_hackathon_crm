@@ -28,6 +28,37 @@ class VendorRead(VendorBase):
     updated_at: datetime
 
 
+class VendorContactBase(BaseModel):
+    product_id: UUID | None = None
+    business_key: str
+    full_name: str
+    phone: str | None = None
+    email: str | None = None
+    preferred_channel: str | None = None
+
+
+class VendorContactCreate(VendorContactBase):
+    pass
+
+
+class VendorContactUpdate(BaseModel):
+    product_id: UUID | None = None
+    business_key: str | None = None
+    full_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    preferred_channel: str | None = None
+
+
+class VendorContactRead(VendorContactBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    vendor_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
 class ITProductBase(BaseModel):
     vendor_id: UUID | None = None
     name: str
