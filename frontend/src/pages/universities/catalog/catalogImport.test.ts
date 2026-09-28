@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyCatalog, catalogText, previewCatalog, suggestCatalogMapping } from './catalogImport';
-import { universityItemsMock } from './mocks';
-import { buildUniversitySections } from './sectionData';
-import { buildUniversityCard } from './universityCard';
+import { universityItemsMock } from '../mocks';
+import { buildUniversitySections } from '../domain/sectionData';
+import { buildUniversityCard } from '../domain/universityCard';
 
 describe('suggestCatalogMapping', () => {
   it('узнаёт колонки ТЗ и близкие названия', () => {

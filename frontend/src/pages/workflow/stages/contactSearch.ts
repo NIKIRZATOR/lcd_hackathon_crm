@@ -1,6 +1,6 @@
 import dayjs, { type Dayjs } from 'dayjs';
 
-import { apiRequest } from '../../api/client';
+import { apiRequest } from '../../../api/client';
 
 /**
  * Срок «Поиск контакта» в сиде плейбука: default_duration_days = 3.

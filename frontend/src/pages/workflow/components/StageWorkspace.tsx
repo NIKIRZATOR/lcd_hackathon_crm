@@ -8,8 +8,8 @@ import { createStakeholder } from '../../organizations/api';
 import { stakeholderRoles } from '../../organizations/screenModel';
 import { apiDownload } from '../../../api/client';
 import type { DeskChecklistItem, DeskFile } from '../api';
-import { stageBlueprints, stageCodeOf } from '../stageBlueprints';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+import { stageBlueprints, stageCodeOf } from '../shared/stageBlueprints';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import styles from '../WorkflowDetailPage.module.scss';
 

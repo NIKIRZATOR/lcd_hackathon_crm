@@ -1,7 +1,7 @@
 import { Grid } from 'antd';
 import type { TableColumnsType } from 'antd';
 
-import type { WorkStatus } from '../../sectionData';
+import type { WorkStatus } from '../../domain/sectionData';
 
 import styles from '../UniversityPanels.module.scss';
 

@@ -7,8 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { apiDownload, apiRequest } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
 import type { DeskChecklistItem, DeskFile } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
-import { stageDeadline } from '../firstMeeting';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
+import { stageDeadline } from '../stages/firstMeeting';
 import {
   PERIOD_SLA_DAYS,
   emptyPeriodDraft,
@@ -21,8 +21,8 @@ import {
   type PeriodDraft,
   type PeriodSnapshot,
   type Verdict,
-} from '../periodResults';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+} from '../stages/periodResults';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import tileStyles from './ContactSearchStage.module.scss';
 import formStyles from './FirstMeetingStage.module.scss';

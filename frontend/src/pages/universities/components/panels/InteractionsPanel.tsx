@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { createUniversityWorkflow } from '../../../workflow/api';
 import type { WorkflowStatus } from '../../../workflow/types';
 import { listUniversityWorkflows } from '../../api';
-import { isInPeriod, usePeriod } from '../../period';
+import { isInPeriod, usePeriod } from '../../domain/period';
 import type { UniversityItem } from '../../types';
 import { byText, shownColumns, styles, unique, useCompact } from './panelShared';
 import { Details, Pill } from './panelUi';

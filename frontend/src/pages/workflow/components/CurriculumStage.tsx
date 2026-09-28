@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiDownload, apiRequest } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
 import type { DeskChecklistItem, DeskFile } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
 import {
   CURRICULUM_NOTE_MIN,
   CURRICULUM_SLA_DAYS,
@@ -17,9 +17,9 @@ import {
   parseCurriculumDraft,
   serializeCurriculumDraft,
   type CurriculumDraft,
-} from '../curriculum';
-import { stageDeadline } from '../firstMeeting';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+} from '../stages/curriculum';
+import { stageDeadline } from '../stages/firstMeeting';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import tileStyles from './ContactSearchStage.module.scss';
 import formStyles from './FirstMeetingStage.module.scss';

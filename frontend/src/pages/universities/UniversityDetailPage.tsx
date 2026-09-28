@@ -10,12 +10,12 @@ import UniversityOverview from './components/UniversityOverview';
 import UniversityPeopleModal from './components/UniversityPeopleModal';
 import UniversityTabBar from './components/UniversityTabBar';
 import { findUniversity, listUniversityWorkflows, rememberUniversity } from './api';
-import { PeriodContext } from './period';
-import type { Period } from './period';
-import { buildUniversitySections } from './sectionData';
+import { PeriodContext } from './domain/period';
+import type { Period } from './domain/period';
+import { buildUniversitySections } from './domain/sectionData';
 
 import { universityTypeLabels } from './types';
-import { buildUniversityCard, getUniversityScore, levelByScore, saveUniversityScore } from './universityCard';
+import { buildUniversityCard, getUniversityScore, levelByScore, saveUniversityScore } from './domain/universityCard';
 
 import styles from './UniversityDetailPage.module.scss';
 

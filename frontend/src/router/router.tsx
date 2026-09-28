@@ -7,6 +7,7 @@ import AnalyticsPage from '../pages/analytics/AnalyticsPage';
 import HomePage from '../pages/home/HomePage';
 import LoginPage from '../pages/login/LoginPage';
 import ManagementPage from '../pages/management/ManagementPage';
+import PlaybookEditorPage from '../pages/management/playbookEditor/PlaybookEditorPage';
 import OrganizationDetailPage from '../pages/organizations/UniversityDetailPage';
 import OrganizationsPage from '../pages/organizations/UniversitiesPage';
 import ProductsPage from '../pages/products/ProductsPage';
@@ -46,6 +47,14 @@ const AppRoutes = () => (
         element={
           <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
             <ManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/management/playbooks/:id"
+        element={
+          <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
+            <PlaybookEditorPage />
           </ProtectedRoute>
         }
       />

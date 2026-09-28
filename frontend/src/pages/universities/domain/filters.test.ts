@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { filterUniversities, hasActiveUniversityFilters, summarizeUniversities } from './filters';
-import { emptyUniversityFilters } from './types';
-import type { UniversityItem } from './types';
+import { emptyUniversityFilters } from '../types';
+import type { UniversityItem } from '../types';
 
 const items: UniversityItem[] = [
   {

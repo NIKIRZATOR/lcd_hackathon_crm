@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiDownload, apiRequest } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
 import type { DeskChecklistItem, DeskFile } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
 import {
   activeFramework,
   DOCUMENT_PACKAGE_SLA_DAYS,
@@ -18,9 +18,9 @@ import {
   type DocumentSlotKind,
   type DocumentTasks,
   type FrameworkContract,
-} from '../documentPackage';
-import { stageDeadline } from '../firstMeeting';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+} from '../stages/documentPackage';
+import { stageDeadline } from '../stages/firstMeeting';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import formStyles from './FirstMeetingStage.module.scss';
 import tileStyles from './ContactSearchStage.module.scss';

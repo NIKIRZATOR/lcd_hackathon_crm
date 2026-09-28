@@ -13,11 +13,11 @@ import {
   deleteStageComment,
   deleteStageFile,
   loadProgramDesk,
+  loadProgramControl,
   loadStageFacts,
   moveProgram,
   reopenProgramStage,
   refuseProgram,
-  rememberClosedProgram,
   saveChecklistItem,
   syncProgram,
   updateStageComment,
@@ -43,22 +43,21 @@ import ControlExecutionStage from './components/ControlExecutionStage';
 import IdentifyNeedStage from './components/IdentifyNeedStage';
 import StageWorkspace from './components/StageWorkspace';
 import WorkflowSteps from './components/WorkflowSteps';
-import { findContactChecklistItem } from './contactSearch';
-import { hasEnteredControl, rememberControlEntered } from './controlExecution';
-import type { MeetingClosePlan } from './firstMeeting';
-import { documentClosePlan } from './documentPackage';
-import { signClosePlan, type SignClosePlan } from './signContract';
-import { signLicensePlan, type SignLicensePlan } from './signLicense';
-import { transferClosePlan, type TransferClosePlan } from './transferAccess';
-import { trainClosePlan, type TrainClosePlan } from './trainTeacher';
-import { confirmClosePlan, type ConfirmClosePlan } from './confirmTeacher';
-import { curriculumClosePlan, type CurriculumClosePlan } from './curriculum';
-import { startClosePlan, type StartClosePlan } from './startClasses';
-import { classesClosePlan, type ClassesClosePlan } from './classesRunning';
-import type { PeriodClosePlan } from './periodResults';
-import { identifyClosePlan } from './identifyNeed';
-import { stageBlueprints, stageCodeOf } from './stageBlueprints';
-import { emptyActionText } from './workflowBackendFieldGaps';
+import { findContactChecklistItem } from './stages/contactSearch';
+import type { MeetingClosePlan } from './stages/firstMeeting';
+import { documentClosePlan } from './stages/documentPackage';
+import type { SignClosePlan } from './stages/signContract';
+import type { SignLicensePlan } from './stages/signLicense';
+import type { TransferClosePlan } from './stages/transferAccess';
+import type { TrainClosePlan } from './stages/trainTeacher';
+import type { ConfirmClosePlan } from './stages/confirmTeacher';
+import type { CurriculumClosePlan } from './stages/curriculum';
+import type { StartClosePlan } from './stages/startClasses';
+import type { ClassesClosePlan } from './stages/classesRunning';
+import type { PeriodClosePlan } from './stages/periodResults';
+import { identifyClosePlan } from './stages/identifyNeed';
+import { stageBlueprints, stageCodeOf } from './shared/stageBlueprints';
+import { emptyActionText } from './backend/workflowBackendFieldGaps';
 
 
 import styles from './WorkflowDetailPage.module.scss';
@@ -82,8 +81,8 @@ const WorkflowDetailPage = () => {
   const [desk, setDesk] = useState<ProgramDesk | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedId, setSelectedId] = useState<string>(() => searchParams.get('stage') === 'control' || hasEnteredControl(id) ? 'control' : '');
-  const [controlEntered, setControlEntered] = useState(() => hasEnteredControl(id));
+  const [selectedId, setSelectedId] = useState<string>(() => searchParams.get('stage') === 'control' ? 'control' : '');
+  const [controlEntered, setControlEntered] = useState(false);
   const [checklist, setChecklist] = useState<DeskChecklistItem[]>([]);
   const [factsStageId, setFactsStageId] = useState('');
   const [stageBlockers, setStageBlockers] = useState<string[] | null>(null);
@@ -110,10 +109,12 @@ const WorkflowDetailPage = () => {
   const load = useCallback(() => {
     if (!id) return;
     setLoading(true);
-    loadProgramDesk(id)
-      .then((loaded) => {
+    Promise.all([loadProgramDesk(id), loadProgramControl<Record<string, unknown>>(id).catch(() => null)])
+      .then(([loaded, control]) => {
         setDesk(loaded);
-        setSelectedId((current) => current || loaded.currentStageId || loaded.stages[0]?.id || '');
+        const entered = Boolean(control) || loaded.stageCode === 'control';
+        setControlEntered(entered);
+        setSelectedId((current) => current || (entered ? 'control' : loaded.currentStageId || loaded.stages[0]?.id || ''));
         setError('');
       })
       .catch(() => setError('Не удалось открыть программу'))
@@ -124,12 +125,6 @@ const WorkflowDetailPage = () => {
     const timer = window.setTimeout(load, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
-
-  useEffect(() => {
-    const entered = hasEnteredControl(id);
-    setControlEntered(entered);
-    setSelectedId(entered || new URLSearchParams(window.location.search).get('stage') === 'control' ? 'control' : '');
-  }, [id]);
 
   useEffect(() => {
     const isControlSelected = selectedId === 'control';
@@ -158,11 +153,13 @@ const WorkflowDetailPage = () => {
       stageCodeOf(stage.code, stage.name) === 'control'
       || stage.name.trim().toLowerCase() === 'контроль исполнения'
     ))) {
-      setChecklist([]);
-      setComments([]);
-      setFiles([]);
-      setFactsStageId(selectedId);
-      return;
+      const timer = window.setTimeout(() => {
+        setChecklist([]);
+        setComments([]);
+        setFiles([]);
+        setFactsStageId(selectedId);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
     if (!selectedId || selectedId.startsWith('gap-')) {
       const code = stageCodeOf(stage?.code, stage?.name);
@@ -216,25 +213,24 @@ const WorkflowDetailPage = () => {
   }, [desk?.stages, selectedId]);
 
   useEffect(() => {
-    setStageBlockers(null);
-    setCloseHint(false);
-    setMeetingPlan(null);
-    setIdentifyPlan(null);
-    setPackagePlan(null);
-    setSignPlan(null);
-    setLicensePlan(null);
-    setTransferPlan(null);
-    setTrainPlan(null);
-    setConfirmPlan(null);
-    setCurriculumPlan(null);
-    setStartPlan(null);
-    setRunningPlan(null);
-    setPeriodPlan(null);
+    const timer = window.setTimeout(() => {
+      setStageBlockers(null);
+      setCloseHint(false);
+      setMeetingPlan(null);
+      setIdentifyPlan(null);
+      setPackagePlan(null);
+      setSignPlan(null);
+      setLicensePlan(null);
+      setTransferPlan(null);
+      setTrainPlan(null);
+      setConfirmPlan(null);
+      setCurriculumPlan(null);
+      setStartPlan(null);
+      setRunningPlan(null);
+      setPeriodPlan(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [selectedId]);
-
-  useEffect(() => {
-    if (desk?.status === 'cancelled') rememberClosedProgram(desk.id);
-  }, [desk?.id, desk?.status]);
 
   const publishBlockers = useCallback((labels: string[]) => {
     setStageBlockers((current) => (current?.join('\n') === labels.join('\n') ? current : labels));
@@ -427,7 +423,6 @@ const WorkflowDetailPage = () => {
     setBusy(true);
     try {
       await refuseProgram(desk.id, { stageId: desk.currentStageId || selected.id, comment: meetingPlan.note });
-      rememberClosedProgram(desk.id);
       const reloaded = await loadProgramDesk(desk.id);
       setDesk(reloaded);
       return true;
@@ -441,8 +436,6 @@ const WorkflowDetailPage = () => {
 
   const closeTraining = async () => {
     if (!trainPlan?.enabled || !trainPlan.personId || !trainPlan.productId || !trainPlan.trainedOn || !trainPlan.personName) return;
-    const moved = await go(forward?.id);
-    if (!moved || desk.id.startsWith('gap-')) return;
     const body = {
       product_id: trainPlan.productId,
       program_instance_id: desk.id,
@@ -452,73 +445,83 @@ const WorkflowDetailPage = () => {
       qualification_until: trainPlan.qualificationUntil,
       status: trainPlan.status,
     };
-    try {
-      if (trainPlan.carrierId) await apiRequest(`/api/teachers/${trainPlan.carrierId}`, { method: 'PATCH', body: JSON.stringify(body) });
-      else await apiRequest(`/api/organizations/${desk.organizationId}/teachers`, { method: 'POST', body: JSON.stringify(body) });
-    } catch (reason) {
-      message.error(errorText(reason));
+    if (!desk.id.startsWith('gap-')) {
+      try {
+        if (trainPlan.carrierId) await apiRequest(`/api/teachers/${trainPlan.carrierId}`, { method: 'PATCH', body: JSON.stringify(body) });
+        else await apiRequest(`/api/organizations/${desk.organizationId}/teachers`, { method: 'POST', body: JSON.stringify(body) });
+      } catch (reason) {
+        message.error(errorText(reason));
+        return;
+      }
     }
+    await go(forward?.id);
   };
 
   const closeTransfer = async () => {
     if (!transferPlan?.enabled || !transferPlan.licenseId || !transferPlan.transferredOn) return;
-    const moved = await go(forward?.id);
-    if (!moved || desk.id.startsWith('gap-')) return;
-    try {
-      await apiRequest(`/api/licenses/${transferPlan.licenseId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          transfer_status: 'transferred',
-          product_access: transferPlan.access,
-          transferred_on: transferPlan.transferredOn,
-        }),
-      });
-    } catch (reason) {
-      message.error(errorText(reason));
+    if (!desk.id.startsWith('gap-')) {
+      try {
+        await apiRequest(`/api/licenses/${transferPlan.licenseId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            transfer_status: 'transferred',
+            product_access: transferPlan.access,
+            transferred_on: transferPlan.transferredOn,
+          }),
+        });
+      } catch (reason) {
+        message.error(errorText(reason));
+        return;
+      }
     }
+    await go(forward?.id);
   };
 
   const closeLicense = async () => {
     if (!licensePlan?.enabled || !licensePlan.fileId || !licensePlan.signedOn || !licensePlan.validUntil) return;
-    const moved = await go(forward?.id);
-    if (!moved || desk.id.startsWith('gap-')) return;
-    try {
-      await apiRequest(`/api/organizations/${desk.organizationId}/licenses`, {
-        method: 'POST',
-        body: JSON.stringify({
-          program_instance_id: desk.id,
-          license_number: licensePlan.number,
-          signed_at: `${licensePlan.signedOn}T00:00:00Z`,
-          valid_until: `${licensePlan.validUntil}T00:00:00Z`,
-          attachment_id: licensePlan.fileId,
-          comment: licensePlan.volume || null,
-          transfer_status: 'not_transferred',
-        }),
-      });
-    } catch (reason) {
-      message.error(errorText(reason));
+    if (!desk.id.startsWith('gap-')) {
+      try {
+        await apiRequest(`/api/organizations/${desk.organizationId}/licenses`, {
+          method: 'POST',
+          body: JSON.stringify({
+            program_instance_id: desk.id,
+            license_number: licensePlan.number,
+            signed_at: `${licensePlan.signedOn}T00:00:00Z`,
+            valid_until: `${licensePlan.validUntil}T00:00:00Z`,
+            attachment_id: licensePlan.fileId,
+            comment: licensePlan.volume || null,
+            transfer_status: 'not_transferred',
+          }),
+        });
+      } catch (reason) {
+        message.error(errorText(reason));
+        return;
+      }
     }
+    await go(forward?.id);
   };
 
   const closeSignedContract = async () => {
     if (!signPlan?.enabled || !signPlan.fileId || !signPlan.signedOn) return;
-    const moved = await go(forward?.id);
-    if (!moved || desk.id.startsWith('gap-')) return;
-    try {
-      await apiRequest(`/api/organizations/${desk.organizationId}/contracts`, {
-        method: 'POST',
-        body: JSON.stringify({
-          number: signPlan.number,
-          signed_on: signPlan.signedOn,
-          valid_until: signPlan.validUntil ? `${signPlan.validUntil}T00:00:00Z` : null,
-          status: 'signed',
-          attachment_id: signPlan.fileId,
-          comment: signPlan.signer || null,
-        }),
-      });
-    } catch (reason) {
-      message.error(errorText(reason));
+    if (!desk.id.startsWith('gap-')) {
+      try {
+        await apiRequest(`/api/organizations/${desk.organizationId}/contracts`, {
+          method: 'POST',
+          body: JSON.stringify({
+            number: signPlan.number,
+            signed_on: signPlan.signedOn,
+            valid_until: signPlan.validUntil ? `${signPlan.validUntil}T00:00:00Z` : null,
+            status: 'signed',
+            attachment_id: signPlan.fileId,
+            comment: signPlan.signer || null,
+          }),
+        });
+      } catch (reason) {
+        message.error(errorText(reason));
+        return;
+      }
     }
+    await go(forward?.id);
   };
 
   const reopen = async () => {
@@ -608,6 +611,7 @@ const WorkflowDetailPage = () => {
                   windowId={desk.windowId}
                   healthBand={desk.healthBand}
                   healthScore={desk.healthScore}
+                  actorName={desk.kam}
                   stages={desk.stages.map((stage) => ({ id: stage.id, name: stage.name, code: stage.code, status: stage.status, dueAt: stage.dueAt }))}
                   onOpenStage={(stageId) => { if (stageId) setSelectedId(stageId); }}
                 />
@@ -1026,17 +1030,21 @@ const WorkflowDetailPage = () => {
                   <Button
                     type="primary"
                     style={periodResults && periodPlan?.early && periodPlan.enabled ? { background: '#f5c451', borderColor: '#f5c451', color: '#3d2e00' } : undefined}
-                    disabled={periodResults ? false : refused || desk.status === 'completed' || (classesRunning ? !runningPlan?.enabled || !canMoveForward : startClasses ? !startPlan?.enabled || !canMoveForward : curriculum ? !curriculumPlan?.enabled || !canMoveForward : confirmTeacher ? !confirmPlan?.enabled || !canMoveForward : trainTeacher ? !trainPlan?.enabled || !canMoveForward : transferAccess ? !transferPlan?.enabled || !canMoveForward : signLicense ? !licensePlan?.enabled || !canMoveForward : signContract ? !signPlan?.enabled || !canMoveForward : documentPackage ? !packagePlan?.enabled || !canMoveForward : identifyNeed ? !identifyPlan?.enabled || !canMoveForward : firstMeeting ? !meetingPlan?.enabled || (meetingPlan.action === 'forward' && !canMoveForward) : findContact ? !canMoveForward || stageBlockers === null : !canClose)}
-                    loading={periodResults ? false : busy}
+                    disabled={periodResults ? !periodPlan?.enabled : refused || desk.status === 'completed' || (classesRunning ? !runningPlan?.enabled || !canMoveForward : startClasses ? !startPlan?.enabled || !canMoveForward : curriculum ? !curriculumPlan?.enabled || !canMoveForward : confirmTeacher ? !confirmPlan?.enabled || !canMoveForward : trainTeacher ? !trainPlan?.enabled || !canMoveForward : transferAccess ? !transferPlan?.enabled || !canMoveForward : signLicense ? !licensePlan?.enabled || !canMoveForward : signContract ? !signPlan?.enabled || !canMoveForward : documentPackage ? !packagePlan?.enabled || !canMoveForward : identifyNeed ? !identifyPlan?.enabled || !canMoveForward : firstMeeting ? !meetingPlan?.enabled || (meetingPlan.action === 'forward' && !canMoveForward) : findContact ? !canMoveForward || stageBlockers === null : !canClose)}
+                    loading={busy}
                     onClick={() => {
                       if (firstMeeting && meetingPlan?.action === 'refuse') {
                         void refuse();
                         return;
                       }
                       if (periodResults) {
-                        rememberControlEntered(desk.id);
-                        setControlEntered(true);
-                        setSelectedId(controlId);
+                        void (async () => {
+                          const target = serverControlStage?.id ?? forward?.id;
+                          const moved = await go(target);
+                          if (moved === false) return;
+                          setControlEntered(true);
+                          setSelectedId(controlId);
+                        })();
                         return;
                       }
                       if (classesRunning || startClasses || curriculum) {

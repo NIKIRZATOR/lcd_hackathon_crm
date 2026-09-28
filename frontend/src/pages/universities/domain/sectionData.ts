@@ -1,4 +1,4 @@
-import type { UniversityItem } from './types';
+import type { UniversityItem } from '../types';
 
 export type WorkStatus = 'active' | 'done' | 'paused';
 export type TrainingStatus = 'done' | 'progress' | 'notStarted';

@@ -2,8 +2,8 @@ import { DownloadOutlined, InboxOutlined } from '@ant-design/icons';
 import { Alert, Button, Modal, Select, Table, Upload, message } from 'antd';
 import { useState } from 'react';
 
-import { applyCatalog, catalogFields, downloadCatalogTemplate, previewCatalog, readCatalogRows, suggestCatalogMapping } from '../catalogImport';
-import type { CatalogField, CatalogMapping, CatalogPreviewRow } from '../catalogImport';
+import { applyCatalog, catalogFields, downloadCatalogTemplate, previewCatalog, readCatalogRows, suggestCatalogMapping } from '../catalog/catalogImport';
+import type { CatalogField, CatalogMapping, CatalogPreviewRow } from '../catalog/catalogImport';
 
 type CatalogImportModalProps = {
   open: boolean;

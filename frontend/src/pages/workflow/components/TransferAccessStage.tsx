@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import { apiDownload, apiRequest } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
 import type { DeskChecklistItem, DeskFile } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
-import { stageDeadline } from '../firstMeeting';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
+import { stageDeadline } from '../stages/firstMeeting';
 import {
   TRANSFER_FILE_KIND,
   TRANSFER_SLA_DAYS,
@@ -19,8 +19,8 @@ import {
   transferStatuses,
   type TransferDraft,
   type TransferStatus,
-} from '../transferAccess';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+} from '../stages/transferAccess';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import tileStyles from './ContactSearchStage.module.scss';
 import formStyles from './FirstMeetingStage.module.scss';

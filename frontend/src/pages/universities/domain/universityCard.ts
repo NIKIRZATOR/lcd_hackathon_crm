@@ -1,4 +1,4 @@
-import type { UniversityItem } from './types';
+import type { UniversityItem } from '../types';
 
 export type StageTone = 'danger' | 'progress' | 'warning' | 'success' | 'neutral';
 export type TaskPriority = 'high' | 'medium' | 'low';

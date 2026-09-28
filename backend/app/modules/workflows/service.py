@@ -208,6 +208,7 @@ class WorkflowVersionService:
             status="DRAFT",
             supersedes_version_id=source.id if source is not None else None,
             created_by=created_by,
+            editor_content=source.editor_content if source is not None else None,
         )
         self.version_repository.add(draft)
 

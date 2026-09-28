@@ -18,7 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/pageLayout/PageLayout';
 import CatalogImportModal from './components/CatalogImportModal';
 import UniversityCreateModal from './components/UniversityCreateModal';
-import { filterUniversities, hasActiveUniversityFilters, summarizeUniversities } from './filters';
+import { filterUniversities, hasActiveUniversityFilters, summarizeUniversities } from './domain/filters';
 import { listUniversities, rememberUniversity } from './api';
 import { emptyUniversityFilters, universityStatusLabels, universityTypeLabels } from './types';
 import type { UniversityDraft, UniversityFilters, UniversityItem, UniversityStatus } from './types';

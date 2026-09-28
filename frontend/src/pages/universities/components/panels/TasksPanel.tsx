@@ -2,8 +2,8 @@ import { SearchOutlined } from '@ant-design/icons';
 import { Input, Select, Table } from 'antd';
 import { useState } from 'react';
 
-import type { SectionTask, TaskKind, UniversitySections } from '../../sectionData';
-import { isInPeriod, usePeriod } from '../../period';
+import type { SectionTask, TaskKind, UniversitySections } from '../../domain/sectionData';
+import { isInPeriod, usePeriod } from '../../domain/period';
 import { byText, shownColumns, styles, unique, useCompact } from './panelShared';
 import { Details, Pill } from './panelUi';
 

@@ -5,11 +5,20 @@ import { useEffect, useState } from 'react';
 
 import { apiDownload, apiRequest } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
-import type { DeskFile } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
-import { classesClosePlan, emptyRunningDraft, signalTone, streamStatuses, CLASSES_RUNNING_SLA_DAYS, type RunningDraft, type StreamStatus } from '../classesRunning';
-import { stageDeadline } from '../firstMeeting';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+import {
+  addChecklistExtra,
+  deleteChecklistExtra,
+  loadChecklistExtras,
+  loadStageData,
+  reorderChecklistExtras,
+  saveStageData,
+  updateChecklistExtra,
+  type DeskFile,
+} from '../api';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
+import { classesClosePlan, emptyRunningDraft, signalTone, streamStatuses, CLASSES_RUNNING_SLA_DAYS, type RunningDraft, type StreamStatus } from '../stages/classesRunning';
+import { stageDeadline } from '../stages/firstMeeting';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import tileStyles from './ContactSearchStage.module.scss';
 import formStyles from './FirstMeetingStage.module.scss';
@@ -34,25 +43,20 @@ type ClassesRunningStageProps = {
 
 type CarrierRow = { product_id: string; program_instance_id?: string | null; full_name: string; status: string };
 const FILE_KIND = 'class_note';
-const storageKey = (stageId: string) => `rtk-eduflow:classes-running:${stageId}`;
-const nextCustomId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? `custom-${crypto.randomUUID()}` : `custom-${Date.now()}`);
 const downloadBlob = (blob: Blob, name: string) => { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); URL.revokeObjectURL(url); };
 
-const ClassesRunningStage = ({ stageId, programId, organizationId, productName, windowTitle, healthLabel, dueAt, files, fallbackPeople, readOnly, onPlan, onUpload, onDeleteFile }: ClassesRunningStageProps) => {
-  const gap = organizationId.startsWith('gap-') || stageId.startsWith('gap-');
+const ClassesRunningStage = ({ stageId, programId, organizationId, productName, windowTitle, healthLabel, dueAt, files, readOnly, onPlan, onUpload, onDeleteFile }: ClassesRunningStageProps) => {
   const [contacts, setContacts] = useState<SiteContact[]>([]);
   const [pending, setPending] = useState(true);
   const [carrier, setCarrier] = useState<CarrierRow | null>(null);
   const [accessText, setAccessText] = useState('');
   const [students, setStudents] = useState<number | null>(null);
   const [signalAt, setSignalAt] = useState<string | null>(null);
-  const [draft, setDraft] = useState<RunningDraft>(() => {
-    try { return { ...emptyRunningDraft(), ...JSON.parse(localStorage.getItem(storageKey(stageId)) || '{}') }; } catch { return emptyRunningDraft(); }
-  });
+  const [draft, setDraft] = useState<RunningDraft>(emptyRunningDraft);
+  const [draftReady, setDraftReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    if (gap) { setPending(false); return () => { cancelled = true; }; }
     loadSiteContacts(organizationId).then((rows) => { if (!cancelled) setContacts(rows); }).catch(() => undefined);
     apiRequest<{ product_id?: string }>(`/api/program-instances/${programId}`).then(async (program) => {
       if (cancelled || !program.product_id) return;
@@ -67,9 +71,46 @@ const ClassesRunningStage = ({ stageId, programId, organizationId, productName, 
       setSignalAt(row?.last_lms_signal_at ?? row?.last_website_signal_at ?? null);
     }).catch(() => { if (!cancelled) { setStudents(null); setSignalAt(null); } }).finally(() => { if (!cancelled) setPending(false); });
     return () => { cancelled = true; };
-  }, [gap, organizationId, programId]);
+  }, [organizationId, programId]);
 
-  useEffect(() => { localStorage.setItem(storageKey(stageId), JSON.stringify(draft)); }, [stageId, draft]);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      loadStageData<{ status?: 'ok' | 'attention' | 'blocked' | 'completed'; comment?: string; replacement_requested?: boolean }>(stageId),
+      loadChecklistExtras(stageId),
+    ]).then(([stored, extras]) => {
+      if (cancelled) return;
+      const status = stored?.payload.status === 'attention'
+        ? 'issues'
+        : stored?.payload.status === 'blocked'
+          ? 'failed'
+          : stored?.payload.status === 'completed'
+            ? 'ok'
+            : stored?.payload.status ?? null;
+      setDraft({
+        status,
+        comment: stored?.payload.comment ?? '',
+        replacement: Boolean(stored?.payload.replacement_requested),
+        order: extras.map((item) => item.id),
+        custom: extras.map((item) => ({ id: item.id, label: item.label, done: item.is_done })),
+      });
+      setDraftReady(true);
+    }).catch(() => setDraftReady(true));
+    return () => { cancelled = true; };
+  }, [stageId]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+    const handle = window.setTimeout(() => {
+      const status = draft.status === 'issues' ? 'attention' : draft.status === 'failed' ? 'blocked' : draft.status;
+      void saveStageData(stageId, {
+        status,
+        comment: draft.comment.trim() || null,
+        replacement_requested: draft.replacement,
+      }).catch(() => message.error('Не удалось сохранить состояние этапа'));
+    }, 500);
+    return () => window.clearTimeout(handle);
+  }, [draft.comment, draft.replacement, draft.status, draftReady, stageId]);
 
   const silence = signalAt ? dayjs().startOf('day').diff(dayjs(signalAt).startOf('day'), 'day') : null;
   const tone = signalTone(students, silence);
@@ -141,11 +182,11 @@ const ClassesRunningStage = ({ stageId, programId, organizationId, productName, 
           { id: 'comment', label: 'Комментарий указан', done: draft.comment.trim().length > 0, required: commentNeeded },
         ]}
         custom={customRows}
-        onAdd={(label) => { const id = nextCustomId(); setDraft((current) => ({ ...current, custom: [...current.custom, { id, label, done: false }], order: [...current.order, id] })); }}
-        onReorder={(order) => setDraft((current) => ({ ...current, order }))}
-        onToggle={(id) => setDraft((current) => ({ ...current, custom: current.custom.map((row) => row.id === id ? { ...row, done: !row.done } : row) }))}
-        onDelete={(id) => setDraft((current) => ({ ...current, custom: current.custom.filter((row) => row.id !== id), order: current.order.filter((item) => item !== id) }))}
-        onRename={(id, label) => setDraft((current) => ({ ...current, custom: current.custom.map((row) => row.id === id ? { ...row, label } : row) }))}
+        onAdd={(label) => { void addChecklistExtra(stageId, label).then((item) => setDraft((current) => ({ ...current, custom: [...current.custom, { id: item.id, label: item.label, done: item.is_done }], order: [...current.order, item.id] }))).catch(() => message.error('Не удалось добавить задачу')); }}
+        onReorder={(order) => { setDraft((current) => ({ ...current, order })); void reorderChecklistExtras(stageId, order).catch(() => message.error('Не удалось сохранить порядок')); }}
+        onToggle={(id) => { const row = draft.custom.find((item) => item.id === id); if (!row) return; const done = !row.done; setDraft((current) => ({ ...current, custom: current.custom.map((item) => item.id === id ? { ...item, done } : item) })); void updateChecklistExtra(id, { is_done: done }).catch(() => message.error('Не удалось обновить задачу')); }}
+        onDelete={(id) => { setDraft((current) => ({ ...current, custom: current.custom.filter((row) => row.id !== id), order: current.order.filter((item) => item !== id) })); void deleteChecklistExtra(id).catch(() => message.error('Не удалось удалить задачу')); }}
+        onRename={(id, label) => { setDraft((current) => ({ ...current, custom: current.custom.map((row) => row.id === id ? { ...row, label } : row) })); void updateChecklistExtra(id, { label }).catch(() => message.error('Не удалось переименовать задачу')); }}
       />
     </div>
   );

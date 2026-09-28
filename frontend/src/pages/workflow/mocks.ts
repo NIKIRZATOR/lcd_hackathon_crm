@@ -1,5 +1,5 @@
 import { universityItemsMock } from '../universities/mocks';
-import { isWorkflowChainFinished, resolveCurrentStageIndex, transitionToNextStage, transitionToStage } from './stageTransition';
+import { isWorkflowChainFinished, resolveCurrentStageIndex, transitionToNextStage, transitionToStage } from './shared/stageTransition';
 import type { WorkflowComment, WorkflowDetailMock, WorkflowFile, WorkflowItem, WorkflowStatus, WorkflowStepConfig } from './types';
 
 const interactionPairs = [

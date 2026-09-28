@@ -62,6 +62,7 @@ class WorkflowVersion(ModelBase):
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    editor_content: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 
 class WorkflowChangeRequest(ModelBase):

@@ -1,8 +1,8 @@
 import { Empty, Select } from 'antd';
 import { useState } from 'react';
 
-import type { SectionHistory, UniversitySections } from '../../sectionData';
-import { isInPeriod, usePeriod } from '../../period';
+import type { SectionHistory, UniversitySections } from '../../domain/sectionData';
+import { isInPeriod, usePeriod } from '../../domain/period';
 import { styles, unique } from './panelShared';
 
 export const HistoryPanel = ({ sections }: { sections: UniversitySections }) => {

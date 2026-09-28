@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import { apiDownload, apiRequest } from '../../../api/client';
 import { roleLabel } from '../../organizations/screenModel';
 import type { DeskChecklistItem, DeskFile } from '../api';
-import { loadSiteContacts, pickResponsible, type SiteContact } from '../contactSearch';
-import { stageDeadline } from '../firstMeeting';
+import { loadSiteContacts, pickResponsible, type SiteContact } from '../stages/contactSearch';
+import { stageDeadline } from '../stages/firstMeeting';
 import {
   START_CLASSES_SLA_DAYS,
   START_SHIFT_DAYS,
@@ -17,8 +17,8 @@ import {
   startChecks,
   startClosePlan,
   type StartDraft,
-} from '../startClasses';
-import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflowFiles';
+} from '../stages/startClasses';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../shared/workflowFiles';
 
 import tileStyles from './ContactSearchStage.module.scss';
 import formStyles from './FirstMeetingStage.module.scss';

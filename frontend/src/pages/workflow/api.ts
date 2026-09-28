@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 
 import { apiRequest } from '../../api/client';
-import { emptyActionText, filledCount, filledPhase, isGapProgram, sampleJournal } from './workflowBackendFieldGaps';
+import { emptyActionText } from './backend/workflowBackendFieldGaps';
 import {
   addWorkflowStageComment as addMockComment,
   addWorkflowStageFile as addMockFile,
@@ -47,26 +47,8 @@ type JournalRow = {
 
 export const CLOSED_STAGE_LABEL = 'Заход закрыт';
 
-const closedProgramsKey = 'rtk-eduflow:closed-programs';
-
-const readClosedPrograms = () => {
-  if (typeof localStorage === 'undefined') return [];
-  try {
-    const raw = JSON.parse(localStorage.getItem(closedProgramsKey) ?? '[]') as unknown;
-    return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
-};
-
-export const rememberClosedProgram = (id: string) => {
-  const ids = new Set(readClosedPrograms());
-  ids.add(id);
-  localStorage.setItem(closedProgramsKey, JSON.stringify([...ids]));
-};
-
 export const journalStageName = (row: { id: string; current_stage_name?: string | null; status?: string | null }) => {
-  if ((row.status ?? '').toLowerCase() === 'cancelled' || readClosedPrograms().includes(row.id)) return CLOSED_STAGE_LABEL;
+  if ((row.status ?? '').toLowerCase() === 'cancelled') return CLOSED_STAGE_LABEL;
   return row.current_stage_name?.trim() || 'Этап не передан';
 };
 
@@ -322,8 +304,8 @@ export type JournalProgram = {
   healthScore: number | null;
   healthBand: 'green' | 'yellow' | 'red' | null;
   kam: string;
-  students: number;
-  applications: number;
+  students: number | null;
+  applications: number | null;
 };
 
 export type DeskStage = {
@@ -368,7 +350,7 @@ export type ProgramDesk = {
   status: string;
   healthScore: number | null;
   healthBand: 'green' | 'yellow' | 'red' | null;
-  students: number;
+  students: number | null;
   stageCode: string | null;
   stages: DeskStage[];
   currentStageId: string | null;
@@ -397,9 +379,6 @@ export const loadJournal = async (preset: JournalPreset): Promise<JournalProgram
     apiRequest<Array<JournalRow & { playbook_name?: string; students_count?: number | null; applications_count?: number | null }>>(`/api/workflow-journal?preset=${preset}`),
     shortNameByOrganization(),
   ]);
-  if (rows.length === 0 && preset === 'all') {
-    return sampleJournal().map((row) => ({ ...row, organization: row.organization.includes('Южный') ? 'ЮФУ' : 'СПбПУ', healthScore: row.healthScore }));
-  }
   return rows.map((row) => ({
     id: row.id,
     organization: shortNames.get(row.organization_name.trim().toLowerCase().replace(/ё/g, 'е')) || text(row.organization_name),
@@ -411,62 +390,12 @@ export const loadJournal = async (preset: JournalPreset): Promise<JournalProgram
     healthScore: row.health_score,
     healthBand: bandOf(row.health_score, row.health_band),
     kam: text(row.kam_name),
-    students: filledCount(row.id, row.students_count, 0),
-    applications: filledCount(row.id, row.applications_count, 7),
+    students: row.students_count ?? null,
+    applications: row.applications_count ?? null,
   }));
 };
 
-const gapDesk = (row: ReturnType<typeof sampleJournal>[number]): ProgramDesk => ({
-  id: row.id,
-  organizationId: 'gap-org',
-  organization: row.organization,
-  direction: row.direction,
-  product: row.product,
-  playbook: row.playbook,
-  windowTitle: 'Осень 2026',
-  windowId: null,
-  kam: row.kam,
-  status: 'active',
-  healthScore: row.healthScore,
-  healthBand: row.healthBand,
-  students: row.students,
-  stageCode: 'first_meeting',
-  currentStageId: 'gap-stage-find_contact',
-  banner: 'Первая встреча просрочена на 6 дней',
-  bannerTone: 'warning',
-  people: [{ id: 'gap-person-1', name: 'Иван Петров', role: 'Проректор', roleCode: 'vice_rector' }],
-  license: 'ЛЦ-1042 · передаётся',
-  transitions: [],
-  stages: [
-    ['find_contact', 'Поиск контакта', 'Старт'],
-    ['first_meeting', 'Первая встреча', 'Старт'],
-    ['identify_need', 'Потребность', 'Договор'],
-    ['document_package', 'Пакет документов', 'Договор'],
-    ['sign_contract', 'Подписание договора', 'Договор'],
-    ['sign_license', 'Подписание лицензии', 'Лицензия'],
-    ['transfer_access', 'Передача и доступ', 'Лицензия'],
-    ['train_teacher', 'Обучение преподавателя', 'Преподаватель'],
-    ['confirm_teacher', 'Подтверждение преподавателя', 'Преподаватель'],
-    ['curriculum', 'Учебный план', 'Занятия'],
-    ['start_classes', 'Старт занятий', 'Занятия'],
-    ['classes_running', 'Ведение занятий', 'Занятия'],
-    ['period_results', 'Итоги периода', 'Итог'],
-  ].map(([code, name, phase], index) => ({
-    id: `gap-stage-${code}`,
-    code,
-    name,
-    phase,
-    status: index === 0 ? 'active' : 'pending',
-    dueAt: index === 0 ? row.due : null,
-    optional: code === 'document_package',
-    final: code === 'period_results',
-  })),
-});
-
 export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
-  const sample = sampleJournal().find((row) => row.id === id);
-  if (isGapProgram(id) && sample) return gapDesk(sample);
-
   const [program, workflow, nba, metrics, license] = await Promise.all([
     apiRequest<{
       organization_id: string;
@@ -493,7 +422,7 @@ export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
   const organization = await apiRequest<{ name: string }>(`/api/organizations/${program.organization_id}`);
   const people = await apiRequest<Array<{ id: string; full_name: string; role_code: string; is_active: boolean }>>(`/api/organizations/${program.organization_id}/stakeholders`).catch(() => []);
   const action = nba.find((item) => item.program_instance_id === id);
-  const students = filledCount(id, metrics?.students_count, 0);
+  const students = metrics?.students_count ?? null;
 
   return {
     id,
@@ -520,7 +449,7 @@ export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
       id: stage.id,
       code: stage.code || stage.name,
       name: stage.name,
-      phase: filledPhase(stage.phase_name),
+      phase: stage.phase_name?.trim() && stage.phase_name.toLowerCase() !== 'other' ? stage.phase_name : '—',
       status: stage.status,
       dueAt: stage.due_at,
       optional: stage.is_optional,
@@ -611,3 +540,69 @@ export const moveProgram = (programId: string, payload: { transitionId?: string;
 });
 
 export const syncProgram = (programId: string) => apiRequest<{ mapped: number; unmatched: number }>(`/api/integrations/program-instances/${programId}/sync`, { method: 'POST' });
+
+export type WorkflowStageData<T extends object> = {
+  id: string;
+  stage_instance_id: string;
+  payload: T;
+};
+
+export const loadStageData = <T extends object>(stageId: string) =>
+  apiRequest<WorkflowStageData<T> | null>(`/api/workflows/stage-instances/${stageId}/data`);
+
+export const saveStageData = <T extends object>(stageId: string, payload: T) =>
+  apiRequest<WorkflowStageData<T>>(`/api/workflows/stage-instances/${stageId}/data`, {
+    method: 'PUT',
+    body: JSON.stringify({ payload }),
+  });
+
+export type ChecklistExtra = {
+  id: string;
+  label: string;
+  is_done: boolean;
+  sort_order: number;
+};
+
+export const loadChecklistExtras = (stageId: string) =>
+  apiRequest<ChecklistExtra[]>(`/api/stage-instances/${stageId}/checklist-extras`);
+
+export const addChecklistExtra = (stageId: string, label: string) =>
+  apiRequest<ChecklistExtra>(`/api/stage-instances/${stageId}/checklist-extras`, {
+    method: 'POST',
+    body: JSON.stringify({ label }),
+  });
+
+export const updateChecklistExtra = (id: string, patch: Partial<Pick<ChecklistExtra, 'label' | 'is_done'>>) =>
+  apiRequest<ChecklistExtra>(`/api/stage-instances/checklist-extras/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+
+export const deleteChecklistExtra = (id: string) =>
+  apiRequest(`/api/stage-instances/checklist-extras/${id}`, { method: 'DELETE' });
+
+export const reorderChecklistExtras = (stageId: string, ids: string[]) =>
+  apiRequest<ChecklistExtra[]>(`/api/stage-instances/${stageId}/checklist-extras/order`, {
+    method: 'PUT',
+    body: JSON.stringify({ ids }),
+  });
+
+export type ProgramControl<T extends object> = {
+  id: string;
+  program_instance_id: string;
+  status: 'active' | 'frozen';
+  payload: T;
+};
+
+export const loadProgramControl = <T extends object>(programId: string) =>
+  apiRequest<ProgramControl<T> | null>(`/api/program-instances/${programId}/control`);
+
+export const saveProgramControl = <T extends object>(
+  programId: string,
+  status: 'active' | 'frozen',
+  payload: T,
+) =>
+  apiRequest<ProgramControl<T>>(`/api/program-instances/${programId}/control`, {
+    method: 'PUT',
+    body: JSON.stringify({ status, payload }),
+  });
