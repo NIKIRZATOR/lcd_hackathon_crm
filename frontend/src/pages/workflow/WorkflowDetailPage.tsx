@@ -13,7 +13,6 @@ import {
   deleteStageComment,
   deleteStageFile,
   loadProgramDesk,
-  loadProgramControl,
   loadStageFacts,
   moveProgram,
   reopenProgramStage,
@@ -82,7 +81,6 @@ const WorkflowDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState<string>(() => searchParams.get('stage') === 'control' ? 'control' : '');
-  const [controlEntered, setControlEntered] = useState(false);
   const [checklist, setChecklist] = useState<DeskChecklistItem[]>([]);
   const [factsStageId, setFactsStageId] = useState('');
   const [stageBlockers, setStageBlockers] = useState<string[] | null>(null);
@@ -109,12 +107,11 @@ const WorkflowDetailPage = () => {
   const load = useCallback(() => {
     if (!id) return;
     setLoading(true);
-    Promise.all([loadProgramDesk(id), loadProgramControl<Record<string, unknown>>(id).catch(() => null)])
-      .then(([loaded, control]) => {
+    loadProgramDesk(id)
+      .then((loaded) => {
         setDesk(loaded);
-        const entered = Boolean(control) || loaded.stageCode === 'control';
-        setControlEntered(entered);
-        setSelectedId((current) => current || (entered ? 'control' : loaded.currentStageId || loaded.stages[0]?.id || ''));
+        const isRealControl = loaded.stageCode === 'control';
+        setSelectedId((current) => current || (isRealControl ? 'control' : loaded.currentStageId || loaded.stages[0]?.id || ''));
         setError('');
       })
       .catch(() => setError('Не удалось открыть программу'))
@@ -319,7 +316,7 @@ const WorkflowDetailPage = () => {
   const serverControlStage = desk.stages.find(isControlStage);
   const controlStepIndex = desk.stages.filter((stage) => !isControlStage(stage)).length;
   const controlSelected = selectedId === controlId || selectedId === serverControlStage?.id;
-  const onControl = controlEntered || desk.stageCode === 'control' || desk.currentStageId === serverControlStage?.id;
+  const onControl = desk.stageCode === 'control' || desk.currentStageId === serverControlStage?.id;
   const currentIndex = onControl ? controlStepIndex : Math.max(desk.stages.findIndex((stage) => stage.id === desk.currentStageId), 0);
   const selectedIndex = controlSelected ? controlStepIndex : Math.max(desk.stages.findIndex((stage) => stage.id === selectedId), 0);
   const selected = desk.stages[selectedIndex];

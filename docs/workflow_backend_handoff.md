@@ -107,6 +107,21 @@ GET    /api/users?role=KAM&scope=team
 Существующие endpoints шаблонов/стадий/переходов покрывают базовую модель, но не покрывают
 фазы, блоки, видимость, содержимое draft целиком, порядок блоков и массовое сохранение.
 
+## Профиль пользователя
+
+`GET /api/auth/me` уже отдаёт id, username, email, full_name, roles, keycloak_user_id.
+
+Нужно:
+
+```http
+POST   /api/users/me/avatar
+DELETE /api/users/me/avatar
+```
+
+Поля: `avatar_url` или `avatar_file_id` (файл в MinIO). Форматы jpg/png/webp, до 5 МБ.
+
+Пока аватар в `localStorage rtk-eduflow:profile-avatar:{userId}` (data URL). Команда и руководитель в профиле не приходят — нужны `team_name`, `manager_name`. Смена пароля — Keycloak Account (`createAccountUrl`). ФИО/email/username только из Keycloak, PATCH из CRM не делать.
+
 ## P0. Плейбуки и мастер создания захода
 
 Сервер должен хранить и выдавать опубликованные Full Cycle, Expansion, License Renewal,

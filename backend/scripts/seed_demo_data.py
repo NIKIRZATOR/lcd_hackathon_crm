@@ -45,6 +45,28 @@ SHORT_PLAYBOOKS = {
 }
 
 
+WORKFLOW_RUNTIME_STAGE_CODES = [
+    "find_contact",
+    "first_meeting",
+    "identify_need",
+    "document_package",
+    "sign_contract",
+    "sign_license",
+    "transfer_access",
+    "train_teacher",
+    "confirm_teacher",
+    "curriculum",
+    "start_classes",
+    "classes_running",
+    "period_results",
+]
+CONTROL_STAGE_CODE = "control"
+SEED_CHECKLIST_EXTRA_LABELS = {
+    "Проверить статус с ответственным",
+    "Зафиксировать результат в карточке",
+}
+
+
 UNIVERSITIES = [
     {
         "name": "Московский государственный университет имени М.В. Ломоносова",
@@ -1155,6 +1177,7 @@ def seed_workflow(db: Session, users: dict[str, User]) -> WorkflowTemplate:
         transition.is_default = True
         transition.condition_code = None
 
+    _sync_short_playbook_stage_content(db, template, version)
     return template
 
 
@@ -1252,6 +1275,123 @@ def _seed_short_playbook(
                     is_default=True,
                 )
             )
+
+
+def _sync_short_playbook_stage_content(
+    db: Session,
+    full_template: WorkflowTemplate,
+    full_version: WorkflowVersion,
+) -> None:
+    """Make shared stages in short playbooks inherit the full-cycle stage content.
+
+    The short playbooks intentionally contain fewer stages, but a stage with the
+    same catalog code must keep the same SLA/requirements/checklist semantics.
+    This keeps runtime rendering deterministic and avoids a second, divergent
+    definition of a shared stage.
+    """
+    source_stages = {
+        stage.stage_catalog_id: stage
+        for stage in db.scalars(
+            select(WorkflowStage).where(
+                WorkflowStage.workflow_template_id == full_template.id,
+                WorkflowStage.workflow_version_id == full_version.id,
+                WorkflowStage.stage_catalog_id.is_not(None),
+            )
+        ).all()
+    }
+
+    generic_unique_stage_items = {
+        "find_teacher": [
+            ("replacement_reason", "Причина замены преподавателя", "text", None),
+            ("new_teacher", "Новый преподаватель-носитель продукта", "stakeholder_role", "teacher"),
+        ],
+        "handover_course": [
+            ("handover_confirmed", "Передача курса новому преподавателю подтверждена", "text", None),
+            ("handover_date", "Дата передачи курса", "date", None),
+        ],
+    }
+
+    for template_code in SHORT_PLAYBOOKS:
+        template = get_by_field(db, WorkflowTemplate, "code", template_code)
+        if template is None:
+            continue
+        version = _published_version(db, template.id)
+        if version is None:
+            continue
+
+        stages = list(
+            db.scalars(
+                select(WorkflowStage)
+                .where(
+                    WorkflowStage.workflow_template_id == template.id,
+                    WorkflowStage.workflow_version_id == version.id,
+                    WorkflowStage.is_active.is_(True),
+                )
+                .order_by(WorkflowStage.order_index)
+            ).all()
+        )
+        for stage in stages:
+            catalog = db.get(WorkflowStageCatalog, stage.stage_catalog_id) if stage.stage_catalog_id else None
+            source = source_stages.get(stage.stage_catalog_id)
+            if source is not None:
+                stage.description = source.description
+                stage.is_optional = source.is_optional
+                stage.semester_critical = source.semester_critical
+                stage.default_duration_days = source.default_duration_days
+                stage.requires_comment = source.requires_comment
+                stage.requires_attachment = source.requires_attachment
+
+                source_items = list(
+                    db.scalars(
+                        select(PlaybookChecklistItem).where(
+                            PlaybookChecklistItem.workflow_stage_id == source.id
+                        )
+                    ).all()
+                )
+                for source_item in source_items:
+                    item = db.scalar(
+                        select(PlaybookChecklistItem).where(
+                            PlaybookChecklistItem.workflow_stage_id == stage.id,
+                            PlaybookChecklistItem.code == source_item.code,
+                        )
+                    )
+                    if item is None:
+                        item = PlaybookChecklistItem(
+                            workflow_stage_id=stage.id,
+                            code=source_item.code,
+                        )
+                        db.add(item)
+                    item.label = source_item.label
+                    item.item_type = source_item.item_type
+                    item.required = source_item.required
+                    item.required_stakeholder_role = source_item.required_stakeholder_role
+                    item.required_attachment_kind = source_item.required_attachment_kind
+                continue
+
+            # teacher_replace contains two stages that are not part of the 13-stage
+            # full cycle. Give them a small generic checklist so they are still
+            # usable by the runtime instead of being empty shells.
+            code = catalog.code if catalog is not None else None
+            stage.description = stage.description or (
+                catalog.description if catalog is not None else f"Действия этапа «{stage.name}»."
+            )
+            for item_code, label, item_type, role in generic_unique_stage_items.get(code, []):
+                item = db.scalar(
+                    select(PlaybookChecklistItem).where(
+                        PlaybookChecklistItem.workflow_stage_id == stage.id,
+                        PlaybookChecklistItem.code == item_code,
+                    )
+                )
+                if item is None:
+                    item = PlaybookChecklistItem(workflow_stage_id=stage.id, code=item_code)
+                    db.add(item)
+                item.label = label
+                item.item_type = item_type
+                item.required = True
+                item.required_stakeholder_role = role
+                item.required_attachment_kind = None
+
+    db.flush()
 
 
 def seed_manager_memberships(db: Session, users: dict[str, User]) -> None:
@@ -1537,7 +1677,8 @@ def seed_program_instances(db: Session) -> None:
     required_cases = [
         ("Южный федеральный университет", "full_cycle", "ЮФУ: первая встреча просрочена, протокол отсутствует."),
         ("Санкт-Петербургский политехнический университет Петра Великого", "expansion", "СПбПУ: expansion, требуется проверить LMS-сигналы."),
-        ("Национальный исследовательский ядерный университет «МИФИ»", "full_cycle", "НИЯУ МИФИ: стабильная активная программа."),
+        ("Национальный исследовательский ядерный университет «МИФИ»", "teacher_replace", "НИЯУ МИФИ: замена преподавателя в действующей программе."),
+        ("Национальный исследовательский технологический университет «МИСИС»", "license_renewal", "НИТУ МИСИС: продление лицензии для действующей программы."),
         ("Лицей инженерных технологий", "school_short", "Инженерный лицей: короткий сценарий передачи доступа."),
         ("Уральский федеральный университет имени первого Президента России Б.Н. Ельцина", "full_cycle", "УрФУ: этап согласования учебного плана перед семестром."),
     ]
@@ -1553,7 +1694,9 @@ def seed_program_instances(db: Session) -> None:
             if program is None:
                 kam_id = db.scalar(select(OrgAssignment.user_id).where(OrgAssignment.organization_id == organization.id, OrgAssignment.status == "active"))
                 parent = db.scalar(select(ProgramInstance).where(ProgramInstance.organization_id == organization.id, ProgramInstance.status == "active").order_by(ProgramInstance.created_at))
-                program = ProgramInstance(organization_id=organization.id, direction_id=base_program.direction_id, product_id=base_product.id, parent_program_id=parent.id if parent is not None else None, kam_user_id=kam_id, playbook_template_id=template.id, template_snapshot=ProgramInstanceService(db)._template_snapshot(template), status="active", academic_window_id=windows["2026_fall"].id, health_band="green", comment=comment)
+                direction_id = parent.direction_id if parent is not None else base_program.direction_id
+                product_id = parent.product_id if parent is not None else base_product.id
+                program = ProgramInstance(organization_id=organization.id, direction_id=direction_id, product_id=product_id, parent_program_id=parent.id if parent is not None else None, kam_user_id=kam_id, playbook_template_id=template.id, template_snapshot=ProgramInstanceService(db)._template_snapshot(template), status="active", academic_window_id=windows["2026_fall"].id, health_band="green", comment=comment)
                 db.add(program)
                 db.flush()
                 WorkflowRuntimeService(db).initialize_program_workflow(program, responsible_user_id=kam_id)
@@ -1565,51 +1708,8 @@ def seed_program_instances(db: Session) -> None:
             if exists is None:
                 db.add(ProgramChecklistValue(stage_instance_id=stage_instance.id, checklist_item_id=item.id))
 
-    scenario_stages = {
-        "ЮФУ": ("first_meeting", True),
-        "СПбПУ": ("classes_running", False),
-        "УрФУ": ("curriculum", False),
-        "Инженерный лицей": ("transfer_access", False),
-    }
-    for short_name, (stage_code, overdue) in scenario_stages.items():
-        organization = db.scalar(select(Organization).where(Organization.short_name == short_name))
-        if organization is None:
-            continue
-        program = db.scalar(select(ProgramInstance).where(ProgramInstance.organization_id == organization.id, ProgramInstance.status == "active").order_by(ProgramInstance.created_at.desc()))
-        if program is None:
-            continue
-        target = db.scalar(select(WorkflowStageInstance).join(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id).join(WorkflowStageCatalog, WorkflowStageCatalog.id == WorkflowStage.stage_catalog_id).where(WorkflowStageInstance.program_instance_id == program.id, WorkflowStageCatalog.code == stage_code))
-        if target is None:
-            continue
-        target_stage = db.get(WorkflowStage, target.workflow_stage_id)
-        for previous, previous_stage in db.execute(
-            select(WorkflowStageInstance, WorkflowStage)
-            .join(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id)
-            .where(
-                WorkflowStageInstance.program_instance_id == program.id,
-                WorkflowStage.order_index < target_stage.order_index,
-            )
-        ):
-            previous.status = "COMPLETED"
-            previous.started_at = datetime.now(timezone.utc) - timedelta(days=14)
-            previous.completed_at = datetime.now(timezone.utc) - timedelta(days=3)
-            for value, item in db.execute(
-                select(ProgramChecklistValue, PlaybookChecklistItem)
-                .join(PlaybookChecklistItem, PlaybookChecklistItem.id == ProgramChecklistValue.checklist_item_id)
-                .where(ProgramChecklistValue.stage_instance_id == previous.id)
-            ):
-                value.is_done = True
-                if item.item_type == "text":
-                    value.value_text = "Требование этапа выполнено и подтверждено ответственным сотрудником."
-                elif item.item_type == "date":
-                    value.value_date = date.today() - timedelta(days=3)
-        target.status = "IN_PROGRESS"
-        target.started_at = datetime.now(timezone.utc) - timedelta(days=10 if overdue else 1)
-        target.due_at = datetime.now(timezone.utc) - timedelta(days=2) if overdue else datetime.now(timezone.utc) + timedelta(days=7)
-        program.current_stage_instance_id = target.id
-        program.current_stage_code = stage_code
-        if short_name == "СПбПУ" and not db.scalar(select(IntegrationSignal.id).where(IntegrationSignal.program_instance_id == program.id, IntegrationSignal.status == "unmatched")):
-            db.add(IntegrationSignal(source="lms", status="unmatched", organization_id=organization.id, program_instance_id=program.id, payload={"seed_case": "lms_issue"}, error_message="LMS record is not matched to the program"))
+    # Runtime stage statuses are assigned centrally after every ProgramInstance
+    # has been initialized against a concrete published workflow version.
 
     first_program = db.scalar(select(ProgramInstance).order_by(ProgramInstance.created_at))
     if first_program is not None:
@@ -1647,97 +1747,252 @@ def seed_program_instances(db: Session) -> None:
 
 
 
-def seed_university_stage_distribution(db: Session) -> None:
-    """Spread university programs across the main workflow for dashboard/funnel coverage."""
-    protected_codes = {"first_meeting", "classes_running", "curriculum", "transfer_access"}
-    now = _utcnow()
+def _program_stage_rows(
+    db: Session, program: ProgramInstance
+) -> list[tuple[WorkflowStageInstance, WorkflowStage, str]]:
+    return list(
+        db.execute(
+            select(WorkflowStageInstance, WorkflowStage, WorkflowStageCatalog.code)
+            .join(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id)
+            .join(WorkflowStageCatalog, WorkflowStageCatalog.id == WorkflowStage.stage_catalog_id)
+            .where(WorkflowStageInstance.program_instance_id == program.id)
+            .order_by(WorkflowStage.order_index)
+        ).all()
+    )
 
+
+def _set_program_active_stage(
+    db: Session,
+    program: ProgramInstance,
+    stage_code: str,
+    *,
+    overdue: bool = False,
+    ordinal: int = 0,
+) -> bool:
+    rows = _program_stage_rows(db, program)
+    target_row = next((row for row in rows if row[2] == stage_code), None)
+    if target_row is None:
+        return False
+
+    now = _utcnow()
+    target_instance, target_stage, _ = target_row
+    for stage_instance, stage, _code in rows:
+        if stage.order_index < target_stage.order_index:
+            stage_instance.status = "COMPLETED"
+            stage_instance.started_at = now - timedelta(days=40 - (ordinal % 7))
+            stage_instance.due_at = now - timedelta(days=24 - (ordinal % 5))
+            stage_instance.completed_at = now - timedelta(days=22 - (ordinal % 5))
+            stage_instance.skipped_at = None
+        elif stage_instance.id == target_instance.id:
+            stage_instance.status = "IN_PROGRESS"
+            stage_instance.started_at = now - timedelta(days=10 if overdue else 2 + (ordinal % 4))
+            stage_instance.due_at = (
+                now - timedelta(days=2 + (ordinal % 2))
+                if overdue
+                else now + timedelta(days=4 + (ordinal % 8))
+            )
+            stage_instance.completed_at = None
+            stage_instance.skipped_at = None
+        else:
+            stage_instance.status = "NOT_STARTED"
+            stage_instance.started_at = None
+            stage_instance.due_at = None
+            stage_instance.completed_at = None
+            stage_instance.skipped_at = None
+
+    program.status = "active"
+    program.completed_at = None
+    program.current_stage_instance_id = target_instance.id
+    program.current_stage_code = stage_code
+    program.started_at = program.started_at or (now - timedelta(days=60))
+    return True
+
+
+def _set_program_control_state(
+    db: Session,
+    program: ProgramInstance,
+    *,
+    completed: bool,
+    ordinal: int = 0,
+) -> bool:
+    rows = _program_stage_rows(db, program)
+    if not rows:
+        return False
+
+    now = _utcnow()
+    for position, (stage_instance, _stage, _code) in enumerate(rows, 1):
+        stage_instance.status = "COMPLETED"
+        stage_instance.started_at = now - timedelta(days=75 - min(position, 20))
+        stage_instance.due_at = now - timedelta(days=60 - min(position, 20))
+        stage_instance.completed_at = now - timedelta(days=max(3, 50 - position * 3))
+        stage_instance.skipped_at = None
+
+    program.current_stage_instance_id = None
+    program.current_stage_code = CONTROL_STAGE_CODE
+    program.started_at = program.started_at or (now - timedelta(days=90))
+    if completed:
+        program.status = "completed"
+        program.completed_at = now - timedelta(days=1 + (ordinal % 3))
+    else:
+        program.status = "active"
+        program.completed_at = None
+    return True
+
+
+def ensure_program_checklist_values(db: Session) -> None:
+    """Create one typed checklist value for every runtime checklist item."""
+    stage_instances = list(
+        db.scalars(
+            select(WorkflowStageInstance).where(
+                WorkflowStageInstance.program_instance_id.is_not(None)
+            )
+        ).all()
+    )
+    for stage_instance in stage_instances:
+        items = list(
+            db.scalars(
+                select(PlaybookChecklistItem).where(
+                    PlaybookChecklistItem.workflow_stage_id == stage_instance.workflow_stage_id
+                )
+            ).all()
+        )
+        for item in items:
+            value = db.scalar(
+                select(ProgramChecklistValue).where(
+                    ProgramChecklistValue.stage_instance_id == stage_instance.id,
+                    ProgramChecklistValue.checklist_item_id == item.id,
+                )
+            )
+            if value is None:
+                db.add(
+                    ProgramChecklistValue(
+                        stage_instance_id=stage_instance.id,
+                        checklist_item_id=item.id,
+                        is_done=False,
+                    )
+                )
+    db.flush()
+
+
+def seed_university_stage_distribution(db: Session) -> None:
+    """Create deterministic, internally consistent runtime workflow scenarios.
+
+    Despite the legacy function name, this now covers every seeded organization
+    type and every playbook.  Each non-control active program gets exactly one
+    IN_PROGRESS stage; future stages are NOT_STARTED.  Dedicated examples are
+    then moved into real control/completed states.
+    """
     programs = list(
         db.scalars(
             select(ProgramInstance)
             .join(Organization, Organization.id == ProgramInstance.organization_id)
-            .join(OrganizationType, OrganizationType.id == Organization.type_id)
-            .where(
-                ProgramInstance.status == "active",
-                OrganizationType.code == "university",
-            )
-            .order_by(Organization.name, ProgramInstance.created_at)
+            .where(ProgramInstance.status.not_in(["cancelled"]))
+            .order_by(Organization.name, ProgramInstance.created_at, ProgramInstance.id)
         ).all()
     )
 
-    target_codes = [
-        "find_contact",
-        "first_meeting",
-        "identify_need",
-        "document_package",
-        "sign_contract",
-        "sign_license",
-        "transfer_access",
-        "train_teacher",
-        "confirm_teacher",
-        "curriculum",
-        "start_classes",
-        "classes_running",
-        "period_results",
-    ]
-
-    for index, program in enumerate(programs):
-        # Preserve scenarios explicitly positioned earlier in seed_program_instances.
-        if program.current_stage_code in protected_codes and index < 8:
+    template_positions: dict[str, int] = {}
+    for ordinal, program in enumerate(programs):
+        template = db.get(WorkflowTemplate, program.playbook_template_id)
+        template_code = template.code if template is not None else "unknown"
+        rows = _program_stage_rows(db, program)
+        available_codes = [code for _instance, _stage, code in rows]
+        if not available_codes:
             continue
+        position = template_positions.get(template_code, 0)
+        template_positions[template_code] = position + 1
+        desired_code = available_codes[position % len(available_codes)]
+        _set_program_active_stage(db, program, desired_code, overdue=(ordinal % 7 == 0), ordinal=ordinal)
 
-        desired_code = target_codes[index % len(target_codes)]
-        target = db.scalar(
-            select(WorkflowStageInstance)
-            .join(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id)
-            .join(WorkflowStageCatalog, WorkflowStageCatalog.id == WorkflowStage.stage_catalog_id)
+    # Named cases make the demo deterministic and easy to verify from the UI.
+    comment_scenarios = {
+        "ЮФУ: первая встреча просрочена": ("first_meeting", True),
+        "СПбПУ: expansion": ("classes_running", False),
+        "НИЯУ МИФИ: замена преподавателя": ("find_teacher", False),
+        "НИТУ МИСИС: продление лицензии": ("sign_license", False),
+        "Инженерный лицей: короткий сценарий": ("transfer_access", False),
+        "УрФУ: этап согласования учебного плана": ("curriculum", False),
+    }
+    for ordinal, program in enumerate(programs, 1):
+        comment = program.comment or ""
+        for prefix, (stage_code, overdue) in comment_scenarios.items():
+            if comment.startswith(prefix):
+                _set_program_active_stage(
+                    db, program, stage_code, overdue=overdue, ordinal=ordinal
+                )
+                break
+
+    # Keep one explicit integration-problem example for the expansion playbook.
+    expansion_program = db.scalar(
+        select(ProgramInstance)
+        .where(ProgramInstance.comment.like("СПбПУ: expansion%"))
+        .order_by(ProgramInstance.created_at)
+    )
+    if expansion_program is not None:
+        organization = db.get(Organization, expansion_program.organization_id)
+        existing_issue = db.scalar(
+            select(IntegrationSignal.id).where(
+                IntegrationSignal.program_instance_id == expansion_program.id,
+                IntegrationSignal.status == "unmatched",
+            )
+        )
+        if organization is not None and existing_issue is None:
+            db.add(
+                IntegrationSignal(
+                    source="lms",
+                    status="unmatched",
+                    organization_id=organization.id,
+                    program_instance_id=expansion_program.id,
+                    payload={"seed_case": "lms_issue"},
+                    error_message="LMS record is not matched to the program",
+                )
+            )
+
+    # A real active control example: all working stages are closed and there is
+    # no current stage instance.  MGU keeps other programs, so University 360
+    # still has active non-control material to display.
+    control_program = db.scalar(
+        select(ProgramInstance)
+        .join(Organization, Organization.id == ProgramInstance.organization_id)
+        .join(WorkflowTemplate, WorkflowTemplate.id == ProgramInstance.playbook_template_id)
+        .where(
+            Organization.short_name == "МГУ",
+            WorkflowTemplate.code == "full_cycle",
+            ProgramInstance.status == "active",
+        )
+        .order_by(ProgramInstance.created_at)
+    )
+    if control_program is not None:
+        _set_program_control_state(db, control_program, completed=False, ordinal=1)
+
+    # One frozen/closed workflow demonstrates journal history and the closed
+    # program UI without abusing current_stage_instance_id.
+    completed_program = db.scalar(
+        select(ProgramInstance)
+        .join(Organization, Organization.id == ProgramInstance.organization_id)
+        .join(WorkflowTemplate, WorkflowTemplate.id == ProgramInstance.playbook_template_id)
+        .where(
+            Organization.short_name == "ИТМО",
+            WorkflowTemplate.code == "full_cycle",
+            ProgramInstance.status == "active",
+        )
+        .order_by(ProgramInstance.created_at)
+    )
+    if completed_program is None:
+        fallback = (
+            select(ProgramInstance)
+            .join(WorkflowTemplate, WorkflowTemplate.id == ProgramInstance.playbook_template_id)
             .where(
-                WorkflowStageInstance.program_instance_id == program.id,
-                WorkflowStageCatalog.code == desired_code,
+                WorkflowTemplate.code == "full_cycle",
+                ProgramInstance.status == "active",
             )
+            .order_by(ProgramInstance.created_at)
         )
-        if target is None:
-            continue
-
-        target_stage = db.get(WorkflowStage, target.workflow_stage_id)
-        if target_stage is None:
-            continue
-
-        stage_rows = list(
-            db.execute(
-                select(WorkflowStageInstance, WorkflowStage)
-                .where(
-                    WorkflowStageInstance.program_instance_id == program.id,
-                    WorkflowStage.id == WorkflowStageInstance.workflow_stage_id,
-                )
-                .order_by(WorkflowStage.order_index)
-            )
-        )
-
-        for stage_instance, stage in stage_rows:
-            if stage.order_index < target_stage.order_index:
-                stage_instance.status = "COMPLETED"
-                stage_instance.started_at = stage_instance.started_at or (now - timedelta(days=30 - (index % 8)))
-                stage_instance.completed_at = stage_instance.completed_at or (now - timedelta(days=15 - (index % 6)))
-                stage_instance.due_at = stage_instance.due_at or (now - timedelta(days=16 - (index % 6)))
-            elif stage_instance.id == target.id:
-                stage_instance.status = "IN_PROGRESS"
-                stage_instance.started_at = stage_instance.started_at or (now - timedelta(days=4 + (index % 8)))
-                # Roughly every fifth program is overdue so risk widgets are non-empty.
-                stage_instance.due_at = (
-                    now - timedelta(days=1 + (index % 3))
-                    if index % 5 == 0
-                    else now + timedelta(days=3 + (index % 9))
-                )
-                stage_instance.completed_at = None
-            else:
-                if str(stage_instance.status).upper() not in {"COMPLETED", "DONE"}:
-                    stage_instance.status = "PENDING"
-                    stage_instance.started_at = None
-                    stage_instance.completed_at = None
-
-        program.current_stage_instance_id = target.id
-        program.current_stage_code = desired_code
+        if control_program is not None:
+            fallback = fallback.where(ProgramInstance.id != control_program.id)
+        completed_program = db.scalar(fallback)
+    if completed_program is not None and (control_program is None or completed_program.id != control_program.id):
+        _set_program_control_state(db, completed_program, completed=True, ordinal=2)
 
     db.flush()
 
@@ -1898,7 +2153,7 @@ def seed_workflow_catalog(db: Session) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Extended seed dataset (V2)
+# Extended demo seed dataset
 # ---------------------------------------------------------------------------
 # The base seed above creates the minimal working contour.  The helpers below
 # enrich it with deterministic seed values for the remaining business fields
@@ -2310,16 +2565,30 @@ def seed_checklist_values_and_comments(db: Session, users: dict[str, User]) -> N
                     value.stakeholder_id = stakeholder.id
 
         author_id = stage_instance.responsible_user_id or users["admin1"].id
-        _core_upsert(
-            db,
-            "workflow_stage_comments",
-            {
-                "stage_instance_id": stage_instance.id,
-                "author_user_id": author_id,
-                "text": "Текущий статус этапа подтверждён ответственным сотрудником.",
-            },
-            {"deleted_at": None},
-        )
+        comment_text = "Текущий статус этапа подтверждён ответственным сотрудником."
+        stage_status = str(stage_instance.status).upper()
+        if stage_status in {"IN_PROGRESS", "WAITING", "BLOCKED", "COMPLETED", "SKIPPED"}:
+            _core_upsert(
+                db,
+                "workflow_stage_comments",
+                {
+                    "stage_instance_id": stage_instance.id,
+                    "author_user_id": author_id,
+                    "text": comment_text,
+                },
+                {"deleted_at": None},
+            )
+        else:
+            # Remove comments created by an older demo seed for stages that are
+            # now genuinely future/NOT_STARTED. Do not touch arbitrary user text.
+            comments_table = _table(db, "workflow_stage_comments")
+            if comments_table is not None:
+                db.execute(
+                    comments_table.delete().where(
+                        comments_table.c.stage_instance_id == stage_instance.id,
+                        comments_table.c.text == comment_text,
+                    )
+                )
 
     # Transition history for already completed adjacent stages.
     for program in db.scalars(select(ProgramInstance)).all():
@@ -2363,7 +2632,7 @@ def seed_checklist_values_and_comments(db: Session, users: dict[str, User]) -> N
 
 
 def seed_workflow_runtime_data(db: Session) -> None:
-    """Seed server-side replacements for workflow UI browser-only state."""
+    """Seed persisted workflow UI state without changing lifecycle semantics."""
     contact_sources = (
         "university_card",
         "call",
@@ -2373,7 +2642,9 @@ def seed_workflow_runtime_data(db: Session) -> None:
         "referral",
         "other",
     )
-    for index, stakeholder in enumerate(db.scalars(select(Stakeholder).order_by(Stakeholder.created_at)).all()):
+    for index, stakeholder in enumerate(
+        db.scalars(select(Stakeholder).order_by(Stakeholder.created_at)).all()
+    ):
         stakeholder.contact_source = contact_sources[index % len(contact_sources)]
 
     payloads = {
@@ -2439,6 +2710,7 @@ def seed_workflow_runtime_data(db: Session) -> None:
             "comment": "Рекомендуется продолжить программу в следующем учебном окне.",
         },
     }
+
     stage_rows = db.execute(
         select(WorkflowStageInstance, WorkflowStageCatalog.code)
         .join(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id)
@@ -2447,53 +2719,116 @@ def seed_workflow_runtime_data(db: Session) -> None:
     ).all()
     for index, (stage_instance, stage_code) in enumerate(stage_rows, 1):
         code = stage_code or ""
+        status = str(stage_instance.status).upper()
+        is_started = status in {"IN_PROGRESS", "WAITING", "BLOCKED", "COMPLETED", "SKIPPED"}
         payload = payloads.get(code)
-        if payload is not None:
-            data = db.scalar(
-                select(WorkflowStageData).where(
-                    WorkflowStageData.stage_instance_id == stage_instance.id
-                )
+        data = db.scalar(
+            select(WorkflowStageData).where(
+                WorkflowStageData.stage_instance_id == stage_instance.id
             )
+        )
+
+        if payload is not None and is_started:
             seeded_payload = {**payload, "source_type": "seed", "version": 1}
             if data is None:
-                db.add(WorkflowStageData(stage_instance_id=stage_instance.id, payload=seeded_payload))
-            else:
-                data.payload = seeded_payload
-
-        if code in payloads:
-            label = "Проверить статус с ответственным" if index % 2 else "Зафиксировать результат в карточке"
-            extra = db.scalar(
-                select(WorkflowChecklistExtra).where(
-                    WorkflowChecklistExtra.stage_instance_id == stage_instance.id,
-                    WorkflowChecklistExtra.label == label,
-                )
-            )
-            if extra is None:
                 db.add(
-                    WorkflowChecklistExtra(
+                    WorkflowStageData(
                         stage_instance_id=stage_instance.id,
-                        label=label,
-                        is_done=str(stage_instance.status).upper() in {"COMPLETED", "DONE"},
-                        sort_order=1,
+                        payload=seeded_payload,
                     )
                 )
+            else:
+                data.payload = seeded_payload
+        elif data is not None and isinstance(data.payload, dict) and data.payload.get("source_type") == "seed":
+            # A rerun of an older seed may have filled forms for future stages.
+            db.delete(data)
+
+        existing_seed_extras = list(
+            db.scalars(
+                select(WorkflowChecklistExtra).where(
+                    WorkflowChecklistExtra.stage_instance_id == stage_instance.id,
+                    WorkflowChecklistExtra.label.in_(SEED_CHECKLIST_EXTRA_LABELS),
+                )
+            ).all()
+        )
+        if code in payloads and is_started:
+            label = (
+                "Проверить статус с ответственным"
+                if index % 2
+                else "Зафиксировать результат в карточке"
+            )
+            extra = next((item for item in existing_seed_extras if item.label == label), None)
+            if extra is None:
+                extra = WorkflowChecklistExtra(
+                    stage_instance_id=stage_instance.id,
+                    label=label,
+                    sort_order=1,
+                )
+                db.add(extra)
+            extra.is_done = status in {"COMPLETED", "SKIPPED"}
+            for stale in existing_seed_extras:
+                if stale.id != extra.id:
+                    db.delete(stale)
+        else:
+            for stale in existing_seed_extras:
+                db.delete(stale)
+
+    # Clean controls created by older versions of the demo seed.  Only rows that
+    # identify themselves as seed data are removed; user-created state is kept.
+    for control in db.scalars(select(ProgramWorkflowControl)).all():
+        program = db.get(ProgramInstance, control.program_instance_id)
+        payload = control.payload if isinstance(control.payload, dict) else {}
+        is_real_control = (
+            program is not None
+            and program.current_stage_code == CONTROL_STAGE_CODE
+            and program.current_stage_instance_id is None
+            and program.status in {"active", "completed"}
+        )
+        if not is_real_control and payload.get("source_type") == "seed":
+            db.delete(control)
+
+    db.flush()
+
     for program in db.scalars(
-        select(ProgramInstance).where(ProgramInstance.status.in_(("active", "completed")))
+        select(ProgramInstance).where(
+            ProgramInstance.current_stage_code == CONTROL_STAGE_CODE,
+            ProgramInstance.current_stage_instance_id.is_(None),
+            ProgramInstance.status.in_(("active", "completed")),
+        )
     ).all():
-        control = db.scalar(select(ProgramWorkflowControl).where(ProgramWorkflowControl.program_instance_id == program.id))
+        rows = _program_stage_rows(db, program)
+        closed_count = sum(
+            1 for stage_instance, _stage, _code in rows
+            if str(stage_instance.status).upper() in {"COMPLETED", "SKIPPED"}
+        )
+        control = db.scalar(
+            select(ProgramWorkflowControl).where(
+                ProgramWorkflowControl.program_instance_id == program.id
+            )
+        )
         payload = {
             "signals": [
-                {"kind": "health", "state": program.health_band, "comment": "Статус здоровья рассчитан автоматически."},
-                {"kind": "workflow", "state": "accepted", "comment": "Контрольный просмотр выполнен."},
+                {
+                    "kind": "health",
+                    "state": program.health_band,
+                    "comment": "Статус здоровья рассчитан backend-сервисом.",
+                },
+                {
+                    "kind": "workflow",
+                    "state": "accepted",
+                    "comment": f"Закрыто рабочих этапов: {closed_count} из {len(rows)}.",
+                },
             ],
+            "progress": {"completed": closed_count, "total": len(rows)},
             "source_type": "seed",
-            "version": 1,
+            "version": 2,
         }
         if control is None:
-            db.add(ProgramWorkflowControl(program_instance_id=program.id, status="frozen" if program.status == "completed" else "active", payload=payload))
-        else:
-            control.status = "frozen" if program.status == "completed" else "active"
-            control.payload = payload
+            control = ProgramWorkflowControl(program_instance_id=program.id)
+            db.add(control)
+        control.status = "frozen" if program.status == "completed" else "active"
+        control.payload = payload
+
     db.flush()
 
 
@@ -3337,9 +3672,15 @@ def seed_object_storage_records(db: Session, users: dict[str, User]) -> None:
 
 
 def validate_seed(db: Session) -> None:
-    """Fail fast on the most important V2 consistency errors."""
+    """Fail fast on demo-data violations of the runtime workflow invariants."""
     problems: list[str] = []
-    programs = list(db.scalars(select(ProgramInstance)).all())
+    programs = list(db.scalars(select(ProgramInstance).order_by(ProgramInstance.created_at)).all())
+
+    playbook_counts: dict[str, int] = {}
+    stage_counts: dict[str, int] = {}
+    control_count = 0
+    completed_program_count = 0
+
     for program in programs:
         required = {
             "organization_id": program.organization_id,
@@ -3347,7 +3688,6 @@ def validate_seed(db: Session) -> None:
             "product_id": program.product_id,
             "playbook_template_id": program.playbook_template_id,
             "workflow_version_id": program.workflow_version_id,
-            "current_stage_instance_id": program.current_stage_instance_id,
             "academic_window_id": program.academic_window_id,
             "status": program.status,
             "current_stage_code": program.current_stage_code,
@@ -3357,9 +3697,121 @@ def validate_seed(db: Session) -> None:
         if missing:
             problems.append(f"ProgramInstance {program.id}: missing {', '.join(missing)}")
             continue
-        stage_instance = db.get(WorkflowStageInstance, program.current_stage_instance_id)
-        if stage_instance is None or stage_instance.program_instance_id != program.id:
-            problems.append(f"ProgramInstance {program.id}: current_stage_instance_id belongs to another program")
+
+        template = db.get(WorkflowTemplate, program.playbook_template_id)
+        if template is not None:
+            playbook_counts[template.code] = playbook_counts.get(template.code, 0) + 1
+
+        version = db.get(WorkflowVersion, program.workflow_version_id)
+        if version is None or version.workflow_template_id != program.playbook_template_id:
+            problems.append(f"ProgramInstance {program.id}: workflow_version_id does not belong to playbook")
+        elif version.status != "PUBLISHED":
+            problems.append(f"ProgramInstance {program.id}: runtime is bound to non-published workflow version")
+
+        rows = _program_stage_rows(db, program)
+        if not rows:
+            problems.append(f"ProgramInstance {program.id}: no workflow_stage_instances")
+            continue
+
+        invalid_statuses = [
+            str(instance.status)
+            for instance, _stage, _code in rows
+            if str(instance.status).upper() in {"PENDING", "DONE"}
+        ]
+        if invalid_statuses:
+            problems.append(
+                f"ProgramInstance {program.id}: obsolete stage statuses present: {invalid_statuses}"
+            )
+
+        for instance, stage, code in rows:
+            status = str(instance.status).upper()
+            if stage.workflow_version_id != program.workflow_version_id:
+                problems.append(
+                    f"ProgramInstance {program.id}: stage {code} belongs to another workflow version"
+                )
+            if status == "COMPLETED" and instance.completed_at is None:
+                problems.append(f"ProgramInstance {program.id}: completed stage {code} has no completed_at")
+            if status == "SKIPPED" and instance.skipped_at is None:
+                problems.append(f"ProgramInstance {program.id}: skipped stage {code} has no skipped_at")
+            if status == "NOT_STARTED" and (instance.started_at is not None or instance.completed_at is not None):
+                problems.append(f"ProgramInstance {program.id}: NOT_STARTED stage {code} has lifecycle dates")
+
+            if status in {"COMPLETED", "SKIPPED"}:
+                required_items = list(
+                    db.scalars(
+                        select(PlaybookChecklistItem).where(
+                            PlaybookChecklistItem.workflow_stage_id == stage.id,
+                            PlaybookChecklistItem.required.is_(True),
+                        )
+                    ).all()
+                )
+                for item in required_items:
+                    value = db.scalar(
+                        select(ProgramChecklistValue).where(
+                            ProgramChecklistValue.stage_instance_id == instance.id,
+                            ProgramChecklistValue.checklist_item_id == item.id,
+                        )
+                    )
+                    if value is None or (status == "COMPLETED" and not value.is_done):
+                        problems.append(
+                            f"ProgramInstance {program.id}: required checklist {item.code} is not done for closed stage {code}"
+                        )
+
+        in_progress = [row for row in rows if str(row[0].status).upper() == "IN_PROGRESS"]
+        is_control = program.current_stage_code == CONTROL_STAGE_CODE
+        control = db.scalar(
+            select(ProgramWorkflowControl).where(
+                ProgramWorkflowControl.program_instance_id == program.id
+            )
+        )
+        control_payload = control.payload if control is not None and isinstance(control.payload, dict) else {}
+        seeded_control = control is not None and control_payload.get("source_type") == "seed"
+
+        if is_control:
+            control_count += 1
+            if program.status == "completed":
+                completed_program_count += 1
+            if program.current_stage_instance_id is not None:
+                problems.append(f"ProgramInstance {program.id}: control must have current_stage_instance_id=NULL")
+            if in_progress:
+                problems.append(f"ProgramInstance {program.id}: control must not have IN_PROGRESS stages")
+            open_rows = [
+                code for instance, _stage, code in rows
+                if str(instance.status).upper() not in {"COMPLETED", "SKIPPED"}
+            ]
+            if open_rows:
+                problems.append(f"ProgramInstance {program.id}: control has open working stages {open_rows}")
+            if control is None:
+                problems.append(f"ProgramInstance {program.id}: control state has no program_workflow_controls row")
+            elif program.status == "active" and control.status != "active":
+                problems.append(f"ProgramInstance {program.id}: active control row is not active")
+            elif program.status == "completed" and control.status != "frozen":
+                problems.append(f"ProgramInstance {program.id}: completed control row is not frozen")
+        elif program.status == "active":
+            if len(in_progress) != 1:
+                problems.append(
+                    f"ProgramInstance {program.id}: active non-control workflow must have exactly one IN_PROGRESS stage, got {len(in_progress)}"
+                )
+            else:
+                current_instance, _current_stage, current_code = in_progress[0]
+                stage_counts[current_code] = stage_counts.get(current_code, 0) + 1
+                if program.current_stage_instance_id != current_instance.id:
+                    problems.append(
+                        f"ProgramInstance {program.id}: current_stage_instance_id does not match IN_PROGRESS"
+                    )
+                if program.current_stage_code != current_code:
+                    problems.append(
+                        f"ProgramInstance {program.id}: current_stage_code={program.current_stage_code} but IN_PROGRESS={current_code}"
+                    )
+            if seeded_control:
+                problems.append(
+                    f"ProgramInstance {program.id}: seed created program_workflow_controls before real control"
+                )
+        elif program.status == "completed":
+            if not is_control:
+                problems.append(f"ProgramInstance {program.id}: completed demo workflow must be frozen in control")
+            if program.completed_at is None:
+                problems.append(f"ProgramInstance {program.id}: completed program has no completed_at")
 
     for vendor in db.scalars(select(Vendor)).all():
         if hasattr(vendor, "business_key") and not vendor.business_key:
@@ -3368,10 +3820,35 @@ def validate_seed(db: Session) -> None:
         if hasattr(product, "business_key") and not product.business_key:
             problems.append(f"Product {product.name}: business_key is empty")
 
+    missing_playbooks = [
+        code for code in ["full_cycle", *SHORT_PLAYBOOKS.keys()]
+        if playbook_counts.get(code, 0) == 0
+    ]
+    if missing_playbooks:
+        problems.append(f"No ProgramInstance examples for playbooks: {missing_playbooks}")
+
+    missing_stage_examples = [
+        code for code in WORKFLOW_RUNTIME_STAGE_CODES if stage_counts.get(code, 0) == 0
+    ]
+    if missing_stage_examples:
+        problems.append(
+            f"No active ProgramInstance examples for runtime stages: {missing_stage_examples}"
+        )
+
+    if control_count == 0:
+        problems.append("No real control-state ProgramInstance was seeded")
+    if completed_program_count == 0:
+        problems.append("No completed/frozen ProgramInstance was seeded")
+
     if problems:
         raise RuntimeError("Seed validation failed:\n - " + "\n - ".join(problems))
 
-    print(f"[seed] V2 validation OK: {len(programs)} program instances")
+    print(
+        "[seed] validation OK: "
+        f"{len(programs)} programs; playbooks={playbook_counts}; "
+        f"active_stages={stage_counts}; control={control_count}; completed={completed_program_count}"
+    )
+
 
 def main() -> None:
     db = SessionLocal()
@@ -3393,32 +3870,38 @@ def main() -> None:
         seed_organization_core(db, universities, users)
         seed_program_instances(db)
         db.flush()
+
+        # Complete and initialize every ProgramInstance before assigning demo
+        # lifecycle positions.  This order is critical: stage distribution must
+        # operate on real WorkflowStageInstance rows, not on template-only data.
+        seed_full_field_enrichment(db, users)
+        db.flush()
         seed_university_stage_distribution(db)
+        ensure_program_checklist_values(db)
         db.flush()
 
-        # Rich V2 seed dataset.
-        seed_full_field_enrichment(db, users)
+        # Rich relational demo data.
         seed_auxiliary_relations(db, users)
         seed_stage5_integration_mappings(db)
-
-        db.flush()
-        
         seed_integration_signals_full(db)
         seed_contracts_licenses_and_teachers(db)
         seed_contracts_full(db)
         seed_document_templates(db)
         seed_checklist_values_and_comments(db, users)
-        seed_workflow_runtime_data(db)
         seed_governance_audit_and_requests(db, users)
 
-        # Commit the relational graph before invoking services that re-query it.
+        # Commit the source graph before services re-query and calculate derived
+        # metrics. Health/NBA are never treated as manually-authored seed facts.
         db.commit()
-
-        # Derived state is always computed from source records, not hard-coded.
         for program in db.scalars(select(ProgramInstance)).all():
             IntegrationSyncService(db).sync_program(program.id)
             HealthService(db).recompute(program.id)
             NbaService(db).recompute_program(program.id)
+        db.commit()
+
+        # Persist stage forms/extras and the control snapshot only after health is
+        # final, so the control payload cannot contain a stale health band.
+        seed_workflow_runtime_data(db)
         db.commit()
 
         # File-backed tables are seeded only when a real MinIO/S3 endpoint exists.
@@ -3435,7 +3918,7 @@ def main() -> None:
     finally:
         db.close()
 
-    print("Seed data created (extended V2 dataset).")
+    print("Seed data created (actualized demo dataset).")
 
 
 if __name__ == "__main__":
