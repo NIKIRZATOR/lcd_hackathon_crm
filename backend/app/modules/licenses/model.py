@@ -41,6 +41,7 @@ class Contract(ModelBase):
     valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    signer: Mapped[str | None] = mapped_column(String(255), nullable=True)
     signed_on: Mapped[date | None] = mapped_column(nullable=True)
     attachment_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("files.id"), nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -79,4 +80,7 @@ class License(ModelBase):
     )
     transferred_on: Mapped[date | None] = mapped_column(nullable=True)
     attachment_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("files.id"), nullable=True)
+    recipient_stakeholder_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("stakeholders.id"), nullable=True
+    )
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)

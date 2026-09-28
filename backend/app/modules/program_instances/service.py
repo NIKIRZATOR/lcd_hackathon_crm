@@ -408,8 +408,14 @@ class ProgramInstanceService:
                     continue
             if preset == "semester" and not (program.academic_window_id and (window := self.db.get(AcademicWindow, program.academic_window_id)) and 0 <= (window.plan_cutoff_on - date.today()).days <= 21):
                 continue
-            shown_stage = "Контроль исполнения" if program.current_stage_code == "control" else stage_name
-            result.append(WorkflowJournalRead(id=program.id, organization_name=org_name, direction_name=direction_name, product_name=product_name, playbook_name=playbook_name, current_stage_name=shown_stage, due_at=due_at, health_score=program.health_score, health_band=program.health_band, kam_name=kam_name, students_count=students, applications_count=applications))
+            shown_stage = (
+                "Заход закрыт"
+                if program.status == "cancelled"
+                else "Контроль исполнения"
+                if program.current_stage_code == "control"
+                else stage_name
+            )
+            result.append(WorkflowJournalRead(id=program.id, organization_name=org_name, direction_name=direction_name, product_name=product_name, playbook_name=playbook_name, current_stage_name=shown_stage, due_at=due_at, health_score=program.health_score, health_band=program.health_band, kam_name=kam_name, students_count=students, applications_count=applications, status=program.status))
         return result
 
     def _recompute_missing_health(self, organization_id: UUID) -> None:
@@ -468,5 +474,6 @@ class ProgramInstanceService:
             started_at=program.started_at,
             completed_at=program.completed_at,
             comment=program.comment,
+            parent_program_id=program.parent_program_id,
             legacy_interaction_id=program.legacy_interaction_id,
         )

@@ -7,6 +7,7 @@ from uuid import uuid4
 from alembic import command
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 
@@ -73,7 +74,7 @@ def _seed_legacy_fixture(database_url: str) -> None:
         engine.dispose()
 
 
-def _verify(database_url: str, *, expect_backfill: bool) -> None:
+def _verify(database_url: str, *, expect_backfill: bool, expected_head: str) -> None:
     engine = create_engine(database_url)
     try:
         schema = inspect(engine)
@@ -82,7 +83,7 @@ def _verify(database_url: str, *, expect_backfill: bool) -> None:
             raise RuntimeError(f"Missing target tables: {sorted(missing)}")
         with engine.connect() as connection:
             current = MigrationContext.configure(connection).get_current_revision()
-        if current != "b4d6f8a0c2e1":
+        if current != expected_head:
             raise RuntimeError(f"Unexpected migration revision: {current}")
         if expect_backfill:
             with engine.connect() as connection:
@@ -110,7 +111,10 @@ def _run_scenario(admin_engine, base_url, *, from_legacy: bool) -> None:
             command.upgrade(config, LEGACY_HEAD)
             _seed_legacy_fixture(database_url)
         command.upgrade(config, "head")
-        _verify(database_url, expect_backfill=from_legacy)
+        expected_head = ScriptDirectory.from_config(config).get_current_head()
+        if expected_head is None:
+            raise RuntimeError("Migration head is missing")
+        _verify(database_url, expect_backfill=from_legacy, expected_head=expected_head)
         print(f"{suffix}: OK")
     finally:
         _drop_database(admin_engine, database_name)

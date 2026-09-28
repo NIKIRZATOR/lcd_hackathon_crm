@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import sys
@@ -16,6 +15,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.core.database import SessionLocal
 from app.modules.contacts.model import UniversityContact
+from app.modules.documents.model import DocumentTemplate
 from app.modules.products.model import ITProduct, ProgramProduct, Vendor
 from app.modules.programs.model import ITDirection, ITProgram
 from app.modules.universities.model import University
@@ -32,7 +32,7 @@ from app.modules.integrations.service import IntegrationSyncService
 from app.modules.integrations.model import ExternalCourseMapping, ExternalStreamMapping, IntegrationSignal
 from app.modules.nba.service import NbaService
 from app.modules.users.model import ManagerMembership, Role, User
-from app.modules.workflows.model import WorkflowStage, WorkflowStageInstance, WorkflowTemplate, WorkflowTransition, WorkflowVersion
+from app.modules.workflows.model import ProgramWorkflowControl, WorkflowChecklistExtra, WorkflowStage, WorkflowStageData, WorkflowStageInstance, WorkflowTemplate, WorkflowTransition, WorkflowVersion
 from app.modules.workflows.service import WorkflowRuntimeService
 from scripts.workflow_seed_data import LEGACY_WORKFLOW_TEMPLATE_NAMES, WORKFLOW_STAGES, WORKFLOW_TEMPLATE
 
@@ -2339,6 +2339,141 @@ def seed_checklist_values_and_comments(db: Session, users: dict[str, User]) -> N
     db.flush()
 
 
+def seed_workflow_runtime_data(db: Session) -> None:
+    """Seed server-side replacements for workflow UI browser-only state."""
+    contact_sources = (
+        "university_card",
+        "call",
+        "email",
+        "site",
+        "event",
+        "referral",
+        "other",
+    )
+    for index, stakeholder in enumerate(db.scalars(select(Stakeholder).order_by(Stakeholder.created_at)).all()):
+        stakeholder.contact_source = contact_sources[index % len(contact_sources)]
+
+    payloads = {
+        "find_contact": {
+            "source": "university_card",
+            "note": "Контакт подтверждён по карточке площадки.",
+        },
+        "first_meeting": {
+            "time": "10:30",
+            "outcome": "go_product",
+            "note": "Проведена вводная встреча с представителем площадки.",
+        },
+        "identify_need": {
+            "reason": "Программа соответствует учебному профилю площадки.",
+            "format": "module",
+            "limits": "До 30 обучающихся в потоке.",
+        },
+        "document_package": {
+            "contract_project_ready": True,
+            "materials_ready": True,
+            "comment": "Пакет документов подготовлен для согласования.",
+        },
+        "sign_contract": {
+            "status": "received",
+            "signer": "Уполномоченный представитель площадки",
+            "comment": "Договор получен и зарегистрирован.",
+        },
+        "sign_license": {
+            "status": "received",
+            "volume": "30 учебных мест",
+            "comment": "Лицензия согласована с поставщиком продукта.",
+        },
+        "transfer_access": {
+            "status": "transferred",
+            "recipient": "Администратор площадки",
+            "access": "Доступ передан через защищённый канал.",
+        },
+        "train_teacher": {
+            "status": "trained",
+            "format": "vendor",
+            "comment": "Преподаватель прошёл обучение у поставщика.",
+        },
+        "confirm_teacher": {
+            "ready": "yes",
+            "reason": "Квалификация подтверждена, доступ активен.",
+        },
+        "curriculum": {
+            "comment": "Учебный план согласован с площадкой и преподавателем.",
+            "plan_ready": True,
+        },
+        "start_classes": {
+            "confirmed": True,
+            "comment": "Старт занятий подтверждён по данным LMS.",
+        },
+        "classes_running": {
+            "status": "ok",
+            "comment": "Занятия идут по расписанию, замечаний нет.",
+            "replacement_requested": False,
+        },
+        "period_results": {
+            "verdict": "continue",
+            "reason": "Показатели периода соответствуют плану.",
+            "comment": "Рекомендуется продолжить программу в следующем учебном окне.",
+        },
+    }
+    stage_rows = db.execute(
+        select(WorkflowStageInstance, WorkflowStageCatalog.code)
+        .join(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id)
+        .outerjoin(WorkflowStageCatalog, WorkflowStageCatalog.id == WorkflowStage.stage_catalog_id)
+        .where(WorkflowStageInstance.program_instance_id.is_not(None))
+    ).all()
+    for index, (stage_instance, stage_code) in enumerate(stage_rows, 1):
+        code = stage_code or ""
+        payload = payloads.get(code)
+        if payload is not None:
+            data = db.scalar(
+                select(WorkflowStageData).where(
+                    WorkflowStageData.stage_instance_id == stage_instance.id
+                )
+            )
+            seeded_payload = {**payload, "source_type": "seed", "version": 1}
+            if data is None:
+                db.add(WorkflowStageData(stage_instance_id=stage_instance.id, payload=seeded_payload))
+            else:
+                data.payload = seeded_payload
+
+        if code in payloads:
+            label = "Проверить статус с ответственным" if index % 2 else "Зафиксировать результат в карточке"
+            extra = db.scalar(
+                select(WorkflowChecklistExtra).where(
+                    WorkflowChecklistExtra.stage_instance_id == stage_instance.id,
+                    WorkflowChecklistExtra.label == label,
+                )
+            )
+            if extra is None:
+                db.add(
+                    WorkflowChecklistExtra(
+                        stage_instance_id=stage_instance.id,
+                        label=label,
+                        is_done=str(stage_instance.status).upper() in {"COMPLETED", "DONE"},
+                        sort_order=1,
+                    )
+                )
+    for program in db.scalars(
+        select(ProgramInstance).where(ProgramInstance.status.in_(("active", "completed")))
+    ).all():
+        control = db.scalar(select(ProgramWorkflowControl).where(ProgramWorkflowControl.program_instance_id == program.id))
+        payload = {
+            "signals": [
+                {"kind": "health", "state": program.health_band, "comment": "Статус здоровья рассчитан автоматически."},
+                {"kind": "workflow", "state": "accepted", "comment": "Контрольный просмотр выполнен."},
+            ],
+            "source_type": "seed",
+            "version": 1,
+        }
+        if control is None:
+            db.add(ProgramWorkflowControl(program_instance_id=program.id, status="frozen" if program.status == "completed" else "active", payload=payload))
+        else:
+            control.status = "frozen" if program.status == "completed" else "active"
+            control.payload = payload
+    db.flush()
+
+
 def seed_integration_signals_full(db: Session) -> None:
     """Create deterministic WEBSITE/LMS/PAYMENT snapshots for every active program."""
     now = _utcnow()
@@ -2552,6 +2687,7 @@ def seed_contracts_full(db: Session) -> None:
         if contract is None:
             continue
         contract.status = contract.status or "active"
+        contract.signer = contract.signer or "Authorized organization representative"
         contract.signed_at = contract.signed_at or (now - timedelta(days=140 - (index % 15)))
         contract.valid_from = contract.valid_from or (now - timedelta(days=135 - (index % 15)))
         contract.signed_on = contract.signed_on or date(2026, 1, 15)
@@ -2571,6 +2707,22 @@ def seed_contracts_full(db: Session) -> None:
             license_record.transferred_on = license_record.transferred_on or (date.today() - timedelta(days=45 - (index % 10)))
         license_record.comment = license_record.comment or "Лицензия привязана к конкретной программе внедрения."
 
+        recipient = db.scalar(
+            select(Stakeholder)
+            .where(
+                Stakeholder.organization_id == program.organization_id,
+                Stakeholder.is_active.is_(True),
+            )
+            .order_by(
+                (Stakeholder.program_instance_id == program.id).desc(),
+                Stakeholder.is_primary.desc(),
+                Stakeholder.created_at,
+            )
+        )
+        license_record.recipient_stakeholder_id = (
+            license_record.recipient_stakeholder_id or (recipient.id if recipient else None)
+        )
+
         carrier = db.scalar(select(TeacherCarrier).where(TeacherCarrier.program_instance_id == program.id))
         if carrier is not None:
             stakeholder = db.scalar(
@@ -2588,6 +2740,31 @@ def seed_contracts_full(db: Session) -> None:
             carrier.last_lms_activity_on = carrier.last_lms_activity_on or (date.today() - timedelta(days=index % 14))
             carrier.status = carrier.status or "active"
 
+    db.flush()
+
+
+def seed_document_templates(db: Session) -> None:
+    templates = (
+        ("contract_project", "Framework contract draft", "https://edu-rt.ru/"),
+        ("direction_materials", "Direction materials", "https://edu-rt.ru/course"),
+        ("product_description", "Educational product description", "https://edu-rt.ru/course"),
+        ("curriculum_plan", "Curriculum plan template", "https://edu-rt.ru/"),
+    )
+    for kind, name, external_url in templates:
+        template = db.scalar(select(DocumentTemplate).where(DocumentTemplate.kind == kind))
+        if template is None:
+            db.add(
+                DocumentTemplate(
+                    kind=kind,
+                    name=name,
+                    external_url=external_url,
+                    is_active=True,
+                )
+            )
+        else:
+            template.name = name
+            template.external_url = template.external_url or external_url
+            template.is_active = True
     db.flush()
 
 
@@ -3175,7 +3352,9 @@ def main() -> None:
         seed_integration_signals_full(db)
         seed_contracts_licenses_and_teachers(db)
         seed_contracts_full(db)
+        seed_document_templates(db)
         seed_checklist_values_and_comments(db, users)
+        seed_workflow_runtime_data(db)
         seed_governance_audit_and_requests(db, users)
 
         # Commit the relational graph before invoking services that re-query it.

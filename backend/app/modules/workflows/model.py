@@ -233,6 +233,43 @@ class WorkflowStageInstance(ModelBase):
     skipped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class WorkflowStageData(ModelBase):
+    __tablename__ = "workflow_stage_data"
+    __table_args__ = (
+        UniqueConstraint("stage_instance_id", name="uq_workflow_stage_data_instance"),
+    )
+
+    stage_instance_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("workflow_stage_instances.id"), nullable=False
+    )
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class WorkflowChecklistExtra(ModelBase):
+    __tablename__ = "workflow_checklist_extras"
+    __table_args__ = (Index("ix_workflow_checklist_extras_stage", "stage_instance_id"),)
+
+    stage_instance_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("workflow_stage_instances.id"), nullable=False
+    )
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_done: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class ProgramWorkflowControl(ModelBase):
+    __tablename__ = "program_workflow_controls"
+    __table_args__ = (
+        UniqueConstraint("program_instance_id", name="uq_program_workflow_control_program"),
+    )
+
+    program_instance_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("program_instances.id"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+
+
 class WorkflowTransitionHistory(ModelBase):
     __tablename__ = "workflow_transition_history"
 

@@ -8,6 +8,8 @@ from app.modules.health.service import HealthService
 from app.modules.nba.service import NbaService
 from app.modules.licenses.model import Contract, License
 from app.modules.licenses.schemas import ContractCreate, ContractUpdate, LicenseCreate, LicenseUpdate
+from app.modules.documents.model import File
+from app.modules.organizations.model import Stakeholder
 from app.modules.organizations.service import OrganizationService
 from app.modules.products.model import ITProduct
 from app.modules.program_instances.model import ProgramInstance
@@ -24,6 +26,7 @@ class ContractLicenseService:
 
     def create_contract(self, organization_id: UUID, payload: ContractCreate, user: User) -> Contract:
         OrganizationService(self.db).get(organization_id, user)
+        self._validate_attachment(payload.attachment_id)
         contract = Contract(organization_id=organization_id, **payload.model_dump())
         self.db.add(contract)
         self.db.commit()
@@ -35,6 +38,8 @@ class ContractLicenseService:
         if contract is None or contract.organization_id is None:
             raise HTTPException(status_code=404, detail="Contract not found")
         OrganizationService(self.db).get(contract.organization_id, user)
+        if "attachment_id" in payload.model_fields_set:
+            self._validate_attachment(payload.attachment_id)
         for field, value in payload.model_dump(exclude_unset=True).items():
             setattr(contract, field, value)
         self.db.commit()
@@ -57,6 +62,8 @@ class ContractLicenseService:
             contract = self.db.get(Contract, payload.contract_id)
             if contract is None or contract.organization_id != organization_id:
                 raise HTTPException(status_code=422, detail="Contract does not belong to organization")
+        self._validate_attachment(payload.attachment_id)
+        self._validate_recipient(payload.recipient_stakeholder_id, organization_id)
         license_record = License(product_id=program.product_id, **payload.model_dump())
         self.db.add(license_record)
         self.db.flush()
@@ -77,6 +84,10 @@ class ContractLicenseService:
             contract = self.db.get(Contract, payload.contract_id)
             if contract is None or contract.organization_id != program.organization_id:
                 raise HTTPException(status_code=422, detail="Contract does not belong to organization")
+        if "attachment_id" in payload.model_fields_set:
+            self._validate_attachment(payload.attachment_id)
+        if "recipient_stakeholder_id" in payload.model_fields_set:
+            self._validate_recipient(payload.recipient_stakeholder_id, program.organization_id)
         for field, value in payload.model_dump(exclude_unset=True).items():
             setattr(license_record, field, value)
         self.db.flush()
@@ -99,3 +110,31 @@ class ContractLicenseService:
         if program is None or program.organization_id != organization_id:
             raise HTTPException(status_code=422, detail="Program does not belong to organization")
         return program
+
+    def contract(self, contract_id: UUID, user: User) -> Contract:
+        contract = self.db.get(Contract, contract_id)
+        if contract is None or contract.organization_id is None:
+            raise HTTPException(status_code=404, detail="Contract not found")
+        OrganizationService(self.db).get(contract.organization_id, user)
+        return contract
+
+    def license(self, license_id: UUID, user: User) -> License:
+        license_record = self.db.get(License, license_id)
+        if license_record is None or license_record.program_instance_id is None:
+            raise HTTPException(status_code=404, detail="License not found")
+        program = self.db.get(ProgramInstance, license_record.program_instance_id)
+        if program is None:
+            raise HTTPException(status_code=404, detail="Program instance not found")
+        OrganizationService(self.db).get(program.organization_id, user)
+        return license_record
+
+    def _validate_attachment(self, file_id: UUID | None) -> None:
+        if file_id is not None and self.db.get(File, file_id) is None:
+            raise HTTPException(status_code=422, detail="Attachment file not found")
+
+    def _validate_recipient(self, stakeholder_id: UUID | None, organization_id: UUID) -> None:
+        if stakeholder_id is None:
+            return
+        stakeholder = self.db.get(Stakeholder, stakeholder_id)
+        if stakeholder is None or stakeholder.organization_id != organization_id:
+            raise HTTPException(status_code=422, detail="Recipient does not belong to organization")
