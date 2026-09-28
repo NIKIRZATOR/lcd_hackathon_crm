@@ -63,6 +63,20 @@ class OrganizationService:
                 raise HTTPException(status_code=403, detail="Cannot access this organization")
         return organization
 
+    def logo_file(self, organization_id: UUID, current_user: User) -> File:
+        organization = self.get(organization_id, current_user)
+        if organization.logo_file_id is None:
+            raise HTTPException(status_code=404, detail="Organization logo not found")
+        file_record = self.db.get(File, organization.logo_file_id)
+        if (
+            file_record is None
+            or file_record.attachment_kind != "organization_logo"
+            or file_record.deleted_at is not None
+            or file_record.purged_at is not None
+        ):
+            raise HTTPException(status_code=404, detail="Organization logo not found")
+        return file_record
+
     def create(self, payload: OrganizationCreate, current_user: User) -> Organization:
         if not is_admin(current_user):
             raise HTTPException(status_code=403, detail="Only ADMIN can create organizations")

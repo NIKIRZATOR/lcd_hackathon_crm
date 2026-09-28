@@ -47,6 +47,8 @@ services:
       S3_BUCKET_IMPORTS: ${S3_BUCKET_IMPORTS:-imports}
       S3_BUCKET_REPORTS: ${S3_BUCKET_REPORTS:-reports}
       S3_BUCKET_DOCUMENTATION: ${S3_BUCKET_DOCUMENTATION:-documentation}
+      S3_BUCKET_ORGANIZATION_LOGOS: ${S3_BUCKET_ORGANIZATION_LOGOS:-organization-logos}
+      ORGANIZATION_LOGO_PRELOAD_DIR: ${ORGANIZATION_LOGO_PRELOAD_DIR:-/preload_data/organization_logo}
       FILE_RETENTION_DAYS: ${FILE_RETENTION_DAYS:-30}
       FILE_MAX_UPLOAD_BYTES: ${FILE_MAX_UPLOAD_BYTES:-26214400}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -56,6 +58,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./preload_data:/preload_data:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,6 +102,7 @@ services:
       S3_BUCKET_IMPORTS: ${S3_BUCKET_IMPORTS:-imports}
       S3_BUCKET_REPORTS: ${S3_BUCKET_REPORTS:-reports}
       S3_BUCKET_DOCUMENTATION: ${S3_BUCKET_DOCUMENTATION:-documentation}
+      S3_BUCKET_ORGANIZATION_LOGOS: ${S3_BUCKET_ORGANIZATION_LOGOS:-organization-logos}
       FILE_RETENTION_DAYS: ${FILE_RETENTION_DAYS:-30}
       FILE_MAX_UPLOAD_BYTES: ${FILE_MAX_UPLOAD_BYTES:-26214400}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -156,6 +160,7 @@ services:
       S3_BUCKET_IMPORTS: ${S3_BUCKET_IMPORTS:-imports}
       S3_BUCKET_REPORTS: ${S3_BUCKET_REPORTS:-reports}
       S3_BUCKET_DOCUMENTATION: ${S3_BUCKET_DOCUMENTATION:-documentation}
+      S3_BUCKET_ORGANIZATION_LOGOS: ${S3_BUCKET_ORGANIZATION_LOGOS:-organization-logos}
     entrypoint:
       - /bin/sh
       - -c
@@ -165,6 +170,7 @@ services:
         mc mb --ignore-existing "local/$$S3_BUCKET_IMPORTS"
         mc mb --ignore-existing "local/$$S3_BUCKET_REPORTS"
         mc mb --ignore-existing "local/$$S3_BUCKET_DOCUMENTATION"
+        mc mb --ignore-existing "local/$$S3_BUCKET_ORGANIZATION_LOGOS"
     depends_on:
       minio:
         condition: service_healthy

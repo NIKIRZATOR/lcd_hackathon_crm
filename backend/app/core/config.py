@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     s3_bucket_imports: str = "imports"
     s3_bucket_reports: str = "reports"
     s3_bucket_documentation: str = "documentation"
+    s3_bucket_organization_logos: str = "organization-logos"
     file_retention_days: int = 30
     file_max_upload_bytes: int = 25 * 1024 * 1024
     import_max_upload_bytes: int = 25 * 1024 * 1024

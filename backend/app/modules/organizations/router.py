@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,7 @@ from app.modules.auth.dependencies import require_roles
 from app.modules.organizations.model import OrganizationType
 from app.modules.organizations.schemas import AssignmentCreate, AssignmentHistoryRead, AssignmentRead, KamRead, Organization360Read, OrganizationCreate, OrganizationDocumentRead, OrganizationFeedItemRead, OrganizationListRead, OrganizationRead, OrganizationTypeRead, OrganizationUpdate, StakeholderCreate, StakeholderRead, StakeholderUpdate
 from app.modules.organizations.service import OrganizationService
+from app.modules.documents.file_service import FileService
 from app.modules.users.model import User
 
 router = APIRouter(prefix="/organizations", tags=["organizations"], dependencies=[Depends(require_roles(*CRM_ROLES))])
@@ -31,6 +33,15 @@ def create_organization(payload: OrganizationCreate, db: Session = Depends(get_d
 @router.get("/{organization_id}", response_model=OrganizationRead)
 def get_organization(organization_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
     return OrganizationService(db).get(organization_id, current_user)
+
+@router.get("/{organization_id}/logo")
+def get_organization_logo(organization_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
+    file_record = OrganizationService(db).logo_file(organization_id, current_user)
+    return StreamingResponse(
+        FileService(db).stream_file(file_record=file_record, actor_user_id=current_user.id),
+        media_type=file_record.mime_type or "application/octet-stream",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 @router.get("/{organization_id}/360", response_model=Organization360Read)
 def get_organization_360(organization_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
