@@ -34,13 +34,18 @@ export const useReportType = ({ availableReportTypes }: UseReportTypeParams) => 
         return;
       }
 
-      setSearchParams((currentParams) => {
-        const params = new URLSearchParams(currentParams);
+      setSearchParams(
+        (currentParams) => {
+          const params = new URLSearchParams(currentParams);
 
-        params.set(REPORT_QUERY_KEY, value);
+          params.set(REPORT_QUERY_KEY, value);
 
-        return params;
-      });
+          return params;
+        },
+        {
+          replace: true,
+        },
+      );
     },
     [availableReportTypes, setSearchParams],
   );

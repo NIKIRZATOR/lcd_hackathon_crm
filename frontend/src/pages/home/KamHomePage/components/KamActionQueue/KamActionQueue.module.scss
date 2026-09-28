@@ -7,26 +7,27 @@
   box-shadow: none;
 
   .cardBody {
-    padding: 16px;
+    padding: 20px;
   }
 }
 
 .header {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .title {
   margin: 0 !important;
 
-  font-size: 16px !important;
-  line-height: 22px !important;
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  line-height: 28px !important;
 }
 
 .count {
   padding: 3px 8px;
 
   color: var(--ant-colorPrimary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 18px;
 
@@ -41,17 +42,17 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .item {
   display: grid;
-  grid-template-columns: 110px minmax(0, 1fr) auto;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
 
-  min-height: 80px;
-  padding: 12px 14px;
+  min-height: 84px;
+  padding: 14px 16px;
 
   border: 1px solid var(--ant-colorBorderSecondary);
   border-left-width: 3px;
@@ -69,7 +70,7 @@
 
   padding: 3px 8px;
 
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 16px;
   text-transform: uppercase;
@@ -90,7 +91,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .itemTitle {
@@ -100,9 +101,9 @@
   gap: 0 4px;
 
   color: var(--ant-colorText);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 20px;
 }
 
 .organizationName,
@@ -131,8 +132,8 @@
   overflow: hidden;
 
   color: var(--ant-colorTextSecondary);
-  font-size: 12px;
-  line-height: 17px;
+  font-size: 13px;
+  line-height: 18px;
 
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -142,14 +143,16 @@
   margin-top: 2px;
 
   color: var(--ant-colorTextSecondary);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .action {
   width: 180px;
   height: auto;
-  min-height: 32px;
+  min-height: 36px;
+
+  font-size: 14px;
 
   white-space: normal;
   text-align: center;
@@ -224,9 +227,22 @@
 }
 
 @media (max-width: 768px) {
+  .card {
+    .cardBody {
+      padding: 16px;
+    }
+  }
+
   .header {
     align-items: stretch;
     flex-direction: column;
+
+    margin-bottom: 14px;
+  }
+
+  .title {
+    font-size: 18px !important;
+    line-height: 24px !important;
   }
 
   .sort {
@@ -235,9 +251,49 @@
 
   .item {
     display: flex;
+    min-width: 0;
     flex-direction: column;
-
+    align-items: stretch;
     gap: 10px;
+
+    width: 100%;
+    min-height: auto;
+    padding: 14px;
+  }
+
+  .severityColumn {
+    width: 100%;
+  }
+
+  .content {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .itemTitle {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .organizationName,
+  .productName {
+    min-width: 0;
+    max-width: 100%;
+
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .reason {
+    width: 100%;
+
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .dueDate {
+    width: 100%;
   }
 
   .action {
@@ -246,8 +302,29 @@
 }
 
 @media (max-width: 576px) {
+  .card {
+    .cardBody {
+      padding: 14px;
+    }
+  }
+
+  .item {
+    padding: 12px;
+  }
+
+  .itemTitle {
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .reason {
+    font-size: 13px;
+    line-height: 18px;
+  }
+
   .action {
+    width: 100%;
+    max-width: 180px;
     align-self: center;
   }
 }
-

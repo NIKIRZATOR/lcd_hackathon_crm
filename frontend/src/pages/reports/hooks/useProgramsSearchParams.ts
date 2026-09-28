@@ -4,18 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import type { ProgramsFilterValues } from '../components/ProgramsReport/types/programsFilters';
 
-const QUERY_KEYS = {
-  from: 'p_from',
-  to: 'p_to',
-  organizations: 'p_organizations',
-  directions: 'p_directions',
-  products: 'p_products',
-  responsibles: 'p_responsibles',
-  playbooks: 'p_playbooks',
-  stages: 'p_stages',
-  healthBands: 'p_health_bands',
-  statuses: 'p_statuses',
-} as const;
+import { PROGRAMS_QUERY_KEYS as QUERY_KEYS } from './reportQueryKeys';
 
 const parseStringArray = (value: string | null): string[] => {
   if (!value) {

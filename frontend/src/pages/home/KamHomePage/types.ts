@@ -15,12 +15,63 @@ export type NbaItem = {
 
 export type HomeSummary = {
   role: string;
+
   cards: {
     nba_today: number;
     health_attention: number;
   };
-  portfolio?: { active_programs: number; health: { green: number; yellow: number; red: number } };
-  b2c?: { applications: number; payment_records: number; students: number; streams: number };
-  academic_windows?: Array<{ title: string; plan_cutoff_on: string }>;
+
+  portfolio?: {
+    active_programs: number;
+    health?: {
+      green: number;
+      yellow: number;
+      red: number;
+    };
+  };
+
+  academic_windows?: AcademicWindow[];
+
+  b2c?: {
+    applications: number;
+    payment_records: number;
+    students: number;
+    streams: number;
+  };
 };
 
+export type AcademicWindow = {
+  id: number;
+  title: string;
+  plan_cutoff_on: string;
+  classes_start_on: string;
+  classes_end_on: string;
+  is_current: boolean;
+};
+
+export type KamSignalSource = 'website' | 'lms';
+
+export type KamSignalType =
+  | 'applications_period'
+  | 'applications_unmatched'
+  | 'students_update'
+  | 'streams_update'
+  | 'course_started'
+  | 'teacher_activity'
+  | 'lms_silence';
+
+export type KamSignal = {
+  id: number;
+  source: KamSignalSource;
+  type: KamSignalType;
+
+  organizationName?: string;
+  programName?: string;
+  productName?: string;
+
+  programInstanceId?: number | null;
+
+  value?: number;
+  days?: number;
+  teacherName?: string;
+};

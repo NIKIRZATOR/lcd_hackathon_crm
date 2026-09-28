@@ -110,4 +110,3 @@ export const exportChart = async (
 
   await downloadRasterImage(chart, format, fileName);
 };
-

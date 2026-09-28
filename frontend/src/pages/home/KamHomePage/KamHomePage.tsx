@@ -1,11 +1,14 @@
-import { Card, Descriptions, List, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 
 import { apiRequest } from '../../../api/client';
 import PageLayout from '../../../components/pageLayout/PageLayout';
 
+import KamAcademicWindow from './components/KamAcademicWindow/';
+import { academicWindowMock } from './components/KamAcademicWindow/mocks';
 import KamActionQueue from './components/KamActionQueue';
 import KamPortfolioHealth from './components/KamPortfolioHealth';
+import KamSignals from './components/KamSignals/';
+import { kamSignalsMock } from './components/KamSignals/mocks';
 import KamSummaryCards from './components/SummaryCards';
 import type { HomeSummary, NbaItem } from './types';
 
@@ -40,7 +43,7 @@ const KamHomePage = () => {
             todayTasksCount={summary?.cards.nba_today}
             attentionCount={summary?.cards.health_attention}
             activeProgramsCount={summary?.portfolio?.active_programs}
-            academicWindowsCount={summary?.academic_windows?.length}
+            academicWindowsCount={1}
           />
 
           <KamActionQueue items={items} />
@@ -51,39 +54,13 @@ const KamHomePage = () => {
             health={summary?.portfolio?.health}
             activePrograms={summary?.portfolio?.active_programs}
           />
-          <Card size="small" title="* B2C сигналы">
-            <Descriptions
-              size="small"
-              column={2}
-              items={[
-                {
-                  key: 'applications',
-                  label: 'Заявки',
-                  children: summary?.b2c?.applications ?? '—',
-                },
-                {
-                  key: 'payments',
-                  label: 'Заказы',
-                  children: summary?.b2c?.payment_records ?? '—',
-                },
-                { key: 'students', label: 'Студенты', children: summary?.b2c?.students ?? '—' },
-                { key: 'streams', label: 'Потоки', children: summary?.b2c?.streams ?? '—' },
-              ]}
-            />
-          </Card>
-          <Card size="small" title="* Учебные окна">
-            <List
-              size="small"
-              dataSource={summary?.academic_windows ?? []}
-              locale={{ emptyText: 'Актуальных окон нет' }}
-              renderItem={(item) => (
-                <List.Item>
-                  <Tag>{item.plan_cutoff_on}</Tag>
-                  {item.title}
-                </List.Item>
-              )}
-            />
-          </Card>
+
+          <KamAcademicWindow
+            academicWindow={academicWindowMock.academicWindow}
+            atRiskProgramsCount={academicWindowMock.atRiskProgramsCount}
+          />
+
+          <KamSignals signals={kamSignalsMock} />
         </aside>
       </div>
     </PageLayout>

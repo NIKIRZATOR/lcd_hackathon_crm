@@ -1,14 +1,14 @@
 import { Tabs } from 'antd';
 
 export type ManagerTabOption = {
-  id: number;
+  id: string;
   name: string;
 };
 
 type ManagerTabsFilterProps = {
   managers: ManagerTabOption[];
-  value: number | null;
-  onChange: (managerId: number | null) => void;
+  value: string | null;
+  onChange: (managerId: string | null) => void;
 };
 
 const ManagerTabsFilter = ({ managers, value, onChange }: ManagerTabsFilterProps) => {
@@ -18,22 +18,16 @@ const ManagerTabsFilter = ({ managers, value, onChange }: ManagerTabsFilterProps
       label: 'Все',
     },
     ...managers.map((manager) => ({
-      key: String(manager.id),
+      key: manager.id,
       label: manager.name,
     })),
   ];
 
   const handleChange = (key: string) => {
-    onChange(key === 'all' ? null : Number(key));
+    onChange(key === 'all' ? null : key);
   };
 
-  return (
-    <Tabs
-      activeKey={value === null ? 'all' : String(value)}
-      items={items}
-      onChange={handleChange}
-    />
-  );
+  return <Tabs activeKey={value ?? 'all'} items={items} onChange={handleChange} />;
 };
 
 export default ManagerTabsFilter;

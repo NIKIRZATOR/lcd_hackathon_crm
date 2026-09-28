@@ -1,7 +1,7 @@
 .card {
   min-width: 0;
 
-  border: 1px solid var(--ant-colorBorderSecondary);
+  border: 1px solid var(--ant-color-border-secondary);
   border-radius: 8px;
 
   box-shadow: none;
@@ -28,7 +28,7 @@
   width: 36px;
   height: 36px;
 
-  color: var(--ant-colorPrimary);
+  color: var(--ant-color-primary);
   font-size: 18px;
 
   background: rgb(119 0 255 / 8%);
@@ -45,7 +45,7 @@
 }
 
 .title {
-  color: var(--ant-colorText);
+  color: var(--ant-color-text);
   font-size: 16px;
   font-weight: 600;
   line-height: 22px;
@@ -56,7 +56,7 @@
 .infoIcon {
   flex-shrink: 0;
 
-  color: var(--ant-colorTextSecondary);
+  color: var(--ant-color-text-secondary);
   font-size: 14px;
 
   cursor: help;
@@ -70,14 +70,8 @@
   height: auto;
   padding: 0;
 
-  color: var(--ant-colorPrimary);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 18px;
-
-  &:hover {
-    color: var(--ant-colorPrimaryHover) !important;
-    background: transparent !important;
-  }
 }
 
 .healthList {
@@ -94,15 +88,16 @@
 }
 
 .label {
-  color: var(--ant-colorText);
-  font-size: 12px;
-  line-height: 18px;
+  color: var(--ant-color-text);
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .count {
-  color: var(--ant-colorText);
-  font-size: 13px;
-  line-height: 18px;
+  color: var(--ant-color-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
   text-align: right;
 }
 
@@ -110,7 +105,7 @@
   height: 8px;
   overflow: hidden;
 
-  background: var(--ant-colorFillSecondary);
+  background: var(--ant-color-fill-secondary);
   border-radius: 999px;
 }
 
@@ -141,8 +136,7 @@
 }
 
 .summaryText {
-  color: var(--ant-colorTextSecondary);
-  font-size: 12px;
+  color: var(--ant-color-text-secondary);
+  font-size: 13px;
   line-height: 18px;
 }
-

@@ -3,6 +3,7 @@
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: 20px;
   align-items: start;
+  padding: 24px 0;
 }
 
 .mainColumn {
@@ -41,4 +42,3 @@
     grid-template-columns: 1fr;
   }
 }
-

@@ -16,8 +16,11 @@
 }
 
 .program {
+  color: var(--ant-color-text);
+
   font-size: 16px;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .product {
@@ -26,12 +29,13 @@
   color: var(--ant-color-text-secondary);
 
   font-size: 13px;
+  line-height: 1.4;
 }
 
 .summary {
   display: grid;
   flex-shrink: 0;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 
   > div {
@@ -39,6 +43,7 @@
     flex-direction: column;
     gap: 2px;
 
+    min-width: 0;
     padding: 8px 10px;
 
     background: var(--ant-color-bg-layout);
@@ -49,11 +54,15 @@
     color: var(--ant-color-text-secondary);
 
     font-size: 11px;
+    line-height: 1.35;
   }
 
   strong {
+    color: var(--ant-color-text);
+
     font-size: 14px;
     font-weight: 600;
+    line-height: 1.4;
   }
 }
 
@@ -80,39 +89,88 @@
 .university {
   padding: 10px 12px;
 
+  background: var(--ant-color-bg-container);
   border: 1px solid var(--ant-color-border-secondary);
   border-radius: var(--ant-border-radius);
 }
 
 .universityHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 105px;
+  gap: 12px;
+  align-items: start;
+}
+
+.universityMain {
+  min-width: 0;
 }
 
 .universityName {
+  color: var(--ant-color-text);
+
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.45;
+
+  overflow-wrap: anywhere;
 }
 
 .responsible {
-  margin-top: 2px;
+  margin-top: 3px;
 
   color: var(--ant-color-text-secondary);
 
   font-size: 12px;
+  line-height: 1.4;
+}
+
+.implementationStatus {
+  display: flex;
+  align-items: flex-start;
+
+  min-width: 0;
+  padding-top: 1px;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: flex-start;
+
+  :global(.ant-badge-status-dot) {
+    flex-shrink: 0;
+
+    margin-top: 5px;
+  }
+
+  :global(.ant-badge-status-text) {
+    margin-inline-start: 7px;
+
+    color: var(--ant-color-text);
+
+    font-size: 12px;
+    line-height: 1.4;
+
+    white-space: normal;
+  }
 }
 
 .metrics {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 8px 16px;
 
   margin-top: 8px;
+}
+
+.metric {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
 
   color: var(--ant-color-text-secondary);
 
   font-size: 12px;
+  line-height: 1.4;
 
   strong {
     color: var(--ant-color-text);
@@ -126,6 +184,14 @@
     width: 420px;
     max-height: min(420px, calc(100vh - 32px));
   }
+
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .universityHeader {
+    grid-template-columns: minmax(0, 1fr) 105px;
+  }
 }
 
 @media (max-width: 575px) {
@@ -134,8 +200,12 @@
   }
 
   .universityHeader {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .implementationStatus {
+    padding-top: 0;
   }
 
   .metrics {

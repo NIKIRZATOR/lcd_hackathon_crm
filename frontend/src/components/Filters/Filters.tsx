@@ -2,7 +2,7 @@ import { SlidersOutlined } from '@ant-design/icons';
 import { Badge, Button, Form, Grid, Modal, Select, Tag } from 'antd';
 import type { SelectProps } from 'antd';
 import type { CSSProperties, ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import styles from './Filters.module.scss';
 
@@ -87,9 +87,17 @@ const Filters = <T extends Record<string, unknown>>({
   const screens = Grid.useBreakpoint();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentValues, setCurrentValues] = useState<T>(initialValues);
 
   const modalInitialValuesRef = useRef<T | null>(null);
+
+  const watchedValues = Form.useWatch([], form) as T | undefined;
+
+  const currentValues = watchedValues ?? initialValues;
+
+  useEffect(() => {
+    form.setFieldsValue(initialValues);
+    modalInitialValuesRef.current = null;
+  }, [form, initialValues]);
 
   const isMobile = screens.md === false;
 
@@ -97,14 +105,8 @@ const Filters = <T extends Record<string, unknown>>({
     .filter(Boolean)
     .join(' ');
 
-  const handleValuesChange = (_: Partial<T>, values: T) => {
-    setCurrentValues(values);
-  };
-
   const handleApply = () => {
     const values = form.getFieldsValue(true) as T;
-
-    setCurrentValues(values);
 
     modalInitialValuesRef.current = null;
     setIsModalOpen(false);
@@ -113,10 +115,8 @@ const Filters = <T extends Record<string, unknown>>({
   };
 
   const handleReset = () => {
-    form.resetFields();
-    form.setFieldsValue(resetValues ?? initialValues);
+    form.setFieldsValue(resetValues);
 
-    setCurrentValues(resetValues ?? initialValues);
     modalInitialValuesRef.current = null;
 
     if (onReset) {
@@ -124,7 +124,7 @@ const Filters = <T extends Record<string, unknown>>({
       return;
     }
 
-    onApply(resetValues ?? initialValues);
+    onApply(resetValues);
   };
 
   const handleOpenModal = () => {
@@ -136,7 +136,6 @@ const Filters = <T extends Record<string, unknown>>({
   const handleCloseModal = () => {
     if (modalInitialValuesRef.current) {
       form.setFieldsValue(modalInitialValuesRef.current);
-      setCurrentValues(modalInitialValuesRef.current);
     }
 
     modalInitialValuesRef.current = null;
@@ -156,7 +155,6 @@ const Filters = <T extends Record<string, unknown>>({
     } as T;
 
     form.setFieldsValue(nextValues);
-    setCurrentValues(nextValues);
 
     onApply(nextValues);
   };
@@ -257,7 +255,6 @@ const Filters = <T extends Record<string, unknown>>({
       layout="vertical"
       initialValues={initialValues}
       preserve
-      onValuesChange={handleValuesChange}
       className={styles.form}
     >
       {isMobile ? (

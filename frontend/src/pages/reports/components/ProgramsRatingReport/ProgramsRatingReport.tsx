@@ -1,9 +1,11 @@
-import { Flex } from 'antd';
+import { Alert, Flex, Spin } from 'antd';
+
+import { useProgramsRatingFilterOptions } from '../../hooks/useProgramsRatingFilterOptions';
+import { useProgramsRatingReport } from '../../hooks/useProgramsRatingReport';
+import { useProgramsRatingReportSearchParams } from '../../hooks/useProgramsRatingReportSearchParams';
 
 import ProgramsRatingReportFilters from './components/ProgramsRatingReportFilters/ProgramsRatingReportFilters';
 import ProgramsRatingReportTable from './components/ProgramsRatingReportTable/ProgramsRatingReportTable';
-import { useProgramsRatingReportSearchParams } from '../../hooks/useProgramsRatingReportSearchParams';
-import { programsRatingReportMock } from './mocks';
 import type { ProgramsRatingReportFiltersValues } from './types';
 
 const EMPTY_FILTERS: ProgramsRatingReportFiltersValues = {
@@ -15,7 +17,11 @@ const EMPTY_FILTERS: ProgramsRatingReportFiltersValues = {
 };
 
 const ProgramsRatingReport = () => {
+  const { options } = useProgramsRatingFilterOptions();
+
   const { filters, setFilters } = useProgramsRatingReportSearchParams();
+
+  const { data, loading, error } = useProgramsRatingReport(filters);
 
   const handleReset = () => {
     setFilters(EMPTY_FILTERS);
@@ -23,15 +29,28 @@ const ProgramsRatingReport = () => {
 
   return (
     <Flex vertical gap={20}>
-      <ProgramsRatingReportFilters
-        options={programsRatingReportMock.filters}
-        initialValues={filters}
-        resetValues={EMPTY_FILTERS}
-        onApply={setFilters}
-        onReset={handleReset}
-      />
+      {options && (
+        <ProgramsRatingReportFilters
+          options={options}
+          initialValues={filters}
+          resetValues={EMPTY_FILTERS}
+          onApply={setFilters}
+          onReset={handleReset}
+        />
+      )}
 
-      <ProgramsRatingReportTable items={programsRatingReportMock.items} />
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message="Не удалось загрузить рейтинг программ"
+          description={error}
+        />
+      )}
+
+      <Spin spinning={loading}>
+        <ProgramsRatingReportTable items={data?.items ?? []} total={data?.total ?? 0} />
+      </Spin>
     </Flex>
   );
 };

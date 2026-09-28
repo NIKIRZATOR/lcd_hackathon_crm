@@ -1,0 +1,91 @@
+.content {
+  padding-top: 8px;
+}
+
+.sectionHeader {
+  min-height: 24px;
+}
+
+// .organizationList {
+//   display: flex;
+//   flex-direction: column;
+
+//   width: 100%;
+//   max-height: 240px;
+//   overflow-y: auto;
+
+//   border: 1px solid var(--ant-colorBorderSecondary);
+//   border-radius: var(--ant-borderRadiusLG);
+// }
+
+// .organizationRow {
+//   display: flex;
+//   align-items: center;
+//   justify-content: space-between;
+//   gap: 16px;
+
+//   min-height: 52px;
+//   padding: 12px 14px;
+
+//   border-bottom: 1px solid var(--ant-colorBorderSecondary);
+
+//   &:last-child {
+//     border-bottom: none;
+//   }
+// }
+
+.organizationList {
+  display: flex;
+  flex-direction: column;
+
+  width: 100%;
+
+  border: 1px solid var(--ant-colorBorderSecondary);
+  border-radius: var(--ant-borderRadiusLG);
+}
+
+.organizationRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+
+  border-bottom: 1px solid var(--ant-colorBorderSecondary);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.organizationCheckbox {
+  width: 100%;
+  min-width: 0;
+
+  :global(.ant-checkbox + span) {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+.programsCount {
+  white-space: nowrap;
+}
+
+.select {
+  width: 100%;
+}
+
+@media (max-width: 575px) {
+  .organizationRow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}

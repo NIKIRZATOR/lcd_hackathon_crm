@@ -60,33 +60,42 @@ const ProgramDetailsPopoverContent = ({ item }: ProgramDetailsPopoverContentProp
       <div className={styles.divider} />
 
       <div className={styles.universities}>
-        {item.universityItems.map((universityItem) => {
+        {item.universityItems.map((universityItem, index) => {
           const status = IMPLEMENTATION_STATUS_CONFIG[universityItem.implementationStatus];
 
           return (
-            <div key={universityItem.university.id} className={styles.university}>
+            <div key={`${universityItem.university.id}-${index}`} className={styles.university}>
               <div className={styles.universityHeader}>
-                <div>
+                <div className={styles.universityMain}>
                   <div className={styles.universityName}>{universityItem.university.name}</div>
 
                   <div className={styles.responsible}>{universityItem.responsible.name}</div>
                 </div>
 
-                <Badge status={status.badgeStatus} text={status.label} />
+                <div className={styles.implementationStatus}>
+                  <Badge
+                    status={status.badgeStatus}
+                    text={status.label}
+                    className={styles.statusBadge}
+                  />
+                </div>
               </div>
 
               <div className={styles.metrics}>
-                <span>
-                  Заявки <strong>{universityItem.applications}</strong>
-                </span>
+                <div className={styles.metric}>
+                  <span>Заявки</span>
+                  <strong>{universityItem.applications}</strong>
+                </div>
 
-                <span>
-                  Обучающиеся <strong>{universityItem.students}</strong>
-                </span>
+                <div className={styles.metric}>
+                  <span>Обучающиеся</span>
+                  <strong>{universityItem.students}</strong>
+                </div>
 
-                <span>
-                  Потоки <strong>{universityItem.streams}</strong>
-                </span>
+                <div className={styles.metric}>
+                  <span>Потоки</span>
+                  <strong>{universityItem.streams}</strong>
+                </div>
               </div>
             </div>
           );

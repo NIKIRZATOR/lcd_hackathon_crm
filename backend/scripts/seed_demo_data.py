@@ -2071,6 +2071,7 @@ def seed_stage5_integration_mappings(db: Session) -> None:
     if course_mapping is None:
         course_mapping = ExternalCourseMapping(source="PAYMENT", external_course_name=course, direction_id=program.direction_id, product_id=program.product_id, status="active")
         db.add(course_mapping)
+        db.flush()
     else:
         course_mapping.direction_id, course_mapping.product_id, course_mapping.status = program.direction_id, program.product_id, "active"
     stream_mapping = db.scalar(select(ExternalStreamMapping).where(ExternalStreamMapping.source == "PAYMENT", ExternalStreamMapping.external_course_name == course, ExternalStreamMapping.external_stream_id == stream))

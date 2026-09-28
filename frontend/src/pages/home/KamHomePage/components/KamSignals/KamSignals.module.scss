@@ -1,0 +1,164 @@
+.card {
+  min-width: 0;
+
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+
+  box-shadow: none;
+}
+
+.cardBody {
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  margin-bottom: 16px;
+}
+
+.icon {
+  display: flex;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+
+  width: 36px;
+  height: 36px;
+
+  color: var(--ant-color-primary);
+  font-size: 18px;
+
+  background: rgb(119 0 255 / 8%);
+  border-radius: 8px;
+}
+
+.title {
+  color: var(--ant-color-text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.infoIcon {
+  flex-shrink: 0;
+
+  color: var(--ant-color-text-secondary);
+  font-size: 14px;
+
+  cursor: help;
+}
+
+.signalList {
+  display: flex;
+  flex-direction: column;
+}
+
+.signal {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: flex-start;
+
+  width: 100%;
+  padding: 12px 0;
+
+  font: inherit;
+  text-align: left;
+
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+
+  cursor: pointer;
+
+  &:first-child {
+    padding-top: 4px;
+  }
+
+  &:hover:not(:disabled) {
+    .signalTitle {
+      color: var(--ant-color-primary);
+    }
+
+    .arrow {
+      color: var(--ant-color-primary);
+    }
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.sourceTag {
+  min-width: 40px;
+  margin: 1px 0 0;
+  padding: 0 6px;
+
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+
+  border-radius: 6px;
+}
+
+.signalContent {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.signalTitle {
+  overflow: hidden;
+
+  color: var(--ant-color-text);
+  font-size: 14px;
+  line-height: 20px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  transition: color 0.2s;
+}
+
+.signalDescription {
+  color: var(--ant-color-text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.arrow {
+  margin-top: 5px;
+
+  color: var(--ant-color-text-quaternary);
+  font-size: 10px;
+
+  transition: color 0.2s;
+}
+
+.hint {
+  display: block;
+
+  margin-top: 14px;
+
+  color: var(--ant-color-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.empty {
+  padding: 12px 14px;
+
+  background: var(--ant-color-fill-quaternary);
+  border-radius: 6px;
+}
+
+.emptyText {
+  color: var(--ant-color-text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
