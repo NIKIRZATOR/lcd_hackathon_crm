@@ -449,8 +449,6 @@ const WorkflowDetailPage = () => {
 
   const closeTraining = async () => {
     if (!trainPlan?.enabled || !trainPlan.personId || !trainPlan.productId || !trainPlan.trainedOn || !trainPlan.personName) return;
-    const moved = await go(forward?.id);
-    if (!moved || desk.id.startsWith('gap-')) return;
     const body = {
       product_id: trainPlan.productId,
       program_instance_id: desk.id,
@@ -460,73 +458,83 @@ const WorkflowDetailPage = () => {
       qualification_until: trainPlan.qualificationUntil,
       status: trainPlan.status,
     };
-    try {
-      if (trainPlan.carrierId) await apiRequest(`/api/teachers/${trainPlan.carrierId}`, { method: 'PATCH', body: JSON.stringify(body) });
-      else await apiRequest(`/api/organizations/${desk.organizationId}/teachers`, { method: 'POST', body: JSON.stringify(body) });
-    } catch (reason) {
-      message.error(errorText(reason));
+    if (!desk.id.startsWith('gap-')) {
+      try {
+        if (trainPlan.carrierId) await apiRequest(`/api/teachers/${trainPlan.carrierId}`, { method: 'PATCH', body: JSON.stringify(body) });
+        else await apiRequest(`/api/organizations/${desk.organizationId}/teachers`, { method: 'POST', body: JSON.stringify(body) });
+      } catch (reason) {
+        message.error(errorText(reason));
+        return;
+      }
     }
+    await go(forward?.id);
   };
 
   const closeTransfer = async () => {
     if (!transferPlan?.enabled || !transferPlan.licenseId || !transferPlan.transferredOn) return;
-    const moved = await go(forward?.id);
-    if (!moved || desk.id.startsWith('gap-')) return;
-    try {
-      await apiRequest(`/api/licenses/${transferPlan.licenseId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          transfer_status: 'transferred',
-          product_access: transferPlan.access,
-          transferred_on: transferPlan.transferredOn,
-        }),
-      });
-    } catch (reason) {
-      message.error(errorText(reason));
+    if (!desk.id.startsWith('gap-')) {
+      try {
+        await apiRequest(`/api/licenses/${transferPlan.licenseId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            transfer_status: 'transferred',
+            product_access: transferPlan.access,
+            transferred_on: transferPlan.transferredOn,
+          }),
+        });
+      } catch (reason) {
+        message.error(errorText(reason));
+        return;
+      }
     }
+    await go(forward?.id);
   };
 
   const closeLicense = async () => {
     if (!licensePlan?.enabled || !licensePlan.fileId || !licensePlan.signedOn || !licensePlan.validUntil) return;
-    const moved = await go(forward?.id);
-    if (!moved || desk.id.startsWith('gap-')) return;
-    try {
-      await apiRequest(`/api/organizations/${desk.organizationId}/licenses`, {
-        method: 'POST',
-        body: JSON.stringify({
-          program_instance_id: desk.id,
-          license_number: licensePlan.number,
-          signed_at: `${licensePlan.signedOn}T00:00:00Z`,
-          valid_until: `${licensePlan.validUntil}T00:00:00Z`,
-          attachment_id: licensePlan.fileId,
-          comment: licensePlan.volume || null,
-          transfer_status: 'not_transferred',
-        }),
-      });
-    } catch (reason) {
-      message.error(errorText(reason));
+    if (!desk.id.startsWith('gap-')) {
+      try {
+        await apiRequest(`/api/organizations/${desk.organizationId}/licenses`, {
+          method: 'POST',
+          body: JSON.stringify({
+            program_instance_id: desk.id,
+            license_number: licensePlan.number,
+            signed_at: `${licensePlan.signedOn}T00:00:00Z`,
+            valid_until: `${licensePlan.validUntil}T00:00:00Z`,
+            attachment_id: licensePlan.fileId,
+            comment: licensePlan.volume || null,
+            transfer_status: 'not_transferred',
+          }),
+        });
+      } catch (reason) {
+        message.error(errorText(reason));
+        return;
+      }
     }
+    await go(forward?.id);
   };
 
   const closeSignedContract = async () => {
     if (!signPlan?.enabled || !signPlan.fileId || !signPlan.signedOn) return;
-    const moved = await go(forward?.id);
-    if (!moved || desk.id.startsWith('gap-')) return;
-    try {
-      await apiRequest(`/api/organizations/${desk.organizationId}/contracts`, {
-        method: 'POST',
-        body: JSON.stringify({
-          number: signPlan.number,
-          signed_on: signPlan.signedOn,
-          valid_until: signPlan.validUntil ? `${signPlan.validUntil}T00:00:00Z` : null,
-          status: 'signed',
-          attachment_id: signPlan.fileId,
-          comment: signPlan.signer || null,
-        }),
-      });
-    } catch (reason) {
-      message.error(errorText(reason));
+    if (!desk.id.startsWith('gap-')) {
+      try {
+        await apiRequest(`/api/organizations/${desk.organizationId}/contracts`, {
+          method: 'POST',
+          body: JSON.stringify({
+            number: signPlan.number,
+            signed_on: signPlan.signedOn,
+            valid_until: signPlan.validUntil ? `${signPlan.validUntil}T00:00:00Z` : null,
+            status: 'signed',
+            attachment_id: signPlan.fileId,
+            comment: signPlan.signer || null,
+          }),
+        });
+      } catch (reason) {
+        message.error(errorText(reason));
+        return;
+      }
     }
+    await go(forward?.id);
   };
 
   const reopen = async () => {
@@ -616,6 +624,7 @@ const WorkflowDetailPage = () => {
                   windowId={desk.windowId}
                   healthBand={desk.healthBand}
                   healthScore={desk.healthScore}
+                  actorName={desk.kam}
                   stages={desk.stages.map((stage) => ({ id: stage.id, name: stage.name, code: stage.code, status: stage.status, dueAt: stage.dueAt }))}
                   onOpenStage={(stageId) => { if (stageId) setSelectedId(stageId); }}
                 />
@@ -1034,17 +1043,22 @@ const WorkflowDetailPage = () => {
                   <Button
                     type="primary"
                     style={periodResults && periodPlan?.early && periodPlan.enabled ? { background: '#f5c451', borderColor: '#f5c451', color: '#3d2e00' } : undefined}
-                    disabled={periodResults ? false : refused || desk.status === 'completed' || (classesRunning ? !runningPlan?.enabled || !canMoveForward : startClasses ? !startPlan?.enabled || !canMoveForward : curriculum ? !curriculumPlan?.enabled || !canMoveForward : confirmTeacher ? !confirmPlan?.enabled || !canMoveForward : trainTeacher ? !trainPlan?.enabled || !canMoveForward : transferAccess ? !transferPlan?.enabled || !canMoveForward : signLicense ? !licensePlan?.enabled || !canMoveForward : signContract ? !signPlan?.enabled || !canMoveForward : documentPackage ? !packagePlan?.enabled || !canMoveForward : identifyNeed ? !identifyPlan?.enabled || !canMoveForward : firstMeeting ? !meetingPlan?.enabled || (meetingPlan.action === 'forward' && !canMoveForward) : findContact ? !canMoveForward || stageBlockers === null : !canClose)}
-                    loading={periodResults ? false : busy}
+                    disabled={periodResults ? !periodPlan?.enabled : refused || desk.status === 'completed' || (classesRunning ? !runningPlan?.enabled || !canMoveForward : startClasses ? !startPlan?.enabled || !canMoveForward : curriculum ? !curriculumPlan?.enabled || !canMoveForward : confirmTeacher ? !confirmPlan?.enabled || !canMoveForward : trainTeacher ? !trainPlan?.enabled || !canMoveForward : transferAccess ? !transferPlan?.enabled || !canMoveForward : signLicense ? !licensePlan?.enabled || !canMoveForward : signContract ? !signPlan?.enabled || !canMoveForward : documentPackage ? !packagePlan?.enabled || !canMoveForward : identifyNeed ? !identifyPlan?.enabled || !canMoveForward : firstMeeting ? !meetingPlan?.enabled || (meetingPlan.action === 'forward' && !canMoveForward) : findContact ? !canMoveForward || stageBlockers === null : !canClose)}
+                    loading={busy}
                     onClick={() => {
                       if (firstMeeting && meetingPlan?.action === 'refuse') {
                         void refuse();
                         return;
                       }
                       if (periodResults) {
-                        rememberControlEntered(desk.id);
-                        setControlEntered(true);
-                        setSelectedId(controlId);
+                        void (async () => {
+                          const target = serverControlStage?.id ?? forward?.id;
+                          const moved = await go(target);
+                          if (moved === false) return;
+                          rememberControlEntered(desk.id);
+                          setControlEntered(true);
+                          setSelectedId(controlId);
+                        })();
                         return;
                       }
                       if (classesRunning || startClasses || curriculum) {

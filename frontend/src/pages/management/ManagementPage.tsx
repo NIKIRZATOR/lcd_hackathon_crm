@@ -19,7 +19,7 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { apiRequest } from '../../api/client';
 import { useAuth } from '../../auth';
@@ -31,6 +31,7 @@ import SystemStatusTab from './SystemStatusTab';
 import UserAccessTab from './UserAccessTab';
 import CatalogsTab from './catalogs/CatalogsTab';
 import ImportDataTab from './imports/ImportDataTab';
+import { listLocalPlaybooks } from './playbookEditor/storage';
 
 type Stage = {
   id: string;
@@ -72,6 +73,7 @@ type DocumentationRequest = {
 
 const ManagementPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = Boolean(user?.roles.includes('ADMIN'));
   const [catalogStages, setCatalogStages] = useState<CatalogStage[]>([]);
@@ -79,11 +81,9 @@ const ManagementPage = () => {
   const [selected, setSelected] = useState<Playbook>();
   const [draft, setDraft] = useState<WorkflowVersion>();
   const [stages, setStages] = useState<Stage[]>([]);
-  const [newName, setNewName] = useState('');
   const [stageName, setStageName] = useState('');
   const [stageSla, setStageSla] = useState<number | null>(null);
   const [stageOptional, setStageOptional] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string>();
   const [factStage, setFactStage] = useState<Stage>();
   const [facts, setFacts] = useState<ChecklistItem[]>([]);
@@ -122,7 +122,19 @@ const ManagementPage = () => {
         apiRequest<Playbook[]>('/api/management/playbooks'),
       ]);
       setCatalogStages(loadedStages);
-      setPlaybooks(loadedPlaybooks);
+      const local = listLocalPlaybooks();
+      const known = new Set(loadedPlaybooks.map((item) => item.id));
+      setPlaybooks([
+        ...local.filter((item) => !known.has(item.id)).map((item) => ({
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          applies_to_type: item.basedOn ? `copy:${item.basedOn}` : 'custom',
+          status: item.status,
+          published_version: item.published_version,
+        })),
+        ...loadedPlaybooks,
+      ]);
     } catch {
       setError('Не удалось загрузить управление.');
     }
@@ -163,28 +175,6 @@ const ManagementPage = () => {
         setDocumentationRequests,
       );
   }, [isAdmin]);
-
-  const createTemplate = async () => {
-    if (!newName.trim()) {
-      setError('Введите название нового эталона перед созданием.');
-      return;
-    }
-    setError(undefined);
-    setCreating(true);
-    try {
-      const template = await apiRequest<Playbook>('/api/workflows/templates', {
-        method: 'POST',
-        body: JSON.stringify({ name: newName.trim() }),
-      });
-      setNewName('');
-      await load();
-      await loadDraft(template);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Не удалось создать эталон.');
-    } finally {
-      setCreating(false);
-    }
-  };
 
   const addStage = async () => {
     if (!selected || !draft || !stageName.trim()) return;
@@ -291,13 +281,8 @@ const ManagementPage = () => {
             children: (
               <>
                 <Space style={{ marginBottom: 16 }}>
-                  <Input
-                    value={newName}
-                    onChange={(event) => setNewName(event.target.value)}
-                    placeholder="Название нового эталона"
-                  />
-                  <Button type="primary" loading={creating} onClick={() => void createTemplate()}>
-                    Создать эталон
+                  <Button type="primary" onClick={() => navigate('/management/playbooks/new')}>
+                    Создать плейбук
                   </Button>
                 </Space>
                 <Table<Playbook>
@@ -322,8 +307,8 @@ const ManagementPage = () => {
                     {
                       title: 'Действие',
                       render: (_, record) => (
-                        <Button onClick={() => void loadDraft(record)}>
-                          Редактировать черновик
+                        <Button onClick={() => navigate(`/management/playbooks/${record.id}`)}>
+                          Открыть в конструкторе
                         </Button>
                       ),
                     },
