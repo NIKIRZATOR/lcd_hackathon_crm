@@ -1761,6 +1761,57 @@ def _program_stage_rows(
     )
 
 
+def _legacy_interaction_stage_rows(
+    db: Session, interaction: UniversityInteraction
+) -> list[tuple[WorkflowStageInstance, str]]:
+    return list(
+        db.execute(
+            select(WorkflowStageInstance, WorkflowStageCatalog.code)
+            .join(WorkflowStage, WorkflowStage.id == WorkflowStageInstance.workflow_stage_id)
+            .join(WorkflowStageCatalog, WorkflowStageCatalog.id == WorkflowStage.stage_catalog_id)
+            .where(WorkflowStageInstance.interaction_id == interaction.id)
+        ).all()
+    )
+
+
+def _sync_legacy_interaction_stages(db: Session, program: ProgramInstance) -> None:
+    if program.legacy_interaction_id is None:
+        return
+
+    interaction = db.get(UniversityInteraction, program.legacy_interaction_id)
+    if interaction is None:
+        return
+
+    program_rows = _program_stage_rows(db, program)
+    interaction_rows = _legacy_interaction_stage_rows(db, interaction)
+    interaction_by_code = {code: instance for instance, code in interaction_rows}
+
+    for interaction_instance in interaction_by_code.values():
+        interaction_instance.status = "NOT_STARTED"
+        interaction_instance.started_at = None
+        interaction_instance.due_at = None
+        interaction_instance.completed_at = None
+        interaction_instance.skipped_at = None
+
+    current_code = None
+    for program_instance, _stage, code in program_rows:
+        interaction_instance = interaction_by_code.get(code)
+        if interaction_instance is None:
+            continue
+        interaction_instance.status = program_instance.status
+        interaction_instance.started_at = program_instance.started_at
+        interaction_instance.due_at = program_instance.due_at
+        interaction_instance.completed_at = program_instance.completed_at
+        interaction_instance.skipped_at = program_instance.skipped_at
+        if program_instance.id == program.current_stage_instance_id:
+            current_code = code
+
+    current_interaction_instance = interaction_by_code.get(current_code)
+    interaction.current_stage_instance_id = (
+        current_interaction_instance.id if current_interaction_instance is not None else None
+    )
+
+
 def _set_program_active_stage(
     db: Session,
     program: ProgramInstance,
@@ -1993,6 +2044,11 @@ def seed_university_stage_distribution(db: Session) -> None:
         completed_program = db.scalar(fallback)
     if completed_program is not None and (control_program is None or completed_program.id != control_program.id):
         _set_program_control_state(db, completed_program, completed=True, ordinal=2)
+
+    for program in db.scalars(
+        select(ProgramInstance).where(ProgramInstance.legacy_interaction_id.is_not(None))
+    ).all():
+        _sync_legacy_interaction_stages(db, program)
 
     db.flush()
 
