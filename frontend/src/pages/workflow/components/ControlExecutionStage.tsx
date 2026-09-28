@@ -63,7 +63,12 @@ const ControlExecutionStage = ({ programId, organizationId, archived, stages, he
     loadProgramControl<Stored>(programId)
       .then((control) => {
         if (cancelled) return;
-        const payload = control?.payload ?? emptyStored();
+        const raw = control?.payload;
+        const payload: Stored = {
+          comments: Array.isArray(raw?.comments) ? raw.comments : [],
+          archive: Array.isArray(raw?.archive) ? raw.archive : null,
+          checkedAt: typeof raw?.checkedAt === 'string' ? raw.checkedAt : null,
+        };
         setStored(payload);
         if (payload.archive) setSignals(payload.archive);
       })

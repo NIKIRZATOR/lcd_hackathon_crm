@@ -265,7 +265,7 @@ const PlaybookEditorPage = () => {
   }, [choice, id, playbooks]);
 
   useEffect(() => {
-    if (choice || !ready) return;
+    if (choice || !ready || draft.status !== 'draft') return;
     const handle = window.setTimeout(() => {
       void apiRequest(`/api/management/playbooks/${draft.id}/editor`, { method: 'PUT', body: JSON.stringify(mapDraftToPayload(draft)) })
         .then(() => setSavedAt(new Date().toISOString()))
