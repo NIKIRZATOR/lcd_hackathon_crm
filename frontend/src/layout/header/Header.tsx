@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { Avatar, Badge, Button, Divider, Dropdown, Layout, Space, Typography } from 'antd';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth';
 import styles from './Header.module.scss';
 
@@ -22,7 +22,7 @@ type HeaderProps = {
 const userMenuItems: MenuProps['items'] = [
   {
     key: 'profile',
-    label: 'Профиль',
+    label: 'Мой профиль',
     icon: <UserOutlined />,
   },
   {
@@ -43,10 +43,11 @@ const userMenuItems: MenuProps['items'] = [
 
 const Header = ({ showMenuButton, onMenuClick }: HeaderProps) => {
   const { logout, user } = useAuth();
+  const navigate = useNavigate();
 
   const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profile') {
-      console.log('Профиль');
+      navigate('/profile');
     }
 
     if (key === 'settings') {

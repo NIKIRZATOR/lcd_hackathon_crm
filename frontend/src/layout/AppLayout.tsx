@@ -1,12 +1,13 @@
-import { ApartmentOutlined, BankOutlined, FileTextOutlined, HomeOutlined, MenuOutlined, QuestionCircleOutlined, SettingOutlined } from '@ant-design/icons';
+import { ApartmentOutlined, BankOutlined, FileTextOutlined, HomeOutlined, LogoutOutlined, MenuOutlined, QuestionCircleOutlined, SettingOutlined, UserOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import type { ReactNode } from 'react';
-import { Button, Drawer, FloatButton, Grid, Layout, Menu, Space, Tag, Typography } from 'antd';
+import { Avatar, Button, Drawer, Dropdown, FloatButton, Grid, Layout, Menu, Space } from 'antd';
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth';
 import DocumentationDrawer from '../documentation/DocumentationDrawer';
+import { readAvatar } from '../pages/profile/avatarStorage';
 
 import styles from './AppLayout.module.scss';
 
@@ -44,9 +45,29 @@ const AppLayout = () => {
       </div>
       <Space className={styles.headerRight}>
         <Button type="text" aria-label="Документация" icon={<QuestionCircleOutlined />} onClick={() => setDocumentationOpen(true)} />
-        <Typography.Text className={styles.userName}>{user?.full_name ?? user?.username}</Typography.Text>
-        {user?.roles.map((role) => <Tag key={role}>{role}</Tag>)}
-        <Button type="link" onClick={() => void logout()}>Выйти</Button>
+        <Dropdown
+          trigger={['click']}
+          placement="bottomRight"
+          menu={{
+            items: [
+              { key: 'profile', label: 'Мой профиль', icon: <UserOutlined /> },
+              { type: 'divider' },
+              { key: 'logout', label: 'Выйти', icon: <LogoutOutlined />, danger: true },
+            ],
+            onClick: ({ key }) => {
+              if (key === 'profile') navigate('/profile');
+              if (key === 'logout') void logout();
+            },
+          }}
+        >
+          <Avatar
+            size={40}
+            src={user ? readAvatar(user.id) || undefined : undefined}
+            style={{ cursor: 'pointer' }}
+          >
+            {(user?.full_name || user?.username || 'П').trim().slice(0, 1).toUpperCase()}
+          </Avatar>
+        </Dropdown>
       </Space>
     </Header>
     <Content className={styles.content}><div className={styles.contentInner}><Outlet /></div></Content>
