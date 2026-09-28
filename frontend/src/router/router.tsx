@@ -6,6 +6,7 @@ import Layout from '../layout';
 import AnalyticsPage from '../pages/analytics/AnalyticsPage';
 import HomePage from '../pages/home/HomePage';
 import LoginPage from '../pages/login/LoginPage';
+import ProfilePage from '../pages/profile/ProfilePage';
 import ManagementPage from '../pages/management/ManagementPage';
 import PlaybookEditorPage from '../pages/management/playbookEditor/PlaybookEditorPage';
 import OrganizationDetailPage from '../pages/organizations/UniversityDetailPage';
@@ -36,6 +37,7 @@ const AppRoutes = () => (
       }
     >
       <Route path="/home" element={<HomePage />} />
+      <Route path="/profile" element={<ProfilePage />} />
       <Route path="/organizations" element={<OrganizationsPage />} />
       <Route path="/organizations/:id" element={<OrganizationDetailPage />} />
       <Route path="/workflows" element={<WorkflowPage />} />
