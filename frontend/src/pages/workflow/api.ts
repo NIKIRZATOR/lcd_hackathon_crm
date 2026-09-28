@@ -423,6 +423,12 @@ export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
   const people = await apiRequest<Array<{ id: string; full_name: string; role_code: string; is_active: boolean }>>(`/api/organizations/${program.organization_id}/stakeholders`).catch(() => []);
   const action = nba.find((item) => item.program_instance_id === id);
   const students = metrics?.students_count ?? null;
+  // Older API responses may omit the current instance pointer.  The stage row
+  // itself still carries enough runtime state to open the correct workspace.
+  const currentStageId = workflow.current_stage_instance_id
+    || workflow.stages.find((stage) => stage.status.toLowerCase() === 'in_progress')?.id
+    || workflow.stages.find((stage) => stage.code === program.current_stage_code)?.id
+    || null;
 
   return {
     id,
@@ -439,7 +445,7 @@ export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
     healthBand: bandOf(program.health_score, program.health_band),
     students,
     stageCode: program.current_stage_code,
-    currentStageId: workflow.current_stage_instance_id,
+    currentStageId,
     banner: action?.reason || (students > 0 && program.current_stage_code === 'classes_running' ? `LMS: ${students} студентов. Подтвердить ведение занятий?` : emptyActionText),
     bannerTone: action ? (action.severity === 'critical' ? 'warning' : 'info') : students > 0 && program.current_stage_code === 'classes_running' ? 'success' : 'info',
     people: people.filter((person) => person.is_active !== false).map((person) => ({ id: (person as { id?: string }).id || person.full_name, name: person.full_name, role: person.role_code, roleCode: person.role_code })),

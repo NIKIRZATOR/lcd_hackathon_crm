@@ -162,7 +162,7 @@ const ControlExecutionStage = ({ programId, organizationId, archived, stages, he
 
   const criticalCount = signals.filter((signal) => signal.level === 'critical').length;
   const warningCount = signals.filter((signal) => signal.level === 'warning').length;
-  const healthTone: ControlLevel = healthBand === 'red' || level === 'critical' ? 'critical' : healthBand === 'yellow' || level === 'warning' ? 'warning' : 'ok';
+  const healthTone: ControlLevel = healthBand === 'red' ? 'critical' : healthBand === 'yellow' ? 'warning' : 'ok';
   const addComment = () => {
     if (!comment.trim()) return;
     setStored((current) => ({ ...current, comments: [{ id: `c-${Date.now()}`, text: comment.trim(), at: new Date().toISOString(), user: actorName, signalId: linkedSignal }, ...current.comments] }));
