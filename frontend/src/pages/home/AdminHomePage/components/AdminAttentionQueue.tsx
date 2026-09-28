@@ -1,6 +1,7 @@
-import { Button, Card, Empty, List, Table, Tag, Typography } from 'antd';
+import { Badge, Button, Card, Empty, List, Table, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
+import { useTableLayout } from '../../../organizations/components/tableLayout';
 import styles from '../AdminHomePage.module.scss';
 import type { Activity, AttentionItem, RecentJob } from '../types';
 
@@ -10,9 +11,17 @@ type AdminAttentionQueueProps = { items: AttentionItem[]; activity: Activity[]; 
 
 const AdminAttentionQueue = ({ items, activity, jobs }: AdminAttentionQueueProps) => {
   const navigate = useNavigate();
+  const layout = useTableLayout();
+
   return (
     <section className={styles.mainColumn}>
-      <Card title="Требует внимания" extra={<Tag>{items.length}</Tag>}>
+      <section className={styles.attentionSection} aria-labelledby="attention-title">
+        <div className={styles.sectionHeader}>
+          <Typography.Title level={4} id="attention-title">
+            Требует внимания
+          </Typography.Title>
+          <Badge className={styles.attentionCount} count={items.length} showZero />
+        </div>
         <Table<AttentionItem>
           rowKey={(item) => `${item.priority}-${item.event}`}
           dataSource={items}
@@ -25,11 +34,13 @@ const AdminAttentionQueue = ({ items, activity, jobs }: AdminAttentionQueueProps
               />
             ),
           }}
+          size={layout === 'narrow' ? 'small' : 'middle'}
+          scroll={layout === 'narrow' ? { x: 640 } : undefined}
           columns={[
             {
               title: 'Приоритет',
               dataIndex: 'priority',
-              width: 100,
+              width: layout === 'wide' ? '10%' : 88,
               render: (value: AttentionItem['priority']) => (
                 <Tag color={attentionColor[value]}>{value}</Tag>
               ),
@@ -54,14 +65,10 @@ const AdminAttentionQueue = ({ items, activity, jobs }: AdminAttentionQueueProps
             },
           ]}
         />
-      </Card>
+      </section>
       <Card
         title="Последняя активность"
-        extra={
-          <Button type="link" onClick={() => navigate('/management')}>
-            Управление
-          </Button>
-        }
+        extra={<Button onClick={() => navigate('/management')}>Управление</Button>}
       >
         <List
           size="small"
