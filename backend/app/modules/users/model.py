@@ -36,6 +36,11 @@ class User(ModelBase):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(String(64), nullable=False, default="USER")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    avatar_file_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("files.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     roles: Mapped[list[Role]] = relationship(Role, secondary=user_roles, lazy="selectin")
 
 

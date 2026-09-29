@@ -5,6 +5,9 @@ export type AuthUser = {
   email: string | null;
   full_name: string;
   roles: string[];
+  has_avatar: boolean;
+  supervisor_name: string | null;
+  team_members: string[];
 };
 
 export type AuthContextValue = {

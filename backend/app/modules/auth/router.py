@@ -1,11 +1,16 @@
+from datetime import datetime, timezone
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session, aliased
 
+from app.core.database import get_db_session
 from app.core.config import settings
 from app.modules.auth.dependencies import get_current_user, require_roles
 from app.modules.auth.schemas import CurrentUserRead, TokenRead
-from app.modules.users.model import User
+from app.modules.users.model import ManagerMembership, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -59,7 +64,11 @@ def login_for_swagger(form: OAuth2PasswordRequestForm = Depends()) -> TokenRead:
     )
 
 
-def _to_current_user_read(user: User) -> CurrentUserRead:
+def _to_current_user_read(
+    user: User,
+    supervisor_name: str | None,
+    team_members: list[str],
+) -> CurrentUserRead:
     return CurrentUserRead(
         id=user.id,
         keycloak_user_id=user.keycloak_user_id,
@@ -67,12 +76,50 @@ def _to_current_user_read(user: User) -> CurrentUserRead:
         email=user.email,
         full_name=user.full_name,
         roles=[role.name for role in user.roles],
+        has_avatar=user.avatar_file_id is not None,
+        supervisor_name=supervisor_name,
+        team_members=team_members,
     )
 
 
 @router.get("/me", response_model=CurrentUserRead)
-def read_current_user(current_user: User = Depends(get_current_user)) -> CurrentUserRead:
-    return _to_current_user_read(current_user)
+def read_current_user(
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> CurrentUserRead:
+    manager = aliased(User)
+    now = datetime.now(timezone.utc)
+    supervisor = db.execute(
+        select(manager.id, manager.full_name)
+        .join(ManagerMembership, ManagerMembership.manager_user_id == manager.id)
+        .where(
+            ManagerMembership.kam_user_id == current_user.id,
+            ManagerMembership.is_active.is_(True),
+            or_(ManagerMembership.valid_from.is_(None), ManagerMembership.valid_from <= now),
+            or_(ManagerMembership.valid_to.is_(None), ManagerMembership.valid_to >= now),
+        )
+        .order_by(manager.full_name)
+        .limit(1)
+    ).first()
+    team_manager_id = current_user.id if any(role.name == "MANAGER" for role in current_user.roles) else (supervisor[0] if supervisor else None)
+    team_members = (
+        list(
+            db.scalars(
+                select(User.full_name)
+                .join(ManagerMembership, ManagerMembership.kam_user_id == User.id)
+                .where(
+                    ManagerMembership.manager_user_id == team_manager_id,
+                    ManagerMembership.is_active.is_(True),
+                    or_(ManagerMembership.valid_from.is_(None), ManagerMembership.valid_from <= now),
+                    or_(ManagerMembership.valid_to.is_(None), ManagerMembership.valid_to >= now),
+                )
+                .order_by(User.full_name)
+            ).all()
+        )
+        if team_manager_id is not None
+        else []
+    )
+    return _to_current_user_read(current_user, supervisor[1] if supervisor else None, team_members)
 
 
 @router.get("/role-check")

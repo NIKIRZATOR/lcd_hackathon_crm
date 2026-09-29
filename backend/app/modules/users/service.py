@@ -1,15 +1,24 @@
-from uuid import UUID
+from datetime import datetime, timedelta, timezone
+from hashlib import sha256
+from io import BytesIO
+from pathlib import Path
+from uuid import UUID, uuid4
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.common.repository import ListResult
 from app.modules.users.model import ManagerMembership, Role, User
 from app.modules.users.repository import ManagerMembershipRepository, UserRepository
 from app.modules.users.schemas import ManagerMembershipCreate, ManagerMembershipUpdate
+from app.core.config import settings
+from app.modules.documents.model import File
+from app.storage import get_storage_adapter
 
 
 SUPPORTED_AUTH_ROLES = {"KAM", "MANAGER", "ADMIN"}
+AVATAR_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
 
 class UserService:
@@ -91,6 +100,118 @@ class UserService:
         self.db.commit()
         self.db.refresh(user)
         return user
+
+    def avatar_file(self, user: User) -> File:
+        if user.avatar_file_id is None:
+            raise HTTPException(status_code=404, detail="Avatar not found")
+        file_record = self.db.get(File, user.avatar_file_id)
+        if (
+            file_record is None
+            or file_record.attachment_kind != "user_avatar"
+            or file_record.deleted_at is not None
+            or file_record.purged_at is not None
+        ):
+            raise HTTPException(status_code=404, detail="Avatar not found")
+        return file_record
+
+    def stream_avatar(self, file_record: File):
+        if not file_record.bucket or not file_record.object_key:
+            raise HTTPException(status_code=409, detail="Avatar storage metadata is missing")
+        stream = get_storage_adapter().get_stream(
+            bucket=file_record.bucket,
+            object_key=file_record.object_key,
+        )
+
+        def chunks():
+            try:
+                while chunk := stream.read(1024 * 1024):
+                    yield chunk
+            finally:
+                close = getattr(stream, "close", None)
+                if close is not None:
+                    close()
+
+        return chunks()
+
+    def upload_avatar(self, user: User, upload: UploadFile) -> File:
+        original_name = Path(upload.filename or "").name
+        extension = Path(original_name).suffix.lower()
+        expected_content_type = AVATAR_TYPES.get(extension)
+        if expected_content_type is None or upload.content_type != expected_content_type:
+            raise HTTPException(status_code=422, detail="Supported avatar formats: JPG, PNG, WebP")
+        content = upload.file.read()
+        if not content:
+            raise HTTPException(status_code=422, detail="Avatar file is empty")
+        if len(content) > MAX_AVATAR_BYTES:
+            raise HTTPException(status_code=413, detail="Avatar file is too large")
+        if not self._is_valid_avatar(content, extension):
+            raise HTTPException(status_code=422, detail="Avatar file content does not match its format")
+
+        object_name = f"{uuid4()}{extension}"
+        bucket = settings.s3_bucket_user_avatars
+        object_key = f"users/{user.id}/avatars/{object_name}"
+        storage = get_storage_adapter()
+        storage.put(
+            bucket=bucket,
+            object_key=object_key,
+            data=BytesIO(content),
+            length=len(content),
+            content_type=upload.content_type,
+        )
+        try:
+            previous_avatar_id = user.avatar_file_id
+            avatar = File(
+                original_name=original_name,
+                storage_name=object_name,
+                storage_path=f"{bucket}/{object_key}",
+                mime_type=upload.content_type,
+                extension=extension.lstrip("."),
+                size_bytes=len(content),
+                checksum=sha256(content).hexdigest(),
+                provider="S3",
+                bucket=bucket,
+                object_key=object_key,
+                attachment_kind="user_avatar",
+                uploaded_by=user.id,
+                scan_status="NOT_SCANNED",
+            )
+            self.db.add(avatar)
+            self.db.flush()
+            user.avatar_file_id = avatar.id
+            self._soft_delete_avatar(previous_avatar_id, user.id)
+            self.db.commit()
+            self.db.refresh(avatar)
+            return avatar
+        except Exception:
+            self.db.rollback()
+            storage.delete(bucket=bucket, object_key=object_key)
+            raise
+
+    def delete_avatar(self, user: User) -> None:
+        if user.avatar_file_id is None:
+            return
+        self._soft_delete_avatar(user.avatar_file_id, user.id)
+        user.avatar_file_id = None
+        self.db.commit()
+
+    def _soft_delete_avatar(self, file_id: UUID | None, actor_user_id: UUID) -> None:
+        if file_id is None:
+            return
+        file_record = self.db.get(File, file_id)
+        if file_record is None:
+            return
+        now = datetime.now(timezone.utc)
+        file_record.deleted_at = now
+        file_record.delete_after = now + timedelta(days=settings.file_retention_days)
+        file_record.deleted_by = actor_user_id
+
+    @staticmethod
+    def _is_valid_avatar(content: bytes, extension: str) -> bool:
+        if extension == ".png":
+            return content.startswith(b"\x89PNG\r\n\x1a\n")
+        if extension in {".jpg", ".jpeg"}:
+            return content.startswith(b"\xff\xd8\xff")
+        return len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP"
 
 
 class ManagerMembershipService:

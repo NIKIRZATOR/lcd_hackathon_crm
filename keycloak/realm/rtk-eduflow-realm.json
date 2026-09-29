@@ -95,7 +95,8 @@
       ],
       "clientRoles": {
         "rtk-eduflow-backend": ["KAM"]
-      }
+      },
+      "realmRoles": ["default-roles-rtk-eduflow"]
     },
     {
       "username": "kam2",
@@ -112,7 +113,8 @@
       ],
       "clientRoles": {
         "rtk-eduflow-backend": ["KAM"]
-      }
+      },
+      "realmRoles": ["default-roles-rtk-eduflow"]
     },
     {
       "username": "manager1",
@@ -129,7 +131,8 @@
       ],
       "clientRoles": {
         "rtk-eduflow-backend": ["MANAGER"]
-      }
+      },
+      "realmRoles": ["default-roles-rtk-eduflow"]
     },
     {
       "username": "admin1",
@@ -146,7 +149,8 @@
       ],
       "clientRoles": {
         "rtk-eduflow-backend": ["ADMIN"]
-      }
+      },
+      "realmRoles": ["default-roles-rtk-eduflow"]
     },
     {
       "username": "viewer1",
@@ -160,7 +164,8 @@
           "value": "viewer1",
           "temporary": false
         }
-      ]
+      ],
+      "realmRoles": ["default-roles-rtk-eduflow"]
     }
   ]
 }

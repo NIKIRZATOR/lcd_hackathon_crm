@@ -40,6 +40,7 @@ class UserRead(BaseModel):
     email: str | None
     roles: list[str]
     is_active: bool
+    has_avatar: bool
     created_at: datetime
     updated_at: datetime
 

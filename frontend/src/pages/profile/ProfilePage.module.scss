@@ -7,7 +7,6 @@
 .heroBody { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .heroBody h1 { margin: 0; overflow: hidden; font-size: 20px; line-height: 1.3; text-overflow: ellipsis; }
 .email { overflow: hidden; text-overflow: ellipsis; }
-.secure { margin-bottom: 12px; }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 1024px) {
   .grid { grid-template-columns: 1fr; }

@@ -12,6 +12,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
   const [initialized, setInitialized] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [authSubject, setAuthSubject] = useState<string>();
 
   const getToken = useCallback(async () => {
     if (!keycloak.authenticated) {
@@ -19,7 +20,6 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
 
     await keycloak.updateToken(30);
-
     return keycloak.token;
   }, []);
 
@@ -29,9 +29,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     error: userError,
     refetch: refetchUser,
   } = useQuery({
-    queryKey: ['auth', 'me'],
+    queryKey: ['auth', 'me', authSubject],
     queryFn: () => apiRequest<AuthUser>('/api/auth/me'),
-    enabled: initialized && authenticated,
+    enabled: initialized && authenticated && Boolean(authSubject),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -62,6 +62,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
     initKeycloak()
       .then((isAuthenticated) => {
+        setAuthSubject(isAuthenticated ? keycloak.subject : undefined);
         setAuthenticated(isAuthenticated);
         setInitialized(true);
       })
@@ -74,12 +75,19 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   }, [getToken]);
 
   useEffect(() => {
-    keycloak.onAuthSuccess = () => {
+    const syncAuthenticatedSubject = () => {
+      queryClient.clear();
+      setAuthSubject(keycloak.subject);
       setAuthenticated(true);
+    };
+
+    keycloak.onAuthSuccess = () => {
+      syncAuthenticatedSubject();
     };
 
     keycloak.onAuthLogout = () => {
       queryClient.clear();
+      setAuthSubject(undefined);
       setAuthenticated(false);
     };
 
@@ -88,6 +96,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         console.error('Failed to refresh Keycloak token', error);
 
         queryClient.clear();
+        setAuthSubject(undefined);
         setAuthenticated(false);
       });
     };
