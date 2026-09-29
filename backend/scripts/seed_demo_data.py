@@ -3310,6 +3310,27 @@ def seed_governance_audit_and_requests(db: Session, users: dict[str, User]) -> N
                 },
             )
 
+    # Built-in documentation must use the routes exposed by the frontend.
+    # The Markdown and images themselves are loaded into object storage below.
+    documentation_pages = (
+        ("home", "Главная", "/home", 10),
+        ("organizations", "Организации", "/organizations", 20),
+        ("workflows", "Workflow", "/workflows", 30),
+        ("management", "\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435", "/management", 50),
+        ("reports", "Отчёты", "/reports", 40),
+    )
+    for slug, title, route_pattern, sort_order in documentation_pages:
+        _core_upsert(
+            db,
+            "documentation_pages",
+            {"slug": slug},
+            {
+                "title": title,
+                "route_pattern": route_pattern,
+                "sort_order": sort_order,
+            },
+        )
+
     # Knowledge-base page/request.
     page = _core_upsert(
         db,
@@ -3554,6 +3575,127 @@ def seed_object_storage_records(db: Session, users: dict[str, User]) -> None:
         "documentation_image",
         base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="),
     )
+
+    documentation_dir = Path(
+        os.getenv(
+            "DOCUMENTATION_PRELOAD_DIR",
+            str(Path(__file__).resolve().parents[2] / "preload_data" / "documentation"),
+        )
+    )
+    documentation_specs = (
+        {
+            "slug": "home",
+            "markdown": "home.md",
+            "images": {
+                "1": "01-kam.png", "2": "02-kam.png", "3": "03-kam.png", "3_1": "04-kam-nba.png",
+                "4": "04-kam.png", "5": "05-kam.png", "6": "06-kam.png",
+                "7": "01-manager.png", "8": "02-manager.png", "9": "03-manager.png",
+                "10": "04-manager.png", "11": "05-manager.png", "12": "06-manager.png",
+            },
+        },
+        {
+            "slug": "organizations",
+            "markdown": "organizations.md",
+            "images": {str(number): f"{number:02d}-organizations.png" for number in range(1, 15)},
+        },
+        {
+            "slug": "workflows",
+            "markdown": "workflows.md",
+            "images": {str(number): f"{number:02d}-workflow.png" for number in range(1, 8)},
+        },
+        {
+            "slug": "management",
+            "markdown": "management.md",
+            "images": {str(number): f"{number:02d}-management.png" for number in range(1, 14)},
+        },
+        {
+            "slug": "reports",
+            "markdown": "reports.md",
+            "images": {str(number): f"{number - 12:02d}-reports.png" for number in range(13, 29)},
+        },
+    )
+    page_table = _table(db, "documentation_pages")
+    documentation_images_table = _table(db, "documentation_images")
+    if False:  # Compatibility with the legacy, incorrectly encoded pattern below.
+        marker_pattern = re.compile(
+        r"(?im)^\s*\(?\s*(?:скрин|скр)\.?\s*(\d+(?:_\d+)?)(?:\s+и\s+(\d+))?[^\n]*\)?\s*$"
+    )
+    marker_pattern = re.compile(
+        r"(?im)^\s*\(?\s*(?:\u0441\u043a\u0440\u0438\u043d|\u0441\u043a\u0440)\.?\s*(\d+(?:_\d+)?)(?:\s+\u0438\s+(\d+))?[^\n]*\)?\s*$"
+    )
+    for spec in documentation_specs:
+        source_dir = documentation_dir / spec["slug"]
+        markdown_path = source_dir / spec["markdown"]
+        if not markdown_path.is_file():
+            print(f"[seed] documentation Markdown is missing: {markdown_path}")
+            continue
+        page = (
+            db.execute(select(page_table).where(page_table.c.slug == spec["slug"])).mappings().first()
+            if page_table is not None
+            else None
+        )
+        if page is None:
+            print(f"[seed] documentation page is missing: {spec['slug']}")
+            continue
+
+        markdown_bytes = markdown_path.read_bytes()
+        markdown_file = ensure_file(
+            "documentation",
+            f"preload/{spec['slug']}/{markdown_path.name}",
+            markdown_path.name,
+            "text/markdown",
+            "documentation_markdown",
+            markdown_bytes,
+        )
+        image_ids: dict[str, object] = {}
+        for reference, filename in spec["images"].items():
+            image_path = source_dir / filename
+            if not image_path.is_file():
+                print(f"[seed] documentation image is missing: {image_path}")
+                continue
+            image_file_record = ensure_file(
+                "documentation",
+                f"preload/{spec['slug']}/{filename}",
+                filename,
+                "image/png",
+                "documentation_image",
+                image_path.read_bytes(),
+            )
+            if image_file_record is None or documentation_images_table is None:
+                continue
+            image = _core_upsert(
+                db,
+                "documentation_images",
+                {"file_id": image_file_record["id"]},
+                {"page_id": page["id"]},
+            )
+            if image is not None:
+                image_ids[reference] = image["id"]
+
+        used_references: set[str] = set()
+
+        def replace_marker(match: re.Match[str]) -> str:
+            references = [reference for reference in match.groups() if reference]
+            images = []
+            for reference in references:
+                image_id = image_ids.get(reference)
+                if image_id is not None:
+                    used_references.add(reference)
+                    images.append(f"![Скрин {reference}](doc-image://{image_id})")
+            return "\n".join(images) if images else match.group(0)
+
+        markdown = marker_pattern.sub(replace_marker, markdown_bytes.decode("utf-8-sig"))
+        remaining = [reference for reference in spec["images"] if reference in image_ids and reference not in used_references]
+        if remaining:
+            markdown += "\n\n## Дополнительные скриншоты\n\n" + "\n\n".join(
+                f"![Скрин {reference}](doc-image://{image_ids[reference]})" for reference in remaining
+            )
+        if markdown_file is not None and page_table is not None:
+            db.execute(
+                page_table.update()
+                .where(page_table.c.id == page["id"])
+                .values(content_markdown=markdown, source_file_id=markdown_file["id"])
+            )
 
     # Lifecycle examples for delete_after/deleted_by/purged_at coverage.
     ensure_file(

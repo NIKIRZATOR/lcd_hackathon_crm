@@ -5,6 +5,8 @@ import {
   DeleteOutlined,
   EditOutlined,
   FileTextOutlined,
+  FullscreenExitOutlined,
+  FullscreenOutlined,
   PlusOutlined,
   QuestionCircleOutlined,
   SearchOutlined,
@@ -61,6 +63,22 @@ const Highlight = ({ value, query }: { value: string; query: string }) => {
   );
 };
 
+const MarkdownText = ({ value, query }: { value: string; query: string }) => (
+  <>
+    {value.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+      const isBold = part.startsWith('**') && part.endsWith('**');
+      const text = isBold ? part.slice(2, -2) : part;
+      return isBold ? (
+        <strong key={index}>
+          <Highlight value={text} query={query} />
+        </strong>
+      ) : (
+        <Highlight key={index} value={text} query={query} />
+      );
+    })}
+  </>
+);
+
 const DocumentationImageView = ({
   pageId,
   imageId,
@@ -101,32 +119,34 @@ const Markdown = ({ value, query, pageId }: { value: string; query: string; page
       if (line.startsWith('### '))
         return (
           <Typography.Title key={index} level={5}>
-            <Highlight value={line.slice(4)} query={query} />
+            <MarkdownText value={line.slice(4)} query={query} />
           </Typography.Title>
         );
       if (line.startsWith('## '))
         return (
           <Typography.Title key={index} level={4}>
-            <Highlight value={line.slice(3)} query={query} />
+            <MarkdownText value={line.slice(3)} query={query} />
           </Typography.Title>
         );
       if (line.startsWith('# '))
         return (
           <Typography.Title key={index} level={3}>
-            <Highlight value={line.slice(2)} query={query} />
+            <MarkdownText value={line.slice(2)} query={query} />
           </Typography.Title>
         );
+      if (['---', '***', '___'].includes(line.trim()))
+        return <hr className={styles.divider} key={index} />;
       if (line.startsWith('- '))
         return (
           <div className={styles.bullet} key={index}>
             <span>✓</span>
-            <Highlight value={line.slice(2)} query={query} />
+            <MarkdownText value={line.slice(2)} query={query} />
           </div>
         );
       if (!line.trim()) return <div className={styles.gap} key={index} />;
       return (
         <Typography.Paragraph key={index}>
-          <Highlight value={line} query={query} />
+          <MarkdownText value={line} query={query} />
         </Typography.Paragraph>
       );
     })}
@@ -141,6 +161,7 @@ const DocumentationDrawer = ({ open, onClose }: { open: boolean; onClose: () => 
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('help');
+  const [fullscreen, setFullscreen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestSubmitting, setRequestSubmitting] = useState(false);
@@ -153,6 +174,7 @@ const DocumentationDrawer = ({ open, onClose }: { open: boolean; onClose: () => 
   const [addingSection, setAddingSection] = useState(false);
   const [sectionForm] = Form.useForm();
   const isAdmin = Boolean(user?.roles.includes('ADMIN'));
+  const canManage = Boolean(user?.roles.some((role) => role === 'ADMIN' || role === 'MANAGER'));
   const load = useCallback(async () => {
     setLoading(true);
     setError(undefined);
@@ -193,11 +215,11 @@ const DocumentationDrawer = ({ open, onClose }: { open: boolean; onClose: () => 
       { title: 'Организации', route: '/organizations', icon: <TeamOutlined /> },
       { title: 'Workflow', route: '/workflows', icon: <CheckSquareOutlined /> },
       { title: 'Отчёты', route: '/reports', icon: <FileTextOutlined /> },
-      ...(isAdmin
+      ...(canManage
         ? [{ title: 'Управление', route: '/management', icon: <SettingOutlined /> }]
         : []),
     ],
-    [isAdmin],
+    [canManage],
   );
   const treeData = useMemo(() => {
     const systemSlugs = new Set([
@@ -318,14 +340,34 @@ const DocumentationDrawer = ({ open, onClose }: { open: boolean; onClose: () => 
       className={styles.drawer}
       closable={false}
       placement="right"
-      width={560}
+      width={fullscreen ? '100vw' : 560}
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        setFullscreen(false);
+        onClose();
+      }}
       styles={{ body: { padding: 0 } }}
     >
       <header className={styles.header}>
         <Typography.Title level={4}>Документация</Typography.Title>
-        <Button type="text" icon={<CloseOutlined />} onClick={onClose} />
+        <span className={styles.headerActions}>
+          <Button
+            type="text"
+            icon={fullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+            aria-label={fullscreen ? 'Свернуть документацию' : 'Развернуть документацию'}
+            title={fullscreen ? 'Свернуть' : 'На весь экран'}
+            onClick={() => setFullscreen((current) => !current)}
+          />
+          <Button
+            type="text"
+            icon={<CloseOutlined />}
+            aria-label="Закрыть документацию"
+            onClick={() => {
+              setFullscreen(false);
+              onClose();
+            }}
+          />
+        </span>
       </header>
       <Tabs
         className={styles.tabs}
