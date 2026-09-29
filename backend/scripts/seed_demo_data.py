@@ -2071,7 +2071,6 @@ def seed_stage5_integration_mappings(db: Session) -> None:
     if course_mapping is None:
         course_mapping = ExternalCourseMapping(source="PAYMENT", external_course_name=course, direction_id=program.direction_id, product_id=program.product_id, status="active")
         db.add(course_mapping)
-        db.flush()
     else:
         course_mapping.direction_id, course_mapping.product_id, course_mapping.status = program.direction_id, program.product_id, "active"
     stream_mapping = db.scalar(select(ExternalStreamMapping).where(ExternalStreamMapping.source == "PAYMENT", ExternalStreamMapping.external_course_name == course, ExternalStreamMapping.external_stream_id == stream))
@@ -2896,11 +2895,19 @@ def seed_integration_signals_full(db: Session) -> None:
     # A payment course mapping is unique by (source, external_course_name). Several
     # ProgramInstance records may use one product/course, so keep newly created
     # mappings visible in this run instead of adding duplicate pending ORM rows.
-    course_mappings = {
-        mapping.external_course_name: mapping
-        for mapping in db.scalars(
+    existing_course_mappings = list(
+        db.scalars(
             select(ExternalCourseMapping).where(ExternalCourseMapping.source == "PAYMENT")
         ).all()
+    )
+    pending_course_mappings = [
+        mapping
+        for mapping in db.new
+        if isinstance(mapping, ExternalCourseMapping) and mapping.source == "PAYMENT"
+    ]
+    course_mappings = {
+        mapping.external_course_name: mapping
+        for mapping in [*existing_course_mappings, *pending_course_mappings]
     }
     for index, program in enumerate(programs, 1):
         org = db.get(Organization, program.organization_id)
