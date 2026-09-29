@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from hashlib import sha256
 from io import BytesIO
@@ -36,9 +37,35 @@ def _cell(value: object) -> str | int | float:
     return value if isinstance(value, (str, int, float)) else str(value)
 
 
-def render_report(rows: list[dict[str, object]], columns: list[str], report_format: str) -> tuple[bytes, str, str]:
+def render_report(
+    rows: list[dict[str, object]],
+    columns: list[str],
+    report_format: str,
+    filter_snapshot: dict[str, object] | None = None,
+) -> tuple[bytes, str, str]:
     selected = _export_columns(columns)
     values = [[REPORT_COLUMNS[column] for column in selected]] + [[_cell(row.get(column)) for column in selected] for row in rows]
+    if report_format == "JSON":
+        payload = {
+            "schema_version": "1.0",
+            "report_type": "programs",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "filters": filter_snapshot or {},
+            "columns": [
+                {"key": column, "title": REPORT_COLUMNS[column]}
+                for column in selected
+            ],
+            "row_count": len(rows),
+            "items": [
+                {column: row.get(column) for column in selected}
+                for row in rows
+            ],
+        }
+        return (
+            json.dumps(payload, ensure_ascii=False, indent=2, default=str).encode("utf-8"),
+            "application/json; charset=utf-8",
+            "json",
+        )
     if report_format == "XLSX":
         from openpyxl import Workbook
 
@@ -108,7 +135,12 @@ class ReportWorker:
                 raise ValueError("Report creator was not found")
             payload = ProgramReportFilter.model_validate(job.filter_snapshot)
             rows = [dict(row) for row in self.db.execute(_statement(payload, self.db, creator)).mappings().all()]
-            content, mime_type, extension = render_report(rows, job.columns_snapshot, job.format)
+            content, mime_type, extension = render_report(
+                rows,
+                job.columns_snapshot,
+                job.format,
+                filter_snapshot=job.filter_snapshot,
+            )
             object_key = f"reports/{job.id}/programs-report.{extension}"
             self.storage.put(bucket=settings.s3_bucket_reports, object_key=object_key, data=BytesIO(content), length=len(content), content_type=mime_type)
             file = File(original_name=f"programs-report.{extension}", storage_name=object_key.rsplit("/", 1)[-1], storage_path=object_key, mime_type=mime_type, extension=extension, size_bytes=len(content), checksum=sha256(content).hexdigest(), provider="minio", bucket=settings.s3_bucket_reports, object_key=object_key, attachment_kind="REPORT", uploaded_by=job.created_by)

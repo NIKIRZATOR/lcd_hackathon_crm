@@ -133,7 +133,7 @@ class ProgramReportFilter(BaseModel):
 
 
 class ProgramReportExportRequest(BaseModel):
-    format: str = Field(pattern="^(XLSX|XLS|PDF)$")
+    format: str = Field(pattern="^(XLSX|XLS|PDF|JSON)$")
     filter: ProgramReportFilter
     columns: list[str] = Field(default_factory=list)
 

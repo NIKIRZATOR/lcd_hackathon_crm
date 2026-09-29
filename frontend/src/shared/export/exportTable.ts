@@ -8,6 +8,18 @@ export const exportTable = async <T extends object>({
   sheetName = 'Отчёт',
   pdfTitle,
 }: ExportTableOptions<T>) => {
+  if (format === 'json') {
+    const { exportTableToJson } = await import('./exportTableToJson');
+
+    exportTableToJson({
+      data,
+      columns,
+      fileName,
+    });
+
+    return;
+  }
+
   if (format === 'pdf') {
     const { exportTableToPdf } = await import('./exportTableToPdf');
 
@@ -31,4 +43,3 @@ export const exportTable = async <T extends object>({
     sheetName,
   });
 };
-
