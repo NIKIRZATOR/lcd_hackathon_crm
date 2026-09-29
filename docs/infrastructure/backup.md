@@ -15,4 +15,15 @@ make backup-schedule
 
 `make backup-schedule` запускает сервис с интервалом `BACKUP_INTERVAL_SECONDS`; по умолчанию это один запуск в сутки. Weekly и monthly snapshots формируются из daily в воскресенье и в первый день месяца; их retention задают `BACKUP_RETENTION_WEEKLY` (в неделях) и `BACKUP_RETENTION_MONTHLY` (в месяцах).
 
+## Шифрование backup
+
+По умолчанию шифрование выключено. Для включения задайте отдельный от PII секрет:
+
+```env
+BACKUP_ENCRYPTION_ENABLED=true
+BACKUP_ENCRYPTION_KEY=<длинный-случайный-секрет>
+```
+
+PostgreSQL, MinIO и Keycloak backup будут сохранены только как `.enc`; временный plaintext удаляется после шифрования. Для восстановления передайте тот же ключ: команда `restore-postgres` автоматически расшифрует `.enc` во временный файл, а `restore-minio` — во временный каталог.
+
 Не резервируются Docker images, исходный код и секреты из `.env`. Для внешнего хранилища следует копировать весь каталог backup в защищённое object storage после проверки checksum.

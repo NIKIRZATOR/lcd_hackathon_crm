@@ -20,6 +20,7 @@ from app.modules.integrations.adapters import (
     parse_vendor_fixture,
     utcnow,
 )
+from app.security.pii import encrypt_pii_payload
 from app.modules.integrations.model import (
     ExternalCourseMapping,
     ExternalStreamMapping,
@@ -555,7 +556,7 @@ class IntegrationSyncService:
             external_key=record.external_key,
             received_at=datetime.now(timezone.utc),
             status="received",
-            payload=record.raw_payload,
+            payload=encrypt_pii_payload(record.raw_payload),
             normalized_payload=record.normalized_payload,
         )
         self.db.add(signal)

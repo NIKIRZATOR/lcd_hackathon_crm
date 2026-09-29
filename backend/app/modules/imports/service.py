@@ -19,6 +19,7 @@ from app.modules.imports.mapping.service import MappingService, import_error
 from app.modules.imports.model import ImportArtifact, ImportJob
 from app.modules.imports.parser.factory import reader_for_path
 from app.storage import StorageAdapter, get_storage_adapter
+from app.security.antivirus import ClamAvScanner, ScanResult
 
 CHUNK_SIZE = 1024 * 1024
 IMPORT_MIME_TYPES = {
@@ -49,6 +50,14 @@ class ImportService:
         extension = Path(original_name).suffix.lower()
         self._validate_upload(original_name=original_name, extension=extension, content_type=upload.content_type)
         size_bytes, checksum, temp_path = self._inspect_to_temp(upload, extension)
+        with temp_path.open("rb") as stream:
+            scan_status = ClamAvScanner().scan(stream)
+        if scan_status is ScanResult.INFECTED:
+            temp_path.unlink(missing_ok=True)
+            raise import_error("IMPORT_FILE_INFECTED", "Import file was rejected by antivirus scan", 422)
+        if scan_status is ScanResult.SCAN_ERROR:
+            temp_path.unlink(missing_ok=True)
+            raise import_error("ANTIVIRUS_UNAVAILABLE", "Antivirus scan is unavailable", 503)
         job = ImportJob(created_by=actor_user_id, status="UPLOADED", header_row=1)
         bucket = settings.s3_bucket_imports
         object_key = ""
@@ -81,7 +90,7 @@ class ImportService:
                 bucket=bucket,
                 object_key=object_key,
                 uploaded_by=actor_user_id,
-                scan_status="NOT_SCANNED",
+                scan_status=scan_status.value,
                 delete_after=datetime.now(timezone.utc) + timedelta(days=settings.import_file_retention_days),
             )
             self.db.add(file_record)
@@ -96,7 +105,7 @@ class ImportService:
                     action="import.upload",
                     entity_type="import_job",
                     entity_id=job.id,
-                    event_metadata={"file_id": str(file_record.id), "checksum": checksum, "bucket": bucket},
+                    event_metadata={"file_id": str(file_record.id), "checksum": checksum, "bucket": bucket, "scan_status": scan_status.value},
                     request_id=request_id,
                 )
             )

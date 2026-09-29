@@ -16,6 +16,24 @@ ensure_root() {
   done
 }
 checksum() { sha256sum "$1" > "$1.sha256"; }
+encryption_enabled() { test "${BACKUP_ENCRYPTION_ENABLED:-false}" = "true"; }
+encrypt_file() {
+  source=$1
+  encryption_enabled || { printf '%s\n' "$source"; return; }
+  test -n "${BACKUP_ENCRYPTION_KEY:-}" || fail "BACKUP_ENCRYPTION_KEY is required when encryption is enabled"
+  target="$source.enc"
+  openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in "$source" -out "$target.partial" -pass env:BACKUP_ENCRYPTION_KEY
+  mv "$target.partial" "$target"
+  rm -f "$source"
+  printf '%s\n' "$target"
+}
+decrypt_file() {
+  source=$1 target=$2
+  case "$source" in *.enc) ;; *) printf '%s\n' "$source"; return ;; esac
+  test -n "${BACKUP_ENCRYPTION_KEY:-}" || fail "BACKUP_ENCRYPTION_KEY is required to restore encrypted backup"
+  openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$source" -out "$target" -pass env:BACKUP_ENCRYPTION_KEY
+  printf '%s\n' "$target"
+}
 prune() { find "$1" -mindepth 1 -maxdepth 1 -mtime +"$2" -exec rm -rf {} +; }
 
 promote_file() {
@@ -43,6 +61,7 @@ backup_postgres() {
   PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -Fc -f "$temporary" "$POSTGRES_DB"
   test -s "$temporary" || fail "PostgreSQL dump is empty"
   mv "$temporary" "$target"
+  target=$(encrypt_file "$target")
   checksum "$target"
   printf '{"created_at":"%s","component":"postgres","format":"pg_dump custom"}\n' "$(date -u +%FT%TZ)" > "$target.json"
   promote_file "$target" postgres
@@ -60,8 +79,19 @@ backup_minio() {
   done
   find "$target" -type f -print0 | sort -z | xargs -0 sha256sum > "$target.sha256"
   printf '{"created_at":"%s","component":"minio","method":"mc mirror"}\n' "$(date -u +%FT%TZ)" > "$target/manifest.json"
-  if test "$(date -u +%u)" = 7; then cp -R "$target" "$root/minio/weekly/"; cp "$target.sha256" "$root/minio/weekly/"; fi
-  if test "$(date -u +%d)" = 01; then cp -R "$target" "$root/minio/monthly/"; cp "$target.sha256" "$root/minio/monthly/"; fi
+  if encryption_enabled; then
+    archive="$target.tar.gz"
+    tar -C "$target" -czf "$archive" .
+    encrypted=$(encrypt_file "$archive")
+    rm -rf "$target"
+    rm -f "$target.sha256"
+    checksum "$encrypted"
+    if test "$(date -u +%u)" = 7; then cp "$encrypted" "$root/minio/weekly/"; cp "$encrypted.sha256" "$root/minio/weekly/"; fi
+    if test "$(date -u +%d)" = 01; then cp "$encrypted" "$root/minio/monthly/"; cp "$encrypted.sha256" "$root/minio/monthly/"; fi
+  else
+    if test "$(date -u +%u)" = 7; then cp -R "$target" "$root/minio/weekly/"; cp "$target.sha256" "$root/minio/weekly/"; fi
+    if test "$(date -u +%d)" = 01; then cp -R "$target" "$root/minio/monthly/"; cp "$target.sha256" "$root/minio/monthly/"; fi
+  fi
   prune "$root/minio/daily" "$daily_days"
   prune "$root/minio/weekly" "$weekly_days"
   prune "$root/minio/monthly" "$monthly_days"
@@ -84,6 +114,7 @@ backup_keycloak() {
     -d '{"exportClients":true,"exportGroupsAndRoles":true}' > "$target.partial"
   test -s "$target.partial" || fail "Keycloak export is empty"
   mv "$target.partial" "$target"
+  target=$(encrypt_file "$target")
   checksum "$target"
   promote_file "$target" keycloak
   log "Keycloak realm export completed: $(basename "$target")"
@@ -125,12 +156,22 @@ restore_postgres() {
   archive=${1:?Backup archive path is required}
   case "$archive" in "$root"/postgres/*) ;; *) fail "Backup path must be inside $root/postgres" ;; esac
   test -f "$archive" || fail "PostgreSQL archive not found"
+  temporary=$(mktemp)
+  archive=$(decrypt_file "$archive" "$temporary")
   PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists "$archive"
+  test "$archive" != "$temporary" || rm -f "$temporary"
 }
 
 restore_minio() {
   archive=${1:?Backup directory path is required}
   case "$archive" in "$root"/minio/*) ;; *) fail "Backup path must be inside $root/minio" ;; esac
+  if test -f "$archive"; then
+    temporary=$(mktemp -d)
+    decrypted="$temporary/backup.tar.gz"
+    decrypt_file "$archive" "$decrypted" >/dev/null
+    tar -C "$temporary" -xzf "$decrypted"
+    archive="$temporary"
+  fi
   test -d "$archive" || fail "MinIO backup directory not found"
   mc alias set target "$S3_ENDPOINT" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" >/dev/null
   for bucket_path in "$archive"/*; do

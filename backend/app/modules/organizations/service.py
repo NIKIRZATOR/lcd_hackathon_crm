@@ -24,6 +24,7 @@ from app.modules.organizations.schemas import AssignmentCreate, BulkAssignmentCr
 from app.modules.interactions.model import UniversityInteraction
 from app.modules.users.model import Role, User
 from app.modules.workflows.model import WorkflowStage, WorkflowStageAttachment, WorkflowStageComment, WorkflowStageInstance, WorkflowTransitionHistory
+from app.security.antivirus import ClamAvScanner, ScanResult
 from app.storage import get_storage_adapter
 
 
@@ -96,6 +97,11 @@ class OrganizationService:
             raise HTTPException(status_code=422, detail="Logo file is empty")
         if len(content) > settings.file_max_upload_bytes:
             raise HTTPException(status_code=413, detail="Logo file is too large")
+        scan_status = ClamAvScanner().scan(BytesIO(content))
+        if scan_status is ScanResult.INFECTED:
+            raise HTTPException(status_code=422, detail="Logo file was rejected by antivirus scan")
+        if scan_status is ScanResult.SCAN_ERROR:
+            raise HTTPException(status_code=503, detail="Antivirus scan is unavailable")
 
         object_name = f"{uuid4()}{extension}"
         bucket = settings.s3_bucket_organization_logos
@@ -123,7 +129,7 @@ class OrganizationService:
                 object_key=object_key,
                 attachment_kind="organization_logo",
                 uploaded_by=current_user.id,
-                scan_status="NOT_SCANNED",
+                scan_status=scan_status.value,
             )
             self.db.add(logo)
             self.db.flush()
@@ -134,7 +140,7 @@ class OrganizationService:
                 action="organization.logo.uploaded",
                 entity_type="organization",
                 entity_id=organization.id,
-                event_metadata={"file_id": str(logo.id), "replaced_file_id": str(previous_logo_id) if previous_logo_id else None},
+                event_metadata={"file_id": str(logo.id), "replaced_file_id": str(previous_logo_id) if previous_logo_id else None, "scan_status": scan_status.value},
             ))
             self.db.commit()
             self.db.refresh(organization)

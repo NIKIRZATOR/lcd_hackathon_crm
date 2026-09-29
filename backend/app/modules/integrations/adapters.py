@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -11,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
+
+from app.security.pii import hmac_pii
 
 
 SOURCES = {"WEBSITE", "LMS", "PAYMENT", "B2C_USER", "VENDOR_CATALOG"}
@@ -52,7 +53,7 @@ def normalize_phone(value: object | None) -> str | None:
 
 
 def hash_value(value: str | None) -> str | None:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest() if value else None
+    return hmac_pii(value) if value else None
 
 
 def split_products(value: object | None) -> list[str]:

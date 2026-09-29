@@ -1,5 +1,48 @@
 # RTK EduFlow
 
+## Security contour (demo)
+
+The project includes a minimal technical security contour; it is not a claim of compliance with 152-FZ or FSTEC requirements.
+
+### Environment
+
+Copy `.env.example` to `.env` for a local stand. Replace every `dev-only-*` value before any non-demo deployment. Keep all secrets out of Git.
+
+```env
+ANTIVIRUS_ENABLED=true
+PII_ENCRYPTION_ENABLED=true
+PII_ENCRYPTION_KEY=<url-safe-base64-of-32-random-bytes>
+PII_HMAC_PEPPER=<random-secret>
+BACKUP_ENCRYPTION_ENABLED=true
+BACKUP_ENCRYPTION_KEY=<separate-random-secret>
+```
+
+`PII_HMAC_PEPPER` is used for deterministic HMAC-SHA-256 matching of normalized email and phone values. It must be set whenever B2C/integration matching is enabled. `BACKUP_ENCRYPTION_KEY` must never equal the PII encryption key.
+
+### Antivirus
+
+Start the optional ClamAV service with no host port published:
+
+```bash
+docker compose --profile antivirus up -d --build
+docker compose ps clamav
+```
+
+With `ANTIVIRUS_ENABLED=true`, workflow attachments, organization logos and import files are scanned before MinIO storage. `CLEAN` files are stored; `INFECTED` files are rejected with HTTP 422; an unavailable scanner returns HTTP 503. The scan result is persisted in `files.scan_status` and audit metadata.
+
+### Encrypted backup and restore
+
+With backup encryption enabled, PostgreSQL, MinIO and Keycloak snapshots are stored as `.enc` only. The backup container uses AES-256-CBC with PBKDF2; plaintext is removed after successful encryption.
+
+```bash
+docker compose --profile backup run --rm backup all
+docker compose --profile backup run --rm backup verify
+docker compose --profile backup run --rm backup restore-postgres /backups/postgres/daily/postgres_YYYY-MM-DD_HH-MM-SS.dump.enc
+docker compose --profile backup run --rm backup restore-minio /backups/minio/daily/minio_YYYY-MM-DD_HH-MM-SS.tar.gz.enc
+```
+
+Use the same `BACKUP_ENCRYPTION_KEY` for backup and restore. Stop backend and worker before a real restore. MinIO server-side encryption is not enabled because its production-grade configuration requires external KMS/KES; RBAC, antivirus checks and encrypted backups remain the current protection controls.
+
 Короткая инструкция для запуска проекта локально.
 
 ## Запуск
