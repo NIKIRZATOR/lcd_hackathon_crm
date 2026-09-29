@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError, apiRequest } from '../../api/client';
+import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflow/shared/workflowFiles';
 
 type ProgramInstance = { organization_id: string; direction_name: string; product_name: string; playbook_name: string; playbook_code: string | null; status: string; kam_name: string | null; academic_window_title: string | null; current_stage_code: string | null; health_score: number | null; health_band: string };
 type Checklist = { id: string; label: string; item_type: 'checkbox' | 'file' | 'date' | 'stakeholder_role' | 'number' | 'text'; required: boolean; required_attachment_kind?: string | null; is_done: boolean; value_text?: string; value_number?: number; value_date?: string; stakeholder_id?: string; attachment_id?: string };
@@ -107,11 +108,15 @@ const ProgramDetailPage = () => {
   const uploadProps: UploadProps = {
     beforeUpload: async (file) => {
       if (!selectedStage || !isViewingCurrentStage) return Upload.LIST_IGNORE;
+      if (!isAllowedWorkflowFile(file.name)) {
+        setMessage(workflowFileRejectionMessage);
+        return Upload.LIST_IGNORE;
+      }
       const form = new FormData(); form.append('file', file); if (attachmentKind.trim()) form.append('attachment_kind', attachmentKind.trim());
       try {
         await apiRequest(`/api/workflows/stage-instances/${selectedStage.id}/attachments`, { method: 'POST', body: form });
         await load();
-      } catch { setMessage('Не удалось загрузить файл. Разрешены PDF, DOCX и XLSX.'); }
+      } catch (caught) { setMessage(caught instanceof ApiError ? caught.message : 'Не удалось загрузить файл.'); }
       return false;
     },
     showUploadList: false,
@@ -171,7 +176,7 @@ const ProgramDetailPage = () => {
         <Input.TextArea disabled={!isViewingCurrentStage} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Комментарий к переходу" rows={2} />
         <div id="attachments"><Typography.Title level={5}>Файлы</Typography.Title>
         <List size="small" dataSource={attachments} locale={{ emptyText: 'Файлов пока нет' }} renderItem={(item) => <List.Item>{item.original_name}{item.attachment_kind ? ` · ${item.attachment_kind}` : ''}</List.Item>} />
-        <Space><Select style={{ width: 240 }} value={attachmentKind || undefined} placeholder="Вид вложения" options={[...new Set(checklist.filter((item) => item.item_type === 'file').map((item) => item.required_attachment_kind).filter(Boolean) as string[])].map((value) => ({ value, label: value }))} onChange={setAttachmentKind} allowClear /><Upload {...uploadProps} disabled={!isViewingCurrentStage}><Button disabled={!isViewingCurrentStage}>Приложить файл</Button></Upload></Space></div>
+        <Space><Select style={{ width: 240 }} value={attachmentKind || undefined} placeholder="Вид вложения" options={[...new Set(checklist.filter((item) => item.item_type === 'file').map((item) => item.required_attachment_kind).filter(Boolean) as string[])].map((value) => ({ value, label: value }))} onChange={setAttachmentKind} allowClear /><Upload {...uploadProps} accept=".png,.jpeg,.jpg,.pdf,.zip,.gz,.gzip,.rar,.doc,.docx,.xls,.xlsx" disabled={!isViewingCurrentStage}><Button disabled={!isViewingCurrentStage}>Приложить файл</Button></Upload></Space></div>
         {isViewingCurrentStage && workflow.available_transitions.length > 0 && <div style={{ marginTop: 20 }}><Select style={{ minWidth: 260 }} options={workflow.available_transitions.map((item) => ({ value: item.id, label: item.name ?? item.to_stage_name }))} value={selectedTransition} onChange={setSelectedTransition} /><Button type="primary" disabled={missingRequired > 0 || !selectedTransition} style={{ marginLeft: 8 }} onClick={() => void closeStage()}>Закрыть и перейти к «{transition?.to_stage_name ?? 'следующему этапу'}»</Button>{currentStage?.is_optional && <Button style={{ marginLeft: 8 }} onClick={() => void closeStage(true)}>Пропустить</Button>}</div>}
         {isViewingCurrentStage && currentStage?.is_final && workflow.available_transitions.length === 0 && <Button type="primary" disabled={missingRequired > 0} style={{ marginTop: 20 }} onClick={() => void closeStage()}>Завершить программу</Button>}
         <Typography.Title level={5}>История переходов</Typography.Title>

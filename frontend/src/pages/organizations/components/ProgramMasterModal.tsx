@@ -116,9 +116,11 @@ const ProgramMasterModal = ({ open, organizationId, programs, onClose, onCreated
       });
       onCreated(created.id);
     } catch (reason) {
-      const payload = reason instanceof ApiError ? reason.payload as { message?: string; detail?: string | { message?: string } } | undefined : undefined;
-      const detail = typeof payload?.detail === 'string' ? payload.detail : payload?.detail?.message;
-      setError(detail || payload?.message || 'Программу не удалось создать. Проверьте, что такой заход ещё не идёт.');
+      setError(
+        reason instanceof ApiError
+          ? reason.message
+          : 'Программу не удалось создать. Проверьте, что такой заход ещё не идёт.',
+      );
     } finally {
       setSaving(false);
     }

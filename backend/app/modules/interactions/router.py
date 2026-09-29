@@ -38,7 +38,7 @@ COMMON_ERROR_RESPONSES = {
                     "code": "UNAUTHORIZED",
                     "message": "Not authenticated",
                     "details": None,
-                    "requestId": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
+                    "request_id": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
                 }
             }
         },
@@ -51,7 +51,7 @@ COMMON_ERROR_RESPONSES = {
                     "code": "FORBIDDEN",
                     "message": "Cannot access this interaction",
                     "details": None,
-                    "requestId": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
+                    "request_id": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
                 }
             }
         },
@@ -64,7 +64,7 @@ COMMON_ERROR_RESPONSES = {
                     "code": "VALIDATION_ERROR",
                     "message": "Request validation failed",
                     "details": [],
-                    "requestId": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
+                    "request_id": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
                 }
             }
         },
@@ -132,7 +132,7 @@ def list_interactions(
                         "code": "NOT_FOUND",
                         "message": "University interaction not found",
                         "details": None,
-                        "requestId": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
+                        "request_id": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
                     }
                 }
             },
@@ -193,7 +193,7 @@ def list_assignment_history(
                         "code": "BAD_REQUEST",
                         "message": "Workflow template has no active stages",
                         "details": None,
-                        "requestId": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
+                        "request_id": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
                     }
                 }
             },
@@ -244,7 +244,7 @@ def create_interaction(
                         "code": "BAD_REQUEST",
                         "message": "Use assignment endpoint to change interaction manager",
                         "details": None,
-                        "requestId": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
+                        "request_id": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
                     }
                 }
             },
@@ -301,7 +301,7 @@ def update_interaction(
                         "code": "BAD_REQUEST",
                         "message": "Manager user not found",
                         "details": None,
-                        "requestId": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
+                        "request_id": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c",
                     }
                 }
             },
