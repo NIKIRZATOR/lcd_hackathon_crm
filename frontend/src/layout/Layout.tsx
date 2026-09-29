@@ -29,7 +29,7 @@ const navigationItems = [
   },
   {
     path: '/universities',
-    title: 'Вузы',
+    title: 'Организации',
     icon: <BankOutlined />,
   },
   {

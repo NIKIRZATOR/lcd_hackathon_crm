@@ -191,7 +191,7 @@ const DocumentationDrawer = ({ open, onClose }: { open: boolean; onClose: () => 
     () => [
       { title: 'Главная', route: '/home', icon: <QuestionCircleOutlined /> },
       { title: 'Организации', route: '/organizations', icon: <TeamOutlined /> },
-      { title: 'Воркфлоу', route: '/workflows', icon: <CheckSquareOutlined /> },
+      { title: 'Workflow', route: '/workflows', icon: <CheckSquareOutlined /> },
       { title: 'Отчёты', route: '/reports', icon: <FileTextOutlined /> },
       ...(isAdmin
         ? [{ title: 'Управление', route: '/management', icon: <SettingOutlined /> }]

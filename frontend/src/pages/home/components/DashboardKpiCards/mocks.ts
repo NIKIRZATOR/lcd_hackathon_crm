@@ -3,7 +3,7 @@ import type { DashboardKpiItem } from './types';
 export const dashboardKpiMock: DashboardKpiItem[] = [
   {
     id: 'universities',
-    label: 'Вузы',
+    label: 'Организации',
     value: 48,
     changePercent: 6,
     trendDirection: 'up',

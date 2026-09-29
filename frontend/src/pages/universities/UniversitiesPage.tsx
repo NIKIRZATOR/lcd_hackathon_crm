@@ -173,7 +173,7 @@ const UniversitiesPage = () => {
   const tableLayout = isTableCompact ? 'narrow' : isIntermediateViewport ? 'mid' : 'wide';
   const columns = ([
     {
-      title: 'Название вуза',
+      title: 'Название организации',
       dataIndex: 'shortName',
       key: 'name',
       show: ['wide', 'mid', 'narrow'],
@@ -356,7 +356,7 @@ const UniversitiesPage = () => {
       <div className={styles.page}>
         <div className={styles.headingRow}>
           <header className={styles.heading}>
-            <h1 className={styles.title}>Вузы</h1>
+            <h1 className={styles.title}>Организации</h1>
             <p className={styles.subtitle}>Все учебные заведения и информация о текущем состоянии взаимодействия</p>
           </header>
           <div className={styles.headingActions}>
@@ -418,7 +418,7 @@ const UniversitiesPage = () => {
             columns={columns}
             dataSource={filteredUniversities.slice(0, visibleCount)}
             pagination={false}
-            locale={{ emptyText: 'Вузы не найдены' }}
+            locale={{ emptyText: 'Организации не найдены' }}
             rowClassName={styles.clickableRow}
             onRow={(item) => ({
               onClick: (event) => {

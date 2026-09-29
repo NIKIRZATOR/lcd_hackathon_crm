@@ -560,7 +560,7 @@ const WorkflowDetailPage = () => {
     <PageLayout>
       <div className={styles.page}>
         <div className={styles.breadcrumbs}>
-          <Link to="/workflows">Воркфлоу</Link>
+          <Link to="/workflows">Workflow</Link>
           <span className={styles.breadcrumbSeparator}>›</span>
           <Link to={`/organizations/${desk.organizationId}?section=programs`}>{desk.organization}</Link>
           <span className={styles.breadcrumbSeparator}>›</span>

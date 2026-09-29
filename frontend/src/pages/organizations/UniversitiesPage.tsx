@@ -158,7 +158,7 @@ const UniversitiesPage = () => {
       <div className={styles.page}>
         <div className={styles.headingRow}>
           <div className={styles.heading}>
-            <h1 className={styles.title}>Вузы</h1>
+            <h1 className={styles.title}>Организации</h1>
             <p className={styles.subtitle}>{isAdmin ? 'Все площадки. Статус сделки живёт на программе, не на вузе.' : seesTeam ? 'Площадки команды. Статус сделки живёт на программе, не на вузе.' : 'Ваши площадки. Статус сделки живёт на программе, не на вузе.'}</p>
           </div>
           {isAdmin && <Button onClick={() => setImportOpen(true)}>Загрузить каталог</Button>}
@@ -189,7 +189,7 @@ const UniversitiesPage = () => {
               onRow={(item) => ({ onClick: () => navigate(`/organizations/${item.id}`) })}
               columns={visibleColumns(layout, [
                 {
-                  title: 'Вуз',
+                  title: 'Организация',
                   dataIndex: 'shortName',
                   show: ['wide', 'mid', 'narrow'],
                   width: layout === 'wide' ? (seesTeam ? '22%' : '26%') : undefined,

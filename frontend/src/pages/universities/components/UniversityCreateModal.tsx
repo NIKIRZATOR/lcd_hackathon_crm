@@ -62,7 +62,7 @@ const UniversityCreateModal = ({ open, onClose, onCreate }: UniversityCreateModa
       >
         <Row gutter={12}>
           <Col xs={24} md={12}>
-            <Form.Item name="name" label="Название вуза" rules={[{ required: true, whitespace: true, message: 'Введите название' }]}>
+            <Form.Item name="name" label="Название организации" rules={[{ required: true, whitespace: true, message: 'Введите название' }]}>
               <Input placeholder="Полное название" />
             </Form.Item>
           </Col>

@@ -61,7 +61,7 @@ const desktopColumns: TableColumnsType<DashboardProgramDemandItem> = [
     render: renderProduct,
   },
   {
-    title: 'Вузов',
+    title: 'Организаций',
     dataIndex: 'universities',
     key: 'universities',
     width: 90,
@@ -250,7 +250,7 @@ const DashboardProgramDemandTable = () => {
                     </div>
 
                     <div className={styles.expandedDetailsRow}>
-                      <span className={styles.expandedDetailsLabel}>Вузов</span>
+                      <span className={styles.expandedDetailsLabel}>Организаций</span>
 
                       <p className={styles.expandedDetailsValue}>{program.universities}</p>
                     </div>

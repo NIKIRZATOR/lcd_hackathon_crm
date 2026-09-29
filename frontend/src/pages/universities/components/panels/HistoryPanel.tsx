@@ -15,7 +15,7 @@ export const HistoryPanel = ({ sections }: { sections: UniversitySections }) => 
   return (
     <div className={styles.section}>
       <div className={styles.head}>
-        <h2>История вуза</h2>
+        <h2>История организации</h2>
         <div className={styles.filters}>
           <Select className={styles.filter} allowClear placeholder="Все взаимодействия" value={interaction || undefined} options={unique(sections.history.map((event) => event.interaction)).map((value) => ({ value, label: value }))} onChange={(value) => setInteraction(value ?? '')} />
           <Select className={styles.filter} allowClear placeholder="Все пользователи" value={actor || undefined} options={unique(sections.history.map((event) => event.actor)).map((value) => ({ value, label: value }))} onChange={(value) => setActor(value ?? '')} />

@@ -35,7 +35,7 @@ const ProgramDetailsPopoverContent = ({ item }: ProgramDetailsPopoverContentProp
 
       <div className={styles.summary}>
         <div>
-          <span>Вузов</span>
+          <span>Организаций</span>
           <strong>{item.universities}</strong>
         </div>
 
