@@ -4,7 +4,7 @@ import type { TableColumnsType } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import type { ManagerLoadItem } from '../../types';
+import type { ManagerKamItem, ManagerLoadItem, ManagerOrganizationHealthItem } from '../../types';
 import ManagerReassignModal, {
   type ManagerReassignPayload,
 } from '../ManagerReassignModal/ManagerReassignModal';
@@ -17,17 +17,28 @@ type ManagerLoadTableProps = {
   items: ManagerLoadItem[];
   loading?: boolean;
   error?: string | null;
+  kams: ManagerKamItem[];
+  organizations: ManagerOrganizationHealthItem[];
+  onReassign: (payload: ManagerReassignPayload) => Promise<void>;
 };
 
 const COMPACT_TABLE_WIDTH = 900;
 
-const ManagerLoadTable = ({ items, loading = false, error }: ManagerLoadTableProps) => {
+const ManagerLoadTable = ({
+  items,
+  loading = false,
+  error,
+  kams,
+  organizations,
+  onReassign,
+}: ManagerLoadTableProps) => {
   const navigate = useNavigate();
 
   const tableWrapperRef = useRef<HTMLDivElement>(null);
 
   const [isCompact, setIsCompact] = useState(false);
   const [reassignKam, setReassignKam] = useState<ManagerLoadItem | null>(null);
+  const [reassignError, setReassignError] = useState<string | null>(null);
 
   useEffect(() => {
     const element = tableWrapperRef.current;
@@ -175,12 +186,25 @@ const ManagerLoadTable = ({ items, loading = false, error }: ManagerLoadTablePro
       {reassignKam && (
         <ManagerReassignModal
           currentKam={reassignKam}
-          kams={items}
-          onCancel={() => setReassignKam(null)}
-          onSubmit={async (payload: ManagerReassignPayload) => {
-            console.log('Переназначение KAM:', payload);
-
+          kams={kams}
+          organizations={organizations}
+          error={reassignError}
+          onCancel={() => {
+            setReassignError(null);
             setReassignKam(null);
+          }}
+          onSubmit={async (payload: ManagerReassignPayload) => {
+            try {
+              setReassignError(null);
+              await onReassign(payload);
+              setReassignKam(null);
+            } catch (submitError) {
+              setReassignError(
+                submitError instanceof Error
+                  ? submitError.message
+                  : 'Не удалось переназначить организации',
+              );
+            }
           }}
         />
       )}

@@ -20,7 +20,8 @@ from app.modules.licenses.model import Contract, License
 from app.modules.nba.model import NbaItem, NbaRule
 from app.modules.organizations.model import OrgAssignment, Organization, OrganizationType, Stakeholder
 from app.modules.program_instances.model import ProgramInstance
-from app.modules.organizations.schemas import AssignmentCreate, OrganizationCreate, OrganizationUpdate, StakeholderCreate, StakeholderUpdate
+from app.modules.organizations.schemas import AssignmentCreate, BulkAssignmentCreate, OrganizationCreate, OrganizationUpdate, StakeholderCreate, StakeholderUpdate
+from app.modules.interactions.model import UniversityInteraction
 from app.modules.users.model import Role, User
 from app.modules.workflows.model import WorkflowStage, WorkflowStageAttachment, WorkflowStageComment, WorkflowStageInstance, WorkflowTransitionHistory
 from app.storage import get_storage_adapter
@@ -201,19 +202,138 @@ class OrganizationService:
         if not (is_admin(current_user) or has_any_role(current_user, "MANAGER")):
             raise HTTPException(status_code=403, detail="Only MANAGER or ADMIN can assign KAM")
         self.get(organization_id, current_user)
+        current_assignment = self.db.scalar(
+            select(OrgAssignment).where(
+                OrgAssignment.organization_id == organization_id,
+                OrgAssignment.status == "active",
+            )
+        )
+        if current_assignment is None:
+            kam_user = self.db.get(User, payload.kam_user_id)
+            if kam_user is None or not has_any_role(kam_user, "KAM"):
+                raise HTTPException(status_code=422, detail="Organization must be assigned to a KAM user")
+            if has_any_role(current_user, "MANAGER") and not is_admin(current_user):
+                if payload.kam_user_id not in get_subordinate_kam_ids(self.db, current_user.id):
+                    raise HTTPException(status_code=403, detail="KAM is outside manager scope")
+            assignment = self._assign(organization_id, payload.kam_user_id, current_user.id)
+            self.db.add(AuditEvent(actor_user_id=current_user.id, action="organization.kam_assigned", entity_type="organization", entity_id=organization_id, reason=payload.reason, event_metadata={"new_kam_user_id": str(payload.kam_user_id)}))
+            self.db.commit()
+            self.db.refresh(assignment)
+            return assignment
+
+        result = self.assign_many(
+            BulkAssignmentCreate(
+                organization_ids=[organization_id],
+                kam_user_id=payload.kam_user_id,
+                reason=payload.reason,
+            ),
+            current_user,
+        )
+        return result["assignments"][0]
+
+    def assign_many(self, payload: BulkAssignmentCreate, current_user: User) -> dict[str, object]:
+        if not (is_admin(current_user) or has_any_role(current_user, "MANAGER")):
+            raise HTTPException(status_code=403, detail="Only MANAGER or ADMIN can assign KAM")
         kam_user = self.db.get(User, payload.kam_user_id)
         if kam_user is None or not has_any_role(kam_user, "KAM"):
             raise HTTPException(status_code=422, detail="Organization must be assigned to a KAM user")
-        if has_any_role(current_user, "MANAGER") and payload.kam_user_id not in get_subordinate_kam_ids(self.db, current_user.id):
+        subordinate_ids = get_subordinate_kam_ids(self.db, current_user.id) if has_any_role(current_user, "MANAGER") and not is_admin(current_user) else None
+        if subordinate_ids is not None and payload.kam_user_id not in subordinate_ids:
             raise HTTPException(status_code=403, detail="KAM is outside manager scope")
+
+        organization_ids = list(dict.fromkeys(payload.organization_ids))
+        organizations = list(self.db.scalars(select(Organization).where(Organization.id.in_(organization_ids))).all())
+        if len(organizations) != len(organization_ids):
+            raise HTTPException(status_code=404, detail="Organization not found")
+        active_assignments = list(
+            self.db.scalars(
+                select(OrgAssignment).where(
+                    OrgAssignment.organization_id.in_(organization_ids),
+                    OrgAssignment.status == "active",
+                ).with_for_update()
+            ).all()
+        )
+        assignments_by_org = {assignment.organization_id: assignment for assignment in active_assignments}
+        if len(assignments_by_org) != len(organization_ids):
+            raise HTTPException(status_code=422, detail="Every organization must have an active KAM assignment")
+        if subordinate_ids is not None and any(
+            assignment.user_id not in subordinate_ids for assignment in active_assignments
+        ):
+            raise HTTPException(status_code=403, detail="Organization is outside manager scope")
+
         now = datetime.now(timezone.utc)
-        for assignment in self.db.scalars(select(OrgAssignment).where(OrgAssignment.organization_id == organization_id, OrgAssignment.status == "active")):
+        changed_assignments = [
+            assignment for assignment in active_assignments if assignment.user_id != payload.kam_user_id
+        ]
+        for assignment in changed_assignments:
             assignment.status, assignment.ended_at = "ended", now
-        assignment = self._assign(organization_id, payload.kam_user_id, current_user.id, now)
-        self.db.add(AuditEvent(actor_user_id=current_user.id, action="organization.kam_reassigned", entity_type="organization", entity_id=organization_id, reason=payload.reason, event_metadata={"new_kam_user_id": str(payload.kam_user_id)}))
+        self.db.flush()
+
+        new_assignments: list[OrgAssignment] = []
+        previous_kam_by_org = {
+            assignment.organization_id: assignment.user_id for assignment in changed_assignments
+        }
+        candidate_programs = list(
+            self.db.scalars(
+                select(ProgramInstance).where(
+                    ProgramInstance.organization_id.in_(previous_kam_by_org),
+                    ProgramInstance.status.in_(("draft", "active", "paused")),
+                )
+            ).all()
+        ) if previous_kam_by_org else []
+        programs = [
+            program
+            for program in candidate_programs
+            if program.kam_user_id == previous_kam_by_org[program.organization_id]
+        ]
+        interaction_ids = [
+            program.legacy_interaction_id
+            for program in programs
+            if program.legacy_interaction_id is not None
+        ]
+        interactions = {
+            interaction.id: interaction
+            for interaction in self.db.scalars(
+                select(UniversityInteraction).where(UniversityInteraction.id.in_(interaction_ids))
+            ).all()
+        } if interaction_ids else {}
+        program_ids = [program.id for program in programs]
+        stage_instances = list(
+            self.db.scalars(
+                select(WorkflowStageInstance).where(
+                    WorkflowStageInstance.program_instance_id.in_(program_ids),
+                    WorkflowStageInstance.status.notin_(("COMPLETED", "DONE", "SKIPPED")),
+                )
+            ).all()
+        ) if program_ids else []
+        moved_programs_by_org: dict[UUID, int] = {}
+        old_kam_by_program = {
+            program.id: previous_kam_by_org[program.organization_id] for program in programs
+        }
+        for program in programs:
+            old_kam_id = old_kam_by_program[program.id]
+            program.kam_user_id = payload.kam_user_id
+            moved_programs_by_org[program.organization_id] = moved_programs_by_org.get(program.organization_id, 0) + 1
+            if program.legacy_interaction_id is not None:
+                interaction = interactions.get(program.legacy_interaction_id)
+                if interaction is not None and interaction.manager_user_id == old_kam_id:
+                    interaction.manager_user_id = payload.kam_user_id
+        for stage_instance in stage_instances:
+            old_kam_id = old_kam_by_program.get(stage_instance.program_instance_id)
+            if old_kam_id is not None and stage_instance.responsible_user_id == old_kam_id:
+                stage_instance.responsible_user_id = payload.kam_user_id
+
+        for previous in changed_assignments:
+            assignment = self._assign(previous.organization_id, payload.kam_user_id, current_user.id, now)
+            new_assignments.append(assignment)
+            moved_count = moved_programs_by_org.get(previous.organization_id, 0)
+            self.db.add(AuditEvent(actor_user_id=current_user.id, action="organization.kam_reassigned", entity_type="organization", entity_id=previous.organization_id, reason=payload.reason, event_metadata={"old_kam_user_id": str(previous.user_id), "new_kam_user_id": str(payload.kam_user_id), "reassigned_programs": moved_count}))
+
         self.db.commit()
-        self.db.refresh(assignment)
-        return assignment
+        for assignment in new_assignments:
+            self.db.refresh(assignment)
+        unchanged = [assignment for assignment in active_assignments if assignment.user_id == payload.kam_user_id]
+        return {"assignments": [*new_assignments, *unchanged], "reassigned_programs": len(programs)}
 
     def assignment_history(self, organization_id: UUID, current_user: User) -> list[dict]:
         self.get(organization_id, current_user)

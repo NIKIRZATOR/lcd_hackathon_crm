@@ -8,7 +8,7 @@ const { Text, Title } = Typography;
 
 type ManagerOrganizationsHealthProps = {
   items: ManagerOrganizationHealthItem[];
-  onOrganizationClick?: (organizationId: number) => void;
+  onOrganizationClick?: (organizationId: string) => void;
 };
 
 const getProgramsLabel = (count: number) => {
@@ -70,7 +70,7 @@ const ManagerOrganizationsHealth = ({
             </Text>
 
             <Text strong className={styles.health}>
-              Health {item.healthScore}
+              Health {item.healthScore ?? '—'}
             </Text>
           </button>
         ))}

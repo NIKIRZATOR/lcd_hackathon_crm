@@ -1,7 +1,7 @@
 import { Alert, Button, Checkbox, Flex, Modal, Select, Typography } from 'antd';
 import { useMemo, useState } from 'react';
 
-import type { ManagerLoadItem } from '../../types';
+import type { ManagerKamItem, ManagerLoadItem, ManagerOrganizationHealthItem } from '../../types';
 
 import styles from './ManagerReassignModal.module.scss';
 
@@ -10,24 +10,23 @@ const { Text } = Typography;
 export type ManagerReassignPayload = {
   fromKamId: string;
   toKamId: string;
-  organizationNames: string[];
+  organizationIds: string[];
 };
 
 type ManagerReassignModalProps = {
   currentKam: ManagerLoadItem;
-  kams: ManagerLoadItem[];
+  kams: ManagerKamItem[];
+  organizations: ManagerOrganizationHealthItem[];
+  error?: string | null;
   onCancel: () => void;
   onSubmit: (payload: ManagerReassignPayload) => Promise<void> | void;
-};
-
-type OrganizationItem = {
-  name: string;
-  programsCount: number;
 };
 
 const ManagerReassignModal = ({
   currentKam,
   kams,
+  organizations: allOrganizations,
+  error,
   onCancel,
   onSubmit,
 }: ManagerReassignModalProps) => {
@@ -35,56 +34,36 @@ const ManagerReassignModal = ({
   const [targetKamId, setTargetKamId] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
 
-  const organizations = useMemo<OrganizationItem[]>(() => {
-    const organizationsMap = new Map<string, number>();
-
-    currentKam.programItems.forEach((program) => {
-      organizationsMap.set(program.university, (organizationsMap.get(program.university) ?? 0) + 1);
-    });
-
-    return Array.from(organizationsMap, ([name, programsCount]) => ({
-      name,
-      programsCount,
-    })).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-  }, [currentKam.programItems]);
-
+  const organizations = useMemo(
+    () =>
+      allOrganizations
+        .filter((organization) => organization.kamId === currentKam.kamId)
+        .sort((a, b) => a.organizationName.localeCompare(b.organizationName, 'ru')),
+    [allOrganizations, currentKam.kamId],
+  );
   const targetKam = useMemo(
     () => kams.find((kam) => kam.kamId === targetKamId),
     [kams, targetKamId],
   );
-
   const kamOptions = useMemo(
     () =>
       kams
         .filter((kam) => kam.kamId !== currentKam.kamId)
-        .map((kam) => ({
-          value: kam.kamId,
-          label: `${kam.kam} · ${kam.activePrograms} программ`,
-        })),
+        .map((kam) => ({ value: kam.kamId, label: kam.kamName })),
     [currentKam.kamId, kams],
   );
-
   const allOrganizationsSelected =
     organizations.length > 0 && selectedOrganizations.length === organizations.length;
-
   const someOrganizationsSelected = selectedOrganizations.length > 0 && !allOrganizationsSelected;
 
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedOrganizations(checked ? organizations.map((organization) => organization.name) : []);
-  };
-
   const handleSubmit = async () => {
-    if (!targetKamId || selectedOrganizations.length === 0) {
-      return;
-    }
-
+    if (!targetKamId || selectedOrganizations.length === 0) return;
     try {
       setSubmitting(true);
-
       await onSubmit({
         fromKamId: currentKam.kamId,
         toKamId: targetKamId,
-        organizationNames: selectedOrganizations,
+        organizationIds: selectedOrganizations,
       });
     } finally {
       setSubmitting(false);
@@ -102,7 +81,6 @@ const ManagerReassignModal = ({
           <Button onClick={onCancel} disabled={submitting}>
             Отмена
           </Button>
-
           <Button
             type="primary"
             loading={submitting}
@@ -115,49 +93,49 @@ const ManagerReassignModal = ({
       }
     >
       <Flex vertical gap={20} className={styles.content}>
+        {error && <Alert type="error" message={error} showIcon />}
         <Text type="secondary">
           Выберите организации, которые нужно передать другому KAM. Программы с отдельно назначенным
           KAM останутся без изменений.
         </Text>
-
         <Flex vertical gap={4}>
           <Text type="secondary">Текущий KAM</Text>
           <Text strong>{currentKam.kam}</Text>
         </Flex>
-
         <Flex vertical gap={10}>
           <Flex align="center" justify="space-between" gap={16} className={styles.sectionHeader}>
             <Text strong>Организации</Text>
-
             <Checkbox
               checked={allOrganizationsSelected}
               indeterminate={someOrganizationsSelected}
-              onChange={(event) => handleSelectAll(event.target.checked)}
+              onChange={(event) =>
+                setSelectedOrganizations(
+                  event.target.checked
+                    ? organizations.map((organization) => organization.organizationId)
+                    : [],
+                )
+              }
             >
               Выбрать все
             </Checkbox>
           </Flex>
-
           <Checkbox.Group
             value={selectedOrganizations}
             onChange={(values) => setSelectedOrganizations(values as string[])}
             className={styles.organizationList}
           >
             {organizations.map((organization) => (
-              <div key={organization.name} className={styles.organizationRow}>
-                <Checkbox value={organization.name}>
-                  <Text>{organization.name}</Text>
+              <div key={organization.organizationId} className={styles.organizationRow}>
+                <Checkbox value={organization.organizationId}>
+                  <Text>{organization.organizationName}</Text>
                 </Checkbox>
-
                 <Text type="secondary">Программ: {organization.programsCount}</Text>
               </div>
             ))}
           </Checkbox.Group>
         </Flex>
-
         <Flex vertical gap={8}>
           <Text strong>Новый KAM</Text>
-
           <Select
             value={targetKamId}
             options={kamOptions}
@@ -168,26 +146,21 @@ const ManagerReassignModal = ({
             onChange={setTargetKamId}
           />
         </Flex>
-
         <Alert
           type="info"
           showIcon
           message="После переназначения"
           description={
             <Flex vertical gap={4}>
-              {targetKam ? (
-                <Text>
-                  <Text strong>{targetKam.kam}</Text> получит выбранные организации:{' '}
-                  {selectedOrganizations.length}.
-                </Text>
-              ) : (
-                <Text>Выберите нового KAM.</Text>
-              )}
-
-              <Text type="secondary">
-                Вместе с организацией перейдут программы, у которых не назначен собственный KAM.
+              <Text>
+                {targetKam
+                  ? `${targetKam.kamName} получит выбранные организации`
+                  : 'Выберите нового KAM'}
+                : {selectedOrganizations.length}.
               </Text>
-
+              <Text type="secondary">
+                Вместе с организацией перейдут программы без отдельно назначенного KAM.
+              </Text>
               <Text type="secondary">Этапы, чеклисты, лицензии и Health не изменятся.</Text>
             </Flex>
           }
