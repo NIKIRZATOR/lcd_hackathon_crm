@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     pii_encryption_enabled: bool = False
     pii_encryption_key: str | None = None
     pii_hmac_pepper: str | None = None
+    lms_mock_enabled: bool = False
+    lms_base_url: str = "http://mock-lms:8080"
+    lms_service_token: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

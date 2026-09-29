@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
+import httpx
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -31,6 +32,10 @@ from app.modules.nba.service import NbaService
 from app.modules.organizations.model import Organization
 from app.modules.products.model import ITProduct, Vendor, VendorContact
 from app.modules.program_instances.model import ProgramInstance
+from app.modules.program_instances.model import AcademicWindow
+from app.modules.programs.model import ITDirection
+from app.core.config import settings
+from app.modules.integrations.schemas import LmsEventCreate
 
 
 class IntegrationSyncService:
@@ -519,6 +524,70 @@ class IntegrationSyncService:
         self.db.commit()
         self.db.refresh(metric)
         return {**counts, "metrics": metric}
+
+    def send_program_to_lms(self, program_id: UUID, actor_user_id: UUID) -> dict[str, object]:
+        if not settings.lms_mock_enabled or not settings.lms_service_token:
+            raise ValueError("Mock LMS is disabled or LMS_SERVICE_TOKEN is not configured")
+        program = self.db.get(ProgramInstance, program_id)
+        if program is None:
+            raise ValueError("Program not found")
+        organization = self.db.get(Organization, program.organization_id)
+        direction = self.db.get(ITDirection, program.direction_id)
+        product = self.db.get(ITProduct, program.product_id)
+        window = self.db.get(AcademicWindow, program.academic_window_id) if program.academic_window_id else None
+        payload = {
+            "program_instance_id": str(program.id),
+            "organization": organization.name if organization else None,
+            "program": {"direction": direction.name if direction else None, "product": product.name if product else None},
+            "stream": window.title if window else None,
+            "dates": {"start": window.classes_start_on.isoformat() if window else None, "end": window.classes_end_on.isoformat() if window else None},
+        }
+        try:
+            response = httpx.post(
+                f"{settings.lms_base_url.rstrip('/')}/api/programs",
+                json=payload,
+                headers={"X-LMS-Service-Token": settings.lms_service_token},
+                timeout=10,
+            )
+            response.raise_for_status()
+            external_lms_id = str(response.json()["external_id"])
+        except (httpx.HTTPError, KeyError, ValueError) as exc:
+            program.lms_sync_status = "FAILED"
+            self.audit.add(AuditEvent(actor_user_id=actor_user_id, action="integration.lms.send", entity_type="program_instance", entity_id=program.id, result="FAILURE", error_code="LMS_UNAVAILABLE", reason=str(exc)[:500]))
+            self.db.commit()
+            raise ValueError("Mock LMS is unavailable") from exc
+        program.external_lms_id = external_lms_id
+        program.lms_sync_status = "SYNCED"
+        program.last_lms_sync_at = datetime.now(timezone.utc)
+        self.audit.add(AuditEvent(actor_user_id=actor_user_id, action="integration.lms.send", entity_type="program_instance", entity_id=program.id, result="SUCCESS", event_metadata={"external_lms_id": external_lms_id}))
+        self.db.commit()
+        return {"external_lms_id": external_lms_id, "status": program.lms_sync_status, "last_lms_sync_at": program.last_lms_sync_at}
+
+    def receive_lms_event(self, event: LmsEventCreate) -> dict[str, object]:
+        existing = self.db.scalar(select(IntegrationSignal).where(IntegrationSignal.source == "LMS", IntegrationSignal.external_key == event.event_id))
+        if existing is not None:
+            return {"status": "ignored", "signal_id": str(existing.id)}
+        program = self.db.scalar(select(ProgramInstance).where(ProgramInstance.external_lms_id == event.external_program_id))
+        student_count = event.data.get("student_count")
+        normalized = {"external_program_id": event.external_program_id, "event_type": event.type}
+        if student_count is not None:
+            normalized["students_count"] = int(student_count)
+        signal = IntegrationSignal(source="LMS", external_key=event.event_id, received_at=datetime.now(timezone.utc), status="mapped" if program else "unmatched", organization_id=program.organization_id if program else None, program_instance_id=program.id if program else None, payload=encrypt_pii_payload(event.model_dump()), normalized_payload=normalized, match_reason="external_lms_id" if program else "external_lms_id_not_found")
+        self.db.add(signal)
+        if program is not None:
+            metric = self.metrics(program.id)
+            if metric is None:
+                metric = ProgramMetric(program_instance_id=program.id)
+                self.db.add(metric)
+            if "students_count" in normalized:
+                metric.students_count = normalized["students_count"]
+            metric.last_lms_signal_at = signal.received_at
+            metric.synced_at = signal.received_at
+            self.audit.add(AuditEvent(actor_user_id=None, action="integration.lms.event", entity_type="program_instance", entity_id=program.id, result="SUCCESS", event_metadata={"event_id": event.event_id, "type": event.type}))
+        else:
+            self.audit.add(AuditEvent(actor_user_id=None, action="integration.lms.event", entity_type="integration_signal", entity_id=signal.id, result="UNMATCHED", event_metadata={"event_id": event.event_id}))
+        self.db.commit()
+        return {"status": signal.status, "signal_id": str(signal.id), "program_instance_id": str(program.id) if program else None}
 
     def _adapter_records(
         self, source: str, file_path: Path | None = None

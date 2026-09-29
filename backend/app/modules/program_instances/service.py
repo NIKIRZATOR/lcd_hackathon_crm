@@ -476,4 +476,7 @@ class ProgramInstanceService:
             comment=program.comment,
             parent_program_id=program.parent_program_id,
             legacy_interaction_id=program.legacy_interaction_id,
+            external_lms_id=program.external_lms_id,
+            lms_sync_status=program.lms_sync_status,
+            last_lms_sync_at=program.last_lms_sync_at,
         )

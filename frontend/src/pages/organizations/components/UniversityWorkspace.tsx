@@ -1,10 +1,10 @@
 import { EditOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
-import { Button, Form, Input, List, Modal, Select, Switch, Table, Tag, Tooltip, message } from 'antd';
+import { Button, Form, Input, List, Modal, Select, Space, Switch, Table, Tag, Tooltip, message } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { apiDownload } from '../../../api/client';
+import { ApiError, apiDownload, apiRequest } from '../../../api/client';
 import { createStakeholder, deactivateStakeholder, updateLicense, updateStakeholder } from '../api';
 import type { StakeholderDraft } from '../api';
 import { isGapRecord } from '../backendFieldGaps';
@@ -33,9 +33,23 @@ const downloadAttachment = async (attachmentId: string, fileName: string) => {
 
 const yearOf = (value: string) => (value && value !== 'Срок не указан' ? value.slice(0, 4) : 'Год не указан');
 
-const ProgramsSection = ({ card }: { card: UniversityCard }) => {
+const ProgramsSection = ({ card, onChanged }: { card: UniversityCard; onChanged: () => void }) => {
   const navigate = useNavigate();
   const layout = useTableLayout();
+  const [sendingToLms, setSendingToLms] = useState<string>();
+
+  const sendToLms = async (programId: string) => {
+    setSendingToLms(programId);
+    try {
+      await apiRequest(`/api/integrations/program-instances/${programId}/lms/send`, { method: 'POST' });
+      message.success('Программа передана в Mock LMS');
+      await onChanged();
+    } catch (caught) {
+      message.error(caught instanceof ApiError ? caught.message : 'Не удалось передать программу в LMS');
+    } finally {
+      setSendingToLms(undefined);
+    }
+  };
   const columns: ResponsiveColumn<UniversityCard['programs'][number]>[] = [
     { title: 'Направление', dataIndex: 'directionName', show: ['wide', 'mid', 'narrow'] },
     { title: 'Продукт', dataIndex: 'productName', show: ['wide', 'mid'] },
@@ -44,6 +58,23 @@ const ProgramsSection = ({ card }: { card: UniversityCard }) => {
     { title: 'Здоровье', show: ['wide', 'mid', 'narrow'], width: 150, render: (_, row) => <HealthMark score={row.healthScore} band={row.healthBand} empty="Нет оценки" /> },
     { title: 'Студенты', dataIndex: 'students', show: ['wide'], width: 110 },
     { title: 'Лицензия', dataIndex: 'license', show: ['wide'] },
+    {
+      title: 'LMS',
+      show: ['wide', 'mid', 'narrow'],
+      width: 220,
+      render: (_, row) => (
+        <Space onClick={(event) => event.stopPropagation()}>
+          {row.externalLmsId && (
+            <Tooltip title={`${row.externalLmsId}${row.lastLmsSyncAt ? ` · ${new Date(row.lastLmsSyncAt).toLocaleString('ru-RU')}` : ''}`}>
+              <Tag color="green">{row.lmsSyncStatus ?? 'SYNCED'}</Tag>
+            </Tooltip>
+          )}
+          <Button size="small" type={row.externalLmsId ? 'default' : 'primary'} loading={sendingToLms === row.id} onClick={() => void sendToLms(row.id)}>
+            {row.externalLmsId ? 'Обновить в LMS' : 'Передать в LMS'}
+          </Button>
+        </Space>
+      ),
+    },
   ];
 
   return (
@@ -361,7 +392,7 @@ const UniversityWorkspace = ({ card, section, onChanged }: UniversityWorkspacePr
   if (section === 'teachers') return <TeachersSection card={card} />;
   if (section === 'documents') return <DocumentsSection card={card} />;
   if (section === 'feed') return <FeedSection card={card} />;
-  return <ProgramsSection card={card} />;
+  return <ProgramsSection card={card} onChanged={onChanged} />;
 };
 
 export default UniversityWorkspace;

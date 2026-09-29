@@ -42,6 +42,9 @@ class ProgramInstanceRead(BaseModel):
     comment: str | None
     parent_program_id: UUID | None = None
     legacy_interaction_id: UUID | None = None
+    external_lms_id: str | None = None
+    lms_sync_status: str | None = None
+    last_lms_sync_at: datetime | None = None
 
 
 class OrganizationHealthRead(BaseModel):

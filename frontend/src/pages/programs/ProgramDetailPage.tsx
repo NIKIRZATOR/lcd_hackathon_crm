@@ -7,7 +7,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { ApiError, apiRequest } from '../../api/client';
 import { isAllowedWorkflowFile, workflowFileRejectionMessage } from '../workflow/shared/workflowFiles';
 
-type ProgramInstance = { organization_id: string; direction_name: string; product_name: string; playbook_name: string; playbook_code: string | null; status: string; kam_name: string | null; academic_window_title: string | null; current_stage_code: string | null; health_score: number | null; health_band: string };
+type ProgramInstance = { organization_id: string; direction_name: string; product_name: string; playbook_name: string; playbook_code: string | null; status: string; kam_name: string | null; academic_window_title: string | null; current_stage_code: string | null; health_score: number | null; health_band: string; external_lms_id: string | null; lms_sync_status: string | null; last_lms_sync_at: string | null };
 type Checklist = { id: string; label: string; item_type: 'checkbox' | 'file' | 'date' | 'stakeholder_role' | 'number' | 'text'; required: boolean; required_attachment_kind?: string | null; is_done: boolean; value_text?: string; value_number?: number; value_date?: string; stakeholder_id?: string; attachment_id?: string };
 type Stage = { id: string; status: string; due_at: string | null; code: string; name: string; phase_code: string; phase_name: string; order_index: number; is_optional: boolean; is_final: boolean };
 type Transition = { id: string; name: string | null; to_stage_name: string };
@@ -132,6 +132,16 @@ const ProgramDetailPage = () => {
     }
   };
 
+  const sendToLms = async () => {
+    if (!id) return;
+    try {
+      await apiRequest(`/api/integrations/program-instances/${id}/lms/send`, { method: 'POST' });
+      await load();
+    } catch (caught) {
+      setMessage(caught instanceof ApiError ? caught.message : 'Не удалось передать программу в LMS.');
+    }
+  };
+
   if (message && !program) return <Alert type="error" message={message} showIcon />;
   if (!program || !workflow) return <Spin size="large" />;
 
@@ -154,6 +164,15 @@ const ProgramDetailPage = () => {
       </Descriptions>
       <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>Запись B2C-заказа из fixture не подтверждает оплату и не является выручкой.</Typography.Paragraph>
       {syncResult && <Alert type={syncResult.errors ? 'warning' : 'success'} showIcon message={`Синхронизация: mapped ${syncResult.mapped}, unmatched ${syncResult.unmatched}, errors ${syncResult.errors}.`} />}
+    </Card>
+    <Card size="small" title="Интеграция с LMS" extra={<Button type="primary" onClick={() => void sendToLms()}>Передать в LMS</Button>} style={{ marginTop: 16 }}>
+      <Descriptions size="small" column={{ xs: 1, md: 4 }}>
+        <Descriptions.Item label="Статус">{program.lms_sync_status ?? 'Не передавалась'}</Descriptions.Item>
+        <Descriptions.Item label="LMS ID">{program.external_lms_id ?? '—'}</Descriptions.Item>
+        <Descriptions.Item label="Последняя синхронизация">{program.last_lms_sync_at ? new Date(program.last_lms_sync_at).toLocaleString('ru-RU') : '—'}</Descriptions.Item>
+        <Descriptions.Item label="Студентов">{metrics?.students_count ?? '—'}</Descriptions.Item>
+      </Descriptions>
+      <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>DEMO / STUB: обмен выполняется с локальным Mock LMS по HTTP.</Typography.Paragraph>
     </Card>
     {nba && <Alert style={{ marginTop: 16 }} type={nba.severity === 'critical' ? 'error' : 'warning'} showIcon message={nba.action} />}
     <Card size="small" title="Текущее состояние" style={{ marginTop: 16 }}><Descriptions size="small" column={{ xs: 1, md: 2 }}><Descriptions.Item label="Лицензия">{license ? `${license.transfer_status} · ${license.valid_until?.slice(0, 10) ?? 'без срока'}` : '—'}</Descriptions.Item><Descriptions.Item label="Преподаватель">{teachers[0] ? `${teachers[0].full_name} · ${teachers[0].status}` : '—'}</Descriptions.Item></Descriptions></Card>

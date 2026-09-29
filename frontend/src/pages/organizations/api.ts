@@ -75,6 +75,9 @@ type ProgramInstance = {
   health_score: number | null;
   health_band: string | null;
   current_stage_code: string | null;
+  external_lms_id: string | null;
+  lms_sync_status: string | null;
+  last_lms_sync_at: string | null;
 };
 
 type Stakeholder = {
@@ -340,6 +343,9 @@ const programRow = (
     license: license
       ? `${transferLabel(license.transfer_status)}${license.license_number ? ` · ${license.license_number}` : ''}`
       : 'Лицензия не заведена',
+    externalLmsId: program.external_lms_id,
+    lmsSyncStatus: program.lms_sync_status,
+    lastLmsSyncAt: program.last_lms_sync_at,
   };
 };
 

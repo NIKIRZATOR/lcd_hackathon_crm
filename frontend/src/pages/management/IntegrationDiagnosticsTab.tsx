@@ -45,6 +45,7 @@ type Program = {
   product_id: string;
   direction_name: string;
   product_name: string;
+  external_lms_id?: string | null;
 };
 type Diagnostic = {
   source: string;
@@ -99,6 +100,8 @@ export const IntegrationDiagnosticsTab = () => {
   const [mappingSignal, setMappingSignal] = useState<Signal>();
   const [organizationId, setOrganizationId] = useState<string>();
   const [programId, setProgramId] = useState<string>();
+  const [lmsEventType, setLmsEventType] = useState('STUDENT_ENROLLED');
+  const [lmsStudents, setLmsStudents] = useState(35);
 
   const load = useCallback(async () => {
     try {
@@ -219,6 +222,33 @@ export const IntegrationDiagnosticsTab = () => {
     }
   };
 
+  const simulateLmsEvent = async () => {
+    const program = programs.find((item) => item.id === programId);
+    if (!program?.external_lms_id) {
+      setError('Сначала передайте выбранную программу в LMS на карточке программы.');
+      return;
+    }
+    setLoading(true);
+    setError(undefined);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_MOCK_LMS_URL ?? 'http://localhost:8090'}/api/demo/events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-LMS-Service-Token': import.meta.env.VITE_LMS_SERVICE_TOKEN ?? 'demo-lms-service-token-change-me',
+        },
+        body: JSON.stringify({ external_program_id: program.external_lms_id, type: lmsEventType, student_count: lmsStudents }),
+      });
+      if (!response.ok) throw new Error();
+      setNotice('Событие отправлено в Mock LMS; callback CRM обработан через integrations pipeline.');
+      await load();
+    } catch {
+      setError('Mock LMS недоступен. Запустите профиль mock-lms и включите LMS_MOCK_ENABLED.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Alert
@@ -229,6 +259,16 @@ export const IntegrationDiagnosticsTab = () => {
       />
       {error && <Alert type="error" showIcon message={error} />}
       {notice && <Alert type="success" showIcon message={notice} />}
+      <Card title="LMS · DEMO / STUB" size="small">
+        <Typography.Paragraph type="secondary">Настоящий HTTP-сценарий: Frontend → Mock LMS → callback CRM. Кнопка не изменяет данные CRM напрямую.</Typography.Paragraph>
+        <Space wrap>
+          <Select showSearch optionFilterProp="label" value={organizationId} onChange={(value) => void selectOrganization(value)} placeholder="Организация" style={{ minWidth: 230 }} options={organizations.map((item) => ({ value: item.id, label: item.name }))} />
+          <Select disabled={!organizationId} value={programId} onChange={setProgramId} placeholder="Программа в LMS" style={{ minWidth: 270 }} options={programs.filter((item) => item.external_lms_id).map((item) => ({ value: item.id, label: `${item.direction_name} · ${item.product_name}` }))} />
+          <Select value={lmsEventType} onChange={setLmsEventType} options={['STUDENT_ENROLLED', 'COURSE_STARTED', 'COURSE_COMPLETED'].map((value) => ({ value, label: value }))} />
+          <Select value={lmsStudents} onChange={setLmsStudents} options={[0, 10, 20, 35, 50].map((value) => ({ value, label: `Студентов: ${value}` }))} />
+          <Button type="primary" disabled={!programId} loading={loading} onClick={() => void simulateLmsEvent()}>Сымитировать событие LMS</Button>
+        </Space>
+      </Card>
       <Card title="Загрузка fixture" size="small">
         <Space wrap>
           <Select

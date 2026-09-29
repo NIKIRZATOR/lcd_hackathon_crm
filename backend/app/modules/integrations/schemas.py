@@ -1,7 +1,9 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ProgramMetricRead(BaseModel):
@@ -28,6 +30,19 @@ class SyncResultRead(BaseModel):
     unmatched: int
     errors: int
     metrics: ProgramMetricRead
+
+
+class LmsEventCreate(BaseModel):
+    event_id: str = Field(min_length=1, max_length=255)
+    external_program_id: str = Field(min_length=1, max_length=128)
+    type: Literal["STUDENT_ENROLLED", "COURSE_STARTED", "COURSE_COMPLETED"]
+    data: dict[str, object] = Field(default_factory=dict)
+
+
+class LmsSendResultRead(BaseModel):
+    external_lms_id: str
+    status: str
+    last_lms_sync_at: datetime
 
 
 class FixtureProcessRead(BaseModel):

@@ -60,6 +60,9 @@ export type UniversityProgramRow = {
   students: number;
   studentsAreTemporary: boolean;
   license: string;
+  externalLmsId?: string | null;
+  lmsSyncStatus?: string | null;
+  lastLmsSyncAt?: string | null;
 };
 
 export type UniversityPerson = {

@@ -56,3 +56,6 @@ class ProgramInstance(ModelBase):
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     parent_program_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("program_instances.id"), nullable=True)
     legacy_interaction_id: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("university_interactions.id"), nullable=True, unique=True)
+    external_lms_id: Mapped[str | None] = mapped_column(String(128), nullable=True, unique=True)
+    lms_sync_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    last_lms_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

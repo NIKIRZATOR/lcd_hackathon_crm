@@ -3,10 +3,13 @@ from uuid import UUID
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+import secrets
+
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db_session
 from app.modules.auth.access import ADMIN_ROLES, CRM_ROLES
 from app.modules.auth.dependencies import require_roles
@@ -15,6 +18,8 @@ from app.modules.integrations.schemas import (
     CourseMappingCreate,
     FixtureProcessRead,
     IntegrationPackageRead,
+    LmsEventCreate,
+    LmsSendResultRead,
     MappingApplyRequest,
     ProgramMetricRead,
     ReplayRequest,
@@ -33,6 +38,16 @@ router = APIRouter(
     tags=["integrations"],
     dependencies=[Depends(require_roles(*CRM_ROLES))],
 )
+lms_router = APIRouter(prefix="/integrations/lms", tags=["integrations"])
+
+
+def require_lms_service_token(
+    x_lms_service_token: str | None = Header(default=None),
+) -> None:
+    if not settings.lms_service_token or not x_lms_service_token or not secrets.compare_digest(
+        x_lms_service_token, settings.lms_service_token
+    ):
+        raise HTTPException(status_code=401, detail="Invalid LMS service token")
 
 
 @router.get(
@@ -58,6 +73,30 @@ def sync_program(
 ):
     ProgramInstanceService(db).get(program_instance_id, current_user)
     return IntegrationSyncService(db).sync_program(program_instance_id)
+
+
+@router.post(
+    "/program-instances/{program_instance_id}/lms/send",
+    response_model=LmsSendResultRead,
+)
+def send_program_to_lms(
+    program_instance_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    ProgramInstanceService(db).get(program_instance_id, current_user)
+    try:
+        return IntegrationSyncService(db).send_program_to_lms(program_instance_id, current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@lms_router.post("/events", dependencies=[Depends(require_lms_service_token)])
+def receive_lms_event(
+    payload: LmsEventCreate,
+    db: Session = Depends(get_db_session),
+):
+    return IntegrationSyncService(db).receive_lms_event(payload)
 
 
 @router.get("/sources", dependencies=[Depends(require_roles(*ADMIN_ROLES))])
