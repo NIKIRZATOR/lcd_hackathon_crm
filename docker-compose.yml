@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rtk_eduflow}
       KEYCLOAK_DB: ${KEYCLOAK_DB:-keycloak}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-keycloak-db.sh:/docker-entrypoint-initdb.d/10-init-keycloak-db.sh:ro
@@ -23,17 +23,17 @@ services:
       context: ./backend
     environment:
       APP_NAME: ${APP_NAME:-edu_crm}
-      APP_ENV: development
-      DEBUG: "true"
+      APP_ENV: ${APP_ENV:-production}
+      DEBUG: ${DEBUG:-false}
       API_PREFIX: /api
-      DATABASE_URL: postgresql+psycopg://rtk_eduflow:rtk_eduflow@postgres:5432/rtk_eduflow
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rtk_eduflow}:${POSTGRES_PASSWORD:-rtk_eduflow}@postgres:5432/${POSTGRES_DB:-rtk_eduflow}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
       DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
       ENABLE_DIAGNOSTIC_HEADERS: ${ENABLE_DIAGNOSTIC_HEADERS:-false}
-      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
-      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
-      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      KEYCLOAK_URL: ${KEYCLOAK_URL}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080/auth}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk-eduflow}
       KEYCLOAK_FRONTEND_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT_ID:-rtk-eduflow-frontend}
       KEYCLOAK_BACKEND_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-rtk-eduflow-backend}
@@ -55,7 +55,7 @@ services:
       REPORT_QUEUE_NAME: ${REPORT_QUEUE_NAME:-reports}
       REPORT_FILE_RETENTION_DAYS: ${REPORT_FILE_RETENTION_DAYS:-90}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./backend:/app
       - ./preload_data:/preload_data:ro
@@ -68,6 +68,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      keycloak:
+        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s
@@ -81,14 +83,14 @@ services:
     command: ["python", "-m", "app.worker.reports"]
     environment:
       APP_NAME: ${APP_NAME:-edu_crm}
-      APP_ENV: development
-      DEBUG: "true"
-      DATABASE_URL: postgresql+psycopg://rtk_eduflow:rtk_eduflow@postgres:5432/rtk_eduflow
+      APP_ENV: ${APP_ENV:-production}
+      DEBUG: ${DEBUG:-false}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rtk_eduflow}:${POSTGRES_PASSWORD:-rtk_eduflow}@postgres:5432/${POSTGRES_DB:-rtk_eduflow}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
       DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
-      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
-      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_URL: ${KEYCLOAK_URL}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080/auth}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk-eduflow}
       KEYCLOAK_FRONTEND_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT_ID:-rtk-eduflow-frontend}
       KEYCLOAK_BACKEND_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-rtk-eduflow-backend}
@@ -119,12 +121,14 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      keycloak:
+        condition: service_started
 
   redis:
     image: redis:7-alpine
     container_name: rtk-eduflow-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -140,8 +144,8 @@ services:
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-rtk_eduflow_minio_secret}
       MINIO_REGION_NAME: ${S3_REGION:-us-east-1}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -198,17 +202,19 @@ services:
     container_name: rtk-eduflow-frontend
     environment:
       VITE_APP_NAME: ${APP_NAME:-edu_crm}
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
-      VITE_KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
+      VITE_API_URL: ${VITE_API_URL}
+      VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL}
+      VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS}
       VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk-eduflow}
       VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT_ID:-rtk-eduflow-frontend}
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
     depends_on:
       - backend
+      - keycloak
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
@@ -220,11 +226,14 @@ services:
       KC_DB_USERNAME: ${POSTGRES_USER:-rtk_eduflow}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-rtk_eduflow}
       KC_HTTP_ENABLED: "true"
-      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME: ${KEYCLOAK_URL}
+      KC_HOSTNAME_STRICT: "true"
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8081:8080"
     volumes:
       - ./keycloak/realm:/opt/keycloak/data/import:ro
     depends_on:
@@ -241,7 +250,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-rtk_eduflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rtk_eduflow}
       KEYCLOAK_DB: ${KEYCLOAK_DB:-keycloak}
-      KEYCLOAK_URL_INTERNAL: http://keycloak:8080
+      KEYCLOAK_URL_INTERNAL: http://keycloak:8080/auth
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk-eduflow}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
