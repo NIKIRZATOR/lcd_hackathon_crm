@@ -1,5 +1,5 @@
 import { ClockCircleOutlined, EnvironmentOutlined, FilterOutlined, SearchOutlined, WarningOutlined } from '@ant-design/icons';
-import { Alert, Button, Collapse, DatePicker, Empty, Input, Select, Spin, Table, Tag } from 'antd';
+import { Alert, Button, Collapse, DatePicker, Empty, Input, Select, Spin, Table } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -104,9 +104,9 @@ const WorkflowPage = () => {
   }
 
   const columns: ResponsiveColumn<JournalProgram>[] = [
-    { title: 'Вуз', dataIndex: 'organization', show: ['wide', 'mid', 'narrow'] },
+    { title: 'Организация', dataIndex: 'organization', show: ['wide', 'mid', 'narrow'] },
     { title: 'Направление', dataIndex: 'direction', show: ['wide', 'mid'] },
-    { title: 'Продукт', dataIndex: 'product', show: ['wide', 'mid', 'narrow'] },
+    { title: 'ИТ-программа', dataIndex: 'product', show: ['wide', 'mid', 'narrow'] },
     { title: 'Плейбук', dataIndex: 'playbook', show: ['wide'] },
     { title: 'Этап', dataIndex: 'stage', show: ['wide', 'mid', 'narrow'] },
     { title: 'Срок', dataIndex: 'due', show: ['wide', 'mid'], width: 130, render: (value: string, row) => value ? `${dayjs(value).format('DD.MM.YYYY')}${overdueDays(row.due) ? ` · ${overdueDays(row.due)} дн.` : ''}` : 'Срок не задан' },
@@ -120,9 +120,8 @@ const WorkflowPage = () => {
     <PageLayout>
       <div className={styles.page}>
         <div className={styles.heading}>
-          <h1 className={styles.title}>Воркфлоу</h1>
-          <p className={styles.subtitle}>{isAdmin ? 'Все программы. Новая программа создаётся из карточки вуза.' : seesKam ? 'Программы команды. Новая программа создаётся из карточки вуза.' : 'Журнал программ. Новая программа создаётся из карточки вуза.'}</p>
-          <Tag color="gold">* Расхождение API: демо- и расчётные значения показываются только при неполном ответе сервера.</Tag>
+          <h1 className={styles.title}>Workflow</h1>
+          <p className={styles.subtitle}>{isAdmin ? 'Все программы. Новая программа создаётся из карточки организации.' : seesKam ? 'Программы команды. Новая программа создаётся из карточки организации.' : 'Журнал программ. Новая программа создаётся из карточки организации.'}</p>
         </div>
         {error && <Alert type="error" showIcon message={error} />}
         <section className={styles.metrics}>
@@ -173,10 +172,10 @@ const WorkflowPage = () => {
   function filterFields() {
     return (
       <>
-        <Input className={styles.search} allowClear prefix={<SearchOutlined />} placeholder="Вуз, направление, продукт" value={search} onChange={(event) => update({ search: event.target.value })} />
-        <Select className={styles.filter} allowClear placeholder="Вуз" value={university || undefined} options={options((row) => row.organization).map((value) => ({ value, label: value }))} onChange={(value) => update({ university: value ?? '' })} />
+        <Input className={styles.search} allowClear prefix={<SearchOutlined />} placeholder="Организация, направление, ИТ-программа" value={search} onChange={(event) => update({ search: event.target.value })} />
+        <Select className={styles.filter} allowClear placeholder="Организация" value={university || undefined} options={options((row) => row.organization).map((value) => ({ value, label: value }))} onChange={(value) => update({ university: value ?? '' })} />
         <Select className={styles.filter} allowClear placeholder="Направление" value={direction || undefined} options={options((row) => row.direction).map((value) => ({ value, label: value }))} onChange={(value) => update({ direction: value ?? '' })} />
-        <Select className={styles.filter} allowClear placeholder="Продукт" value={product || undefined} options={options((row) => row.product).map((value) => ({ value, label: value }))} onChange={(value) => update({ product: value ?? '' })} />
+        <Select className={styles.filter} allowClear placeholder="ИТ-программа" value={product || undefined} options={options((row) => row.product).map((value) => ({ value, label: value }))} onChange={(value) => update({ product: value ?? '' })} />
         <Select className={styles.filter} allowClear placeholder="Этап" value={stage || undefined} options={options((row) => row.stage).map((value) => ({ value, label: value }))} onChange={(value) => update({ stage: value ?? '' })} />
         <Select className={styles.filter} allowClear placeholder="Плейбук" value={playbook || undefined} options={options((row) => row.playbook).map((value) => ({ value, label: value }))} onChange={(value) => update({ playbook: value ?? '' })} />
         {seesKam && <Select className={styles.filter} allowClear showSearch placeholder="KAM" value={kam || undefined} options={options((row) => row.kam).filter((value) => value !== 'KAM не назначен').map((value) => ({ value, label: value }))} onChange={(value) => update({ kam: value ?? '' })} />}

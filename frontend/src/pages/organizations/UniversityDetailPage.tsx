@@ -104,7 +104,7 @@ const UniversityDetailPage = () => {
   }
 
   if (!card) {
-    return <PageLayout><Empty description={error || 'Вуз не найден'} /></PageLayout>;
+    return <PageLayout><Empty description={error || 'Организация не найдена'} /></PageLayout>;
   }
 
   const note = healthNote(card.healthScore);
@@ -116,7 +116,7 @@ const UniversityDetailPage = () => {
     <PageLayout>
       <div className={styles.page}>
         <div className={styles.breadcrumbs}>
-          <Link to="/organizations">Вузы</Link>
+          <Link to="/organizations">Организации</Link>
           <span className={styles.breadcrumbSeparator}>›</span>
           {section === 'programs' ? <span className={styles.breadcrumbCurrent}>{card.shortName}</span> : (
             <>

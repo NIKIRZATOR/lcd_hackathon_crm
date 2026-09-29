@@ -129,7 +129,7 @@ const CatalogImportModal = ({ open, onClose, onApplied }: CatalogImportModalProp
             pagination={false}
             dataSource={preview.slice(0, 6)}
             columns={[
-              { title: 'Вуз', dataIndex: 'name' },
+              { title: 'Организация', dataIndex: 'name' },
               { title: 'Действие', dataIndex: 'action', render: (value: CatalogPreviewRow['action']) => value === 'update' ? 'Обновить' : 'Добавить' },
               { title: 'Менеджер', dataIndex: 'manager' },
               { title: 'ПО', dataIndex: 'software' },

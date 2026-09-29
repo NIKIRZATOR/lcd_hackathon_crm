@@ -50,7 +50,7 @@ export type SelectFilterConfig = {
 export const selectFilters: SelectFilterConfig[] = [
   {
     name: 'universityIds',
-    label: 'Вуз',
+    label: 'Организация',
     placeholder: 'Все вузы',
     options: universityOptionsMock,
   },

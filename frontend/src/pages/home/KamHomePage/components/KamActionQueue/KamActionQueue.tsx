@@ -1,9 +1,12 @@
 import { CalendarOutlined } from '@ant-design/icons';
-import { Button, Card, Flex, Select, Typography } from 'antd';
+import { Button, Card, Flex, Select, Spin, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import NBARecommendation from '../../nba/NBARecommendation';
+import { dueCaption } from '../../nba/nbaQueueAdapter';
+import type { NbaRecommendation } from '../../nba/nbaTypes';
 import type { NbaItem } from '../../types';
 
 import styles from './KamActionQueue.module.scss';
@@ -12,6 +15,8 @@ const { Text, Title } = Typography;
 
 type KamActionQueueProps = {
   items: NbaItem[];
+  recommendations?: Record<string, NbaRecommendation>;
+  loading?: boolean;
 };
 
 const SEVERITY_CONFIG: Record<
@@ -46,27 +51,7 @@ const PRIORITY_ORDER: Record<string, number> = {
   P3: 3,
 };
 
-const getDueText = (dueAt: string | null) => {
-  if (!dueAt) {
-    return null;
-  }
-
-  const dueDate = dayjs(dueAt);
-  const today = dayjs().startOf('day');
-  const diff = dueDate.startOf('day').diff(today, 'day');
-
-  if (diff < 0) {
-    return `Просрочено на ${Math.abs(diff)} дн.`;
-  }
-
-  if (diff === 0) {
-    return 'Сегодня';
-  }
-
-  return `${dueDate.format('DD.MM.YYYY')} (через ${diff} дн.)`;
-};
-
-const KamActionQueue = ({ items }: KamActionQueueProps) => {
+const KamActionQueue = ({ items, recommendations, loading }: KamActionQueueProps) => {
   const [sort, setSort] = useState<'priority' | 'date'>('priority');
   const navigate = useNavigate();
 
@@ -105,7 +90,7 @@ const KamActionQueue = ({ items }: KamActionQueueProps) => {
             Очередь действий
           </Title>
 
-          <span className={styles.count}>{items.length} задач</span>
+          {!loading && <span className={styles.count}>{items.length} задач</span>}
         </Flex>
 
         <Select
@@ -125,10 +110,16 @@ const KamActionQueue = ({ items }: KamActionQueueProps) => {
         />
       </Flex>
 
+      {loading ? (
+        <div className={styles.loader}>
+          <Spin size="large" />
+        </div>
+      ) : (
       <div className={styles.list}>
         {sortedItems.map((item) => {
           const severity = SEVERITY_CONFIG[item.severity];
-          const dueText = getDueText(item.due_at);
+          const recommendation = recommendations?.[item.id];
+          const dueText = dueCaption(item.due_at);
 
           return (
             <div key={item.id} className={`${styles.item} ${severity.className}`}>
@@ -148,7 +139,7 @@ const KamActionQueue = ({ items }: KamActionQueueProps) => {
                   )}
                 </div>
 
-                <Text className={styles.reason}>{item.reason}</Text>
+                <NBARecommendation recommendation={recommendation} />
 
                 {dueText && (
                   <Flex align="center" gap={5} className={styles.dueDate}>
@@ -171,12 +162,13 @@ const KamActionQueue = ({ items }: KamActionQueueProps) => {
                   )
                 }
               >
-                {item.action}
+                Открыть программу
               </Button>
             </div>
           );
         })}
       </div>
+      )}
     </Card>
   );
 };

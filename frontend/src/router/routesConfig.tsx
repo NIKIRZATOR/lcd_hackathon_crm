@@ -27,13 +27,13 @@ export const routesConfig: AppRoute[] = [
   },
   {
     path: '/universities',
-    title: 'Вузы',
+    title: 'Организации',
     element: <UniversitiesPage />,
     parent: '/',
   },
   {
     path: '/universities/:id',
-    title: 'Карточка вуза',
+    title: 'Карточка организации',
     element: <UniversityDetailPage />,
     parent: '/universities',
   },

@@ -22,7 +22,7 @@ export const PROGRAM_RATING_REPORT_COLUMN_DEFINITIONS: ReportColumnDefinition<Pr
     },
     {
       key: 'universities',
-      title: 'Вузы',
+      title: 'Организации',
       minWidth: 80,
       sorter: (a, b) => a.universities - b.universities,
     },

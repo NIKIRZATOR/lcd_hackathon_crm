@@ -47,7 +47,7 @@ const renderStatus = (status: AttentionStatus, compact: boolean) => {
 
 const desktopColumns: TableColumnsType<DashboardAttentionItem> = [
   {
-    title: 'Вуз',
+    title: 'Организация',
     dataIndex: 'university',
     key: 'university',
   },
@@ -84,7 +84,7 @@ const desktopColumns: TableColumnsType<DashboardAttentionItem> = [
 
 const mobileColumns: TableColumnsType<DashboardAttentionItem> = [
   {
-    title: 'Вуз',
+    title: 'Организация',
     dataIndex: 'university',
     key: 'university',
   },

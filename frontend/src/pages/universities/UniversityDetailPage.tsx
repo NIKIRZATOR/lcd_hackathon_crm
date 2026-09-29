@@ -60,7 +60,7 @@ const UniversityDetailPage = () => {
   if (!university || !card || !sections) {
     return (
       <PageLayout>
-        <Empty description="Вуз не найден" />
+        <Empty description="Организация не найдена" />
       </PageLayout>
     );
   }
@@ -101,7 +101,7 @@ const UniversityDetailPage = () => {
     <PageLayout>
       <div className={styles.page}>
         <div className={styles.breadcrumbs}>
-          <Link to="/universities">Вузы</Link>
+          <Link to="/universities">Организации</Link>
           <span className={styles.breadcrumbSeparator}>›</span>
           <span className={styles.breadcrumbCurrent}>{university.shortName}</span>
         </div>

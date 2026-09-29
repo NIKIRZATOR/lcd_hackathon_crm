@@ -1,0 +1,22 @@
+.block {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.star {
+  flex-shrink: 0;
+
+  color: var(--ant-colorPrimary);
+  font-size: 14px;
+  line-height: 18px;
+  cursor: help;
+}
+
+.text {
+  color: var(--ant-colorText);
+  font-size: 13px;
+  line-height: 18px;
+  white-space: normal;
+}
