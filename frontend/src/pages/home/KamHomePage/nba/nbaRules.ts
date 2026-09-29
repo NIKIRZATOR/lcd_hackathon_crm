@@ -143,7 +143,7 @@ export const missingFactText = (fact: ChecklistFact, stage?: StageCode) => {
 };
 
 export const firstMissing = (facts: ChecklistFact[]) =>
-  [...facts].sort((a, b) => a.order - b.order).find((item) => item.required && !item.done);
+  facts.filter((item) => item.required).find((item) => item.completed !== true);
 
 export const READY: Record<StageCode, string> = {
   find_contact: 'Контакт собран. Можно переходить к первой встрече.',

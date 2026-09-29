@@ -156,7 +156,7 @@ export const contextFromQueueItem = (item: NbaItem): ProgramNbaContext => {
     code: row.code,
     label: row.label,
     required: true,
-    done: ready ? true : factLabel ? !matchesFact(row, factLabel) : true,
+    completed: ready ? true : factLabel ? !matchesFact(row, factLabel) : true,
     order,
   }));
 

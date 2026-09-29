@@ -2,6 +2,8 @@ import dayjs from 'dayjs';
 
 import { apiRequest } from '../../../../api/client';
 
+import { LICENSE_FILE_KIND, parseLicenseDraft, signLicenseChecks } from '../../../workflow/stages/signLicense';
+
 import { resolveStageCode } from './getNextBestAction';
 import type { ChecklistFact, ProgramNbaContext } from './nbaTypes';
 
@@ -32,21 +34,6 @@ const overdueDays = (dueAt: string | null) => {
   return diff > 0 ? diff : 0;
 };
 
-const parseDraft = (raw: string | null | undefined) => {
-  if (!raw?.trim()) return { number: '', status: null as string | null, signedOn: null as string | null };
-  try {
-    const data = JSON.parse(raw) as Record<string, unknown>;
-    if (data.v !== 1) return { number: raw.trim(), status: null, signedOn: null };
-    return {
-      number: typeof data.number === 'string' ? data.number : '',
-      status: typeof data.status === 'string' ? data.status : null,
-      signedOn: typeof data.signedOn === 'string' ? data.signedOn : null,
-    };
-  } catch {
-    return { number: raw.trim(), status: null, signedOn: null };
-  }
-};
-
 export const emptyContext = (programId: string, live = false): ProgramNbaContext => ({
   programId,
   live,
@@ -60,26 +47,31 @@ const licenseFacts = (
   files: Array<{ attachment_kind?: string | null }>,
 ): ChecklistFact[] => {
   const byCode = (code: string) => rows.find((row) => (row.code || '').toLowerCase() === code);
-  const numberItem = byCode('license_number');
-  const termItem = byCode('license_valid_until');
-  const fileItem = byCode('license_attachment');
-  const draft = parseDraft(numberItem?.value_text);
-  const hasFile = Boolean(fileItem?.attachment_id) || files.some((file) => file.attachment_kind === 'license');
-  return [
-    { code: 'received', label: 'Статус «получена подписанная»', required: true, done: draft.status === 'received', order: 0 },
-    { code: 'number', label: 'Номер указан', required: true, done: draft.number.trim().length > 0, order: 1 },
-    { code: 'signed', label: 'Дата указана', required: true, done: Boolean(draft.signedOn), order: 2 },
-    { code: 'term', label: 'Срок указан', required: true, done: Boolean(termItem?.value_date), order: 3 },
-    { code: 'file', label: 'Файл приложен', required: true, done: hasFile, order: 4 },
-  ];
+  const draft = parseLicenseDraft(byCode('license_number')?.value_text);
+  const validUntil = byCode('license_valid_until')?.value_date ?? null;
+  const latest = files.filter((file) => file.attachment_kind === LICENSE_FILE_KIND).at(-1) ?? null;
+  const done = {
+    received: draft.status === 'received',
+    number: draft.number.trim().length > 0,
+    signed: Boolean(draft.signedOn),
+    term: Boolean(validUntil),
+    file: Boolean(latest),
+  };
+  return signLicenseChecks.map((item, order) => ({
+    code: item.id,
+    label: item.label,
+    required: true,
+    completed: done[item.id] === true,
+    order,
+  }));
 };
 
 const mapFacts = (rows: ChecklistRow[]): ChecklistFact[] =>
   rows.map((row, order) => ({
     code: row.code || `item-${order}`,
     label: row.label,
-    required: row.required,
-    done: row.is_done,
+    required: row.required === true,
+    completed: row.is_done === true,
     order,
   }));
 
@@ -93,6 +85,9 @@ export const loadNbaContext = async (programId: string): Promise<ProgramNbaConte
 
   const ctx = emptyContext(programId, true);
   ctx.stageCode = resolveStageCode(current?.code);
+  if (ctx.stageCode === 'unknown' && current?.name && /подписан.*лиценз/i.test(current.name)) {
+    ctx.stageCode = 'sign_license';
+  }
   ctx.overdueDays = overdueDays(current?.due_at ?? null);
 
   if (!current?.id) return ctx;

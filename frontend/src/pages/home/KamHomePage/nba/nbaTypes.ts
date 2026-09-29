@@ -21,7 +21,7 @@ export type ChecklistFact = {
   code: string;
   label: string;
   required: boolean;
-  done: boolean;
+  completed: boolean;
   order: number;
 };
 

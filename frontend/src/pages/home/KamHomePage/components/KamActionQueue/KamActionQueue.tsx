@@ -1,12 +1,12 @@
 import { CalendarOutlined } from '@ant-design/icons';
-import { Button, Card, Flex, Select, Typography } from 'antd';
+import { Button, Card, Flex, Select, Spin, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { getNextBestAction } from '../../nba/getNextBestAction';
 import NBARecommendation from '../../nba/NBARecommendation';
-import { contextFromQueueItem, dueCaption } from '../../nba/nbaQueueAdapter';
+import { dueCaption } from '../../nba/nbaQueueAdapter';
+import type { NbaRecommendation } from '../../nba/nbaTypes';
 import type { NbaItem } from '../../types';
 
 import styles from './KamActionQueue.module.scss';
@@ -15,6 +15,8 @@ const { Text, Title } = Typography;
 
 type KamActionQueueProps = {
   items: NbaItem[];
+  recommendations?: Record<string, NbaRecommendation>;
+  loading?: boolean;
 };
 
 const SEVERITY_CONFIG: Record<
@@ -49,7 +51,7 @@ const PRIORITY_ORDER: Record<string, number> = {
   P3: 3,
 };
 
-const KamActionQueue = ({ items }: KamActionQueueProps) => {
+const KamActionQueue = ({ items, recommendations, loading }: KamActionQueueProps) => {
   const [sort, setSort] = useState<'priority' | 'date'>('priority');
   const navigate = useNavigate();
 
@@ -88,7 +90,7 @@ const KamActionQueue = ({ items }: KamActionQueueProps) => {
             Очередь действий
           </Title>
 
-          <span className={styles.count}>{items.length} задач</span>
+          {!loading && <span className={styles.count}>{items.length} задач</span>}
         </Flex>
 
         <Select
@@ -108,10 +110,15 @@ const KamActionQueue = ({ items }: KamActionQueueProps) => {
         />
       </Flex>
 
+      {loading ? (
+        <div className={styles.loader}>
+          <Spin size="large" />
+        </div>
+      ) : (
       <div className={styles.list}>
         {sortedItems.map((item) => {
           const severity = SEVERITY_CONFIG[item.severity];
-          const recommendation = getNextBestAction(contextFromQueueItem(item));
+          const recommendation = recommendations?.[item.id];
           const dueText = dueCaption(item.due_at);
 
           return (
@@ -155,12 +162,13 @@ const KamActionQueue = ({ items }: KamActionQueueProps) => {
                   )
                 }
               >
-                {item.action}
+                Открыть программу
               </Button>
             </div>
           );
         })}
       </div>
+      )}
     </Card>
   );
 };
