@@ -5,7 +5,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
@@ -15,8 +15,8 @@ REQUEST_ID_HEADER = "X-Request-ID"
 class ErrorEnvelope(BaseModel):
     code: str
     message: str
-    details: Any | None = None
-    request_id: str = Field(alias="requestId")
+    details: Any | None
+    request_id: str
 
 
 STATUS_CODE_MAP = {
@@ -50,9 +50,9 @@ def error_payload(
         code=code or STATUS_CODE_MAP.get(status_code, "ERROR"),
         message=message or default_message_for_status(status_code),
         details=details,
-        requestId=request_id,
+        request_id=request_id,
     )
-    return envelope.model_dump(by_alias=True)
+    return envelope.model_dump()
 
 
 def get_request_id(request: Request) -> str:
@@ -76,9 +76,16 @@ def install_error_handlers(application: FastAPI) -> None:
         details = None
 
         if isinstance(detail, dict):
-            code = detail.get("code")
-            message = detail.get("message")
-            details = detail.get("details")
+            if {"code", "message", "details"}.intersection(detail):
+                code = detail.get("code")
+                message = detail.get("message")
+                details = detail.get("details")
+            else:
+                message = None
+                details = detail
+        elif not isinstance(detail, str):
+            message = None
+            details = detail
 
         return JSONResponse(
             status_code=exc.status_code,

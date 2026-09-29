@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -45,10 +46,28 @@ def test_report_exporters_build_all_required_formats() -> None:
     xlsx, _, _ = render_report(rows, ["organization", "applications"], "XLSX")
     xls, _, _ = render_report(rows, ["organization", "applications"], "XLS")
     pdf, _, _ = render_report(rows, ["organization", "applications"], "PDF")
+    json_content, json_mime_type, json_extension = render_report(
+        rows,
+        ["organization", "applications"],
+        "JSON",
+        filter_snapshot={"health_bands": ["red"]},
+    )
+    json_payload = json.loads(json_content)
 
     assert xlsx.startswith(b"PK")
     assert xls.startswith(bytes.fromhex("D0CF11E0"))
     assert pdf.startswith(b"%PDF-")
+    assert json_mime_type == "application/json; charset=utf-8"
+    assert json_extension == "json"
+    assert json_payload["schema_version"] == "1.0"
+    assert json_payload["report_type"] == "programs"
+    assert json_payload["filters"] == {"health_bands": ["red"]}
+    assert [column["key"] for column in json_payload["columns"]] == [
+        "organization",
+        "applications",
+    ]
+    assert json_payload["row_count"] == 1
+    assert json_payload["items"] == rows
 
 
 def test_report_worker_marks_job_failed_when_creator_is_missing() -> None:

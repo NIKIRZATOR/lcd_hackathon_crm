@@ -52,13 +52,25 @@ vi.mock('../pages/login/LoginPage', () => ({
 }));
 
 vi.mock('../layout/AppLayout', async () => {
-  const { Outlet } = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
-  return {
-    default: () => (
+  const { Outlet, useLocation } =
+    await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+
+  const MockAppLayout = () => {
+    const location = useLocation();
+
+    return (
       <div data-testid="v2-layout">
+        <span data-testid="current-location">
+          {location.pathname}
+          {location.search}
+        </span>
         <Outlet />
       </div>
-    ),
+    );
+  };
+
+  return {
+    default: MockAppLayout,
   };
 });
 
@@ -68,6 +80,18 @@ vi.mock('../pages/reports/V2PlaceholderPage', () => ({
 
 vi.mock('../pages/home/RoleHomePage', () => ({
   default: () => <div>Сегодня</div>,
+}));
+
+vi.mock('../pages/organizations/UniversitiesPage', () => ({
+  default: () => <div>Organizations page</div>,
+}));
+
+vi.mock('../pages/workflow/WorkflowPage', () => ({
+  default: () => <div>Workflow page</div>,
+}));
+
+vi.mock('../pages/workflow/WorkflowDetailPage', () => ({
+  default: () => <div>Workflow detail page</div>,
 }));
 
 vi.mock('../pages/analytics/AnalyticsPage', () => ({
@@ -164,5 +188,27 @@ describe('AppRoutes start route', () => {
     renderRoute('/management');
 
     expect(await screen.findByText('Denied by route guard')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['/tasks', '/home'],
+    ['/programs', '/workflows'],
+    ['/products', '/organizations'],
+    ['/analytics', '/reports'],
+    ['/rating', '/reports?report=programs-rating'],
+    ['/universities', '/organizations'],
+    ['/universities/legacy-id', '/organizations'],
+    ['/workflow', '/workflows'],
+    ['/workflow/program-id', '/workflows/program-id'],
+  ])('redirects legacy route %s to %s', async (legacyPath, currentPath) => {
+    authState.value = {
+      authenticated: true,
+      initialized: true,
+      user: { roles: ['KAM'] },
+    };
+
+    renderRoute(legacyPath);
+
+    expect(await screen.findByTestId('current-location')).toHaveTextContent(currentPath);
   });
 });

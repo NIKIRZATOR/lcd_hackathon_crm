@@ -605,9 +605,8 @@ def upload_stage_attachment(
         ...,
         description=(
             "Binary content attachment. Разрешенные extensions и MIME types: "
-            "PDF `application/pdf`, DOCX "
-            "`application/vnd.openxmlformats-officedocument.wordprocessingml.document`, XLSX "
-            "`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`."
+            "PNG/JPEG, PDF, ZIP/GZIP/RAR, DOC/DOCX и XLS/XLSX. "
+            "Backend дополнительно проверяет соответствие MIME type и сигнатуры файла."
         ),
     ),
     description: str | None = Form(default=None, description="Опциональное описание attachment."),

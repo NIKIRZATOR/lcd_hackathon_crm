@@ -31,7 +31,7 @@ def test_not_found_uses_error_envelope() -> None:
         "code": "NOT_FOUND",
         "message": "Not Found",
         "details": None,
-        "requestId": "stage0-test",
+        "request_id": "stage0-test",
     }
 
 
@@ -46,5 +46,12 @@ def test_validation_error_uses_error_envelope() -> None:
     body = response.json()
     assert body["code"] == "VALIDATION_ERROR"
     assert body["message"] == "Request validation failed"
-    assert body["requestId"]
+    assert body["request_id"]
     assert isinstance(body["details"], list)
+
+
+def test_openapi_error_envelope_requires_the_unified_contract() -> None:
+    schema = create_app().openapi()["components"]["schemas"]["ErrorEnvelope"]
+
+    assert set(schema["properties"]) == {"code", "message", "details", "request_id"}
+    assert set(schema["required"]) == {"code", "message", "details", "request_id"}

@@ -1,9 +1,7 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 
 import { ProtectedRoute } from '../auth';
 import AppLayout from '../layout/AppLayout';
-import Layout from '../layout';
-import AnalyticsPage from '../pages/analytics/AnalyticsPage';
 import HomePage from '../pages/home/HomePage';
 import LoginPage from '../pages/login/LoginPage';
 import ProfilePage from '../pages/profile/ProfilePage';
@@ -11,18 +9,18 @@ import ManagementPage from '../pages/management/ManagementPage';
 import PlaybookEditorPage from '../pages/management/playbookEditor/PlaybookEditorPage';
 import OrganizationDetailPage from '../pages/organizations/UniversityDetailPage';
 import OrganizationsPage from '../pages/organizations/UniversitiesPage';
-import ProductsPage from '../pages/products/ProductsPage';
 import ProgramDetailPage from '../pages/programs/ProgramDetailPage';
-import ProgramsPage from '../pages/programs/ProgramsPage';
-import RatingPage from '../pages/rating/RatingPage';
 import ReportsPage from '../pages/reports/ReportsPage';
-import TasksPage from '../pages/tasks/TasksPage';
-import UniversitiesPage from '../pages/universities/UniversitiesPage';
-import UniversityDetailPage from '../pages/universities/UniversityDetailPage';
 import WorkflowDetailPage from '../pages/workflow/WorkflowDetailPage';
 import WorkflowPage from '../pages/workflow/WorkflowPage';
 import { allowedRoles } from './constants';
 import StartRoute from './StartRoute';
+
+const LegacyWorkflowRedirect = () => {
+  const { id } = useParams();
+
+  return <Navigate to={id ? `/workflows/${id}` : '/workflows'} replace />;
+};
 
 const AppRoutes = () => (
   <Routes>
@@ -44,6 +42,15 @@ const AppRoutes = () => (
       <Route path="/workflows/:id" element={<WorkflowDetailPage />} />
       <Route path="/programs/:id" element={<ProgramDetailPage />} />
       <Route path="/reports" element={<ReportsPage />} />
+      <Route path="/tasks" element={<Navigate to="/home" replace />} />
+      <Route path="/programs" element={<Navigate to="/workflows" replace />} />
+      <Route path="/products" element={<Navigate to="/organizations" replace />} />
+      <Route path="/analytics" element={<Navigate to="/reports" replace />} />
+      <Route path="/rating" element={<Navigate to="/reports?report=programs-rating" replace />} />
+      <Route path="/universities" element={<Navigate to="/organizations" replace />} />
+      <Route path="/universities/:id" element={<Navigate to="/organizations" replace />} />
+      <Route path="/workflow" element={<Navigate to="/workflows" replace />} />
+      <Route path="/workflow/:id" element={<LegacyWorkflowRedirect />} />
       <Route
         path="/management"
         element={
@@ -60,24 +67,6 @@ const AppRoutes = () => (
           </ProtectedRoute>
         }
       />
-    </Route>
-
-    <Route
-      element={
-        <ProtectedRoute allowedRoles={allowedRoles}>
-          <Layout />
-        </ProtectedRoute>
-      }
-    >
-      <Route path="/universities" element={<UniversitiesPage />} />
-      <Route path="/universities/:id" element={<UniversityDetailPage />} />
-      <Route path="/workflow" element={<WorkflowPage />} />
-      <Route path="/workflow/:id" element={<WorkflowDetailPage />} />
-      <Route path="/tasks" element={<TasksPage />} />
-      <Route path="/programs" element={<ProgramsPage />} />
-      <Route path="/products" element={<ProductsPage />} />
-      <Route path="/analytics" element={<AnalyticsPage />} />
-      <Route path="/rating" element={<RatingPage />} />
     </Route>
 
     <Route path="*" element={<Navigate to="/" replace />} />

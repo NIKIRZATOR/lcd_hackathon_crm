@@ -1061,9 +1061,13 @@ Stage 4 import actions:
   "code": "FORBIDDEN",
   "message": "Cannot access this interaction",
   "details": null,
-  "requestId": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c"
+  "request_id": "6f3f843b-4e5c-46df-9df7-0628d88f3d3c"
 }
 ```
+
+Контракт одинаков для HTTP-ошибок, ошибок валидации и необработанных исключений. Тот же
+`request_id` возвращается в заголовке `X-Request-ID` и может использоваться для поиска
+события в журнале и логах.
 
 ### Auth
 

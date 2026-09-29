@@ -2,6 +2,7 @@ import {
   DownloadOutlined,
   DownOutlined,
   FileExcelOutlined,
+  FileTextOutlined,
   FilePdfOutlined,
   UpOutlined,
 } from '@ant-design/icons';
@@ -116,6 +117,11 @@ const ReportsTable = <T extends ReportTableItem>({
         key: 'pdf',
         icon: <FilePdfOutlined />,
         label: 'PDF (.pdf)',
+      },
+      {
+        key: 'json',
+        icon: <FileTextOutlined />,
+        label: 'JSON (.json)',
       },
     ],
     onClick: ({ key }) => {

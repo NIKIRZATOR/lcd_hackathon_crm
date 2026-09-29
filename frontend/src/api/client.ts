@@ -2,15 +2,31 @@ type TokenProvider = () => Promise<string | undefined>;
 
 let tokenProvider: TokenProvider | undefined;
 
-export type ApiErrorPayload = { code: string; message: string; details?: unknown; requestId?: string };
+export type ApiErrorPayload = {
+  code: string;
+  message: string;
+  details: unknown | null;
+  request_id: string;
+};
 
 export class ApiError extends Error {
-  constructor(public readonly status: number, public readonly payload?: ApiErrorPayload) {
+  constructor(
+    public readonly status: number,
+    public readonly payload?: ApiErrorPayload,
+  ) {
     super(payload?.message ?? `API request failed with status ${status}`);
   }
 }
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+
+const readErrorPayload = async (response: Response): Promise<ApiErrorPayload | undefined> => {
+  try {
+    return (await response.json()) as ApiErrorPayload;
+  } catch {
+    return undefined;
+  }
+};
 
 export const setAuthTokenProvider = (provider: TokenProvider) => {
   tokenProvider = provider;
@@ -34,8 +50,7 @@ export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promi
   });
 
   if (!response.ok) {
-    let payload: ApiErrorPayload | undefined;
-    try { payload = await response.json() as ApiErrorPayload; } catch { payload = undefined; }
+    const payload = await readErrorPayload(response);
     throw new ApiError(response.status, payload);
   }
 
@@ -44,7 +59,9 @@ export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promi
 
 export const apiDownload = async (path: string): Promise<Blob> => {
   const token = await tokenProvider?.();
-  const response = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
-  if (!response.ok) throw new ApiError(response.status);
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!response.ok) throw new ApiError(response.status, await readErrorPayload(response));
   return response.blob();
 };

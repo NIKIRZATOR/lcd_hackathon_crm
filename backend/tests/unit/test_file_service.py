@@ -171,6 +171,65 @@ def test_upload_accepts_required_png_attachment_type() -> None:
     assert file_record.extension == "png"
 
 
+@pytest.mark.parametrize(
+    ("filename", "content_type", "data"),
+    [
+        ("proof.png", "image/png", b"\x89PNG\r\n\x1a\ncontent"),
+        ("photo.jpeg", "image/jpeg", b"\xff\xd8\xffcontent"),
+        ("document.pdf", "application/pdf", b"%PDF content"),
+        ("archive.zip", "application/zip", b"PK\x03\x04content"),
+        ("archive.gzip", "application/gzip", b"\x1f\x8bcontent"),
+        ("archive.rar", "application/vnd.rar", b"Rar!\x1a\x07\x00content"),
+        ("document.doc", "application/msword", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1content"),
+        (
+            "document.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            b"PK\x03\x04content",
+        ),
+        ("report.xls", "application/vnd.ms-excel", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1content"),
+        (
+            "report.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            b"PK\x03\x04content",
+        ),
+    ],
+)
+def test_upload_accepts_full_required_attachment_whitelist(
+    filename: str,
+    content_type: str,
+    data: bytes,
+) -> None:
+    stage_instance = make_stage_instance()
+    db = FakeDb(stage_instance=stage_instance)
+    storage = FakeStorage()
+
+    attachment = FileService(db, storage).upload_workflow_attachment(
+        stage_instance_id=stage_instance.id,
+        upload=FakeUpload(filename=filename, content_type=content_type, data=data),
+        uploaded_by=uuid4(),
+    )
+
+    file_record = next(entity for entity in db.added if isinstance(entity, File))
+    assert attachment.file_id == file_record.id
+    assert file_record.extension == filename.rsplit(".", 1)[-1]
+
+
+def test_upload_rejects_allowed_extension_with_wrong_mime_type() -> None:
+    stage_instance = make_stage_instance()
+    db = FakeDb(stage_instance=stage_instance)
+    storage = FakeStorage()
+
+    with pytest.raises(HTTPException) as error:
+        FileService(db, storage).upload_workflow_attachment(
+            stage_instance_id=stage_instance.id,
+            upload=FakeUpload(filename="proof.png", content_type="text/plain", data=b"\x89PNG\r\n\x1a\ncontent"),
+            uploaded_by=uuid4(),
+        )
+
+    assert error.value.detail["code"] == "FILE_MIME_NOT_ALLOWED"
+    assert storage.objects == {}
+
+
 def test_upload_rejects_signature_mismatch() -> None:
     stage_instance = make_stage_instance()
     db = FakeDb(stage_instance=stage_instance)

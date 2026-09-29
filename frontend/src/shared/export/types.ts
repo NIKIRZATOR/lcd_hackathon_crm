@@ -1,6 +1,6 @@
 export type ChartExportFormat = 'png' | 'jpeg' | 'svg';
 
-export type TableExportFormat = 'xls' | 'xlsx' | 'pdf';
+export type TableExportFormat = 'xls' | 'xlsx' | 'pdf' | 'json';
 
 export type TableExportColumn<T extends object> = {
   key: Extract<keyof T, string>;
