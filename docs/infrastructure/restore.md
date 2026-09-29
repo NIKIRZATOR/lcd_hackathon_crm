@@ -2,6 +2,8 @@
 
 Сначала остановите frontend, backend и worker, затем выберите проверенный backup внутри `data/backups`.
 
+Если выбран файл с расширением `.enc`, перед восстановлением установите в окружении тот же `BACKUP_ENCRYPTION_KEY`, который использовался при создании backup. Расшифровка выполняется автоматически во временный файл контейнера.
+
 ```bash
 make restore-postgres BACKUP=/backups/postgres/daily/postgres_YYYY-MM-DD_HH-MM-SS.dump
 make restore-minio BACKUP=/backups/minio/daily/minio_YYYY-MM-DD_HH-MM-SS

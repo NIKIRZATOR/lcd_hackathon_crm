@@ -2,7 +2,7 @@ FROM quay.io/minio/mc:latest AS minio_client
 
 FROM postgres:16-alpine
 
-RUN apk add --no-cache ca-certificates curl jq
+RUN apk add --no-cache ca-certificates curl jq openssl
 
 COPY --from=minio_client /usr/bin/mc /usr/local/bin/mc
 

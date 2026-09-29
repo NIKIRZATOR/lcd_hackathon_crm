@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     backup_status_path: Path = Path("/backups/last-successful.json")
     backup_heartbeat_path: Path = Path("/backups/scheduler-heartbeat.json")
     backup_heartbeat_ttl_seconds: int = 180
+    antivirus_enabled: bool = False
+    antivirus_host: str = "clamav"
+    antivirus_port: int = 3310
+    pii_encryption_enabled: bool = False
+    pii_encryption_key: str | None = None
+    pii_hmac_pepper: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

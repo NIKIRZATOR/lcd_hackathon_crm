@@ -55,6 +55,12 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       REPORT_QUEUE_NAME: ${REPORT_QUEUE_NAME:-reports}
       REPORT_FILE_RETENTION_DAYS: ${REPORT_FILE_RETENTION_DAYS:-90}
+      ANTIVIRUS_ENABLED: ${ANTIVIRUS_ENABLED:-false}
+      ANTIVIRUS_HOST: ${ANTIVIRUS_HOST:-clamav}
+      ANTIVIRUS_PORT: ${ANTIVIRUS_PORT:-3310}
+      PII_ENCRYPTION_ENABLED: ${PII_ENCRYPTION_ENABLED:-false}
+      PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:-}
+      PII_HMAC_PEPPER: ${PII_HMAC_PEPPER:-}
       BACKUP_STATUS_PATH: /backups/last-successful.json
       BACKUP_HEARTBEAT_PATH: /backups/scheduler-heartbeat.json
       BACKUP_HEARTBEAT_TTL_SECONDS: ${BACKUP_HEARTBEAT_TTL_SECONDS:-180}
@@ -259,6 +265,8 @@ services:
       BACKUP_RETENTION_WEEKLY: ${BACKUP_RETENTION_WEEKLY:-4}
       BACKUP_RETENTION_MONTHLY: ${BACKUP_RETENTION_MONTHLY:-3}
       BACKUP_HEARTBEAT_INTERVAL_SECONDS: ${BACKUP_HEARTBEAT_INTERVAL_SECONDS:-60}
+      BACKUP_ENCRYPTION_ENABLED: ${BACKUP_ENCRYPTION_ENABLED:-false}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
     volumes:
       - ${BACKUP_LOCAL_PATH:-./data/backups}:/backups
     depends_on:
@@ -274,6 +282,11 @@ services:
       service: backup
     profiles: !reset []
     command: ["schedule"]
+    restart: unless-stopped
+
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["antivirus"]
     restart: unless-stopped
 
 volumes:

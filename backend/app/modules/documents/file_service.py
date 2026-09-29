@@ -13,6 +13,7 @@ from app.modules.audit.model import AuditEvent
 from app.modules.audit.repository import AuditEventRepository
 from app.modules.documents.model import File
 from app.modules.workflows.model import WorkflowStageAttachment, WorkflowStageInstance
+from app.security.antivirus import ClamAvScanner, ScanResult
 from app.storage import StorageAdapter, get_storage_adapter
 
 
@@ -82,6 +83,13 @@ class FileService:
         self._validate_upload(original_name=original_name, extension=extension, content_type=upload.content_type)
 
         size_bytes, checksum = self._inspect_upload(upload, extension=extension)
+        scan_status = ClamAvScanner().scan(upload.file)
+        if scan_status is ScanResult.INFECTED:
+            self.audit_repository.add(AuditEvent(actor_user_id=uploaded_by, action="file.scan_status_changed", entity_type="file", entity_id=None, result="INFECTED", event_metadata={"original_name": original_name}))
+            self.db.commit()
+            raise file_error(status_code=422, code="FILE_INFECTED", message="File was rejected by antivirus scan")
+        if scan_status is ScanResult.SCAN_ERROR:
+            raise file_error(status_code=503, code="ANTIVIRUS_UNAVAILABLE", message="Antivirus scan is unavailable")
         object_name = f"{uuid4()}{extension}"
         object_key = f"interactions/{instance.interaction_id}/stages/{stage_instance_id}/{object_name}"
         bucket = settings.s3_bucket_workflow_files
@@ -111,7 +119,7 @@ class FileService:
                 object_key=object_key,
                 attachment_kind=attachment_kind,
                 uploaded_by=uploaded_by,
-                scan_status="NOT_SCANNED",
+                scan_status=scan_status.value,
             )
             self.db.add(file_record)
             self.db.flush()
@@ -137,6 +145,7 @@ class FileService:
                         "object_key": object_key,
                         "size_bytes": size_bytes,
                         "mime_type": upload.content_type,
+                        "scan_status": scan_status.value,
                     },
                     request_id=request_id,
                 )
