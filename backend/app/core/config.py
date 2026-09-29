@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     import_file_retention_days: int = 90
     redis_url: str = "redis://localhost:6379/0"
     report_queue_name: str = "reports"
+    report_worker_concurrency: int = 1
     report_file_retention_days: int = 90
     backup_status_path: Path = Path("/backups/last-successful.json")
     backup_heartbeat_path: Path = Path("/backups/scheduler-heartbeat.json")

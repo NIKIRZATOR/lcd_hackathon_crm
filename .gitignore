@@ -29,3 +29,5 @@ AGENTS.md
 data/backups/
 backend/scripts/seed_demo_data_expanded_clean_20_universities.py
 env.server.example
+.tools
+.tmp_docx

@@ -505,14 +505,14 @@ def list_report_jobs(
     total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
     jobs = list(db.scalars(statement.order_by(ReportJob.created_at.desc()).limit(pagination.limit).offset(pagination.offset)).all())
     artifacts = {artifact.report_job_id: artifact for artifact in db.scalars(select(ReportArtifact).where(ReportArtifact.report_job_id.in_([job.id for job in jobs])).order_by(ReportArtifact.created_at.desc())).all()} if jobs else {}
-    return {"items": [{"id": job.id, "status": job.status, "format": job.format, "created_at": job.created_at, "finished_at": job.finished_at, "row_count": job.row_count, "error_code": job.error_code, "error_message": job.error_message, "ready": job.id in artifacts, "download_path": f"/api/reports/jobs/{job.id}/download" if job.id in artifacts else None} for job in jobs], "total": total, "limit": pagination.limit, "offset": pagination.offset}
+    return {"items": [{"id": job.id, "status": job.status, "format": job.format, "created_at": job.created_at, "started_at": job.started_at, "finished_at": job.finished_at, "row_count": job.row_count, "error_code": job.error_code, "error_message": job.error_message, "ready": job.id in artifacts, "download_path": f"/api/reports/jobs/{job.id}/download" if job.id in artifacts else None} for job in jobs], "total": total, "limit": pagination.limit, "offset": pagination.offset}
 
 
 @router.get("/jobs/{job_id}")
 def get_report_job(job_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_roles(*CRM_ROLES))):
     job = _get_job(job_id, db, current_user)
     artifact = db.scalar(select(ReportArtifact).where(ReportArtifact.report_job_id == job.id).order_by(ReportArtifact.created_at.desc()))
-    return {"id": job.id, "status": job.status, "format": job.format, "created_at": job.created_at, "finished_at": job.finished_at, "row_count": job.row_count, "error_code": job.error_code, "error_message": job.error_message, "ready": artifact is not None, "download_path": f"/api/reports/jobs/{job.id}/download" if artifact else None}
+    return {"id": job.id, "status": job.status, "format": job.format, "created_at": job.created_at, "started_at": job.started_at, "finished_at": job.finished_at, "row_count": job.row_count, "error_code": job.error_code, "error_message": job.error_message, "ready": artifact is not None, "download_path": f"/api/reports/jobs/{job.id}/download" if artifact else None}
 
 
 @router.get("/jobs/{job_id}/download")

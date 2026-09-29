@@ -1,4 +1,5 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from hashlib import sha256
 from io import BytesIO
@@ -173,12 +174,20 @@ class ReportWorker:
 
 
 def main() -> None:
-    while True:
+    concurrency = max(1, settings.report_worker_concurrency)
+
+    def process(job_id: UUID) -> None:
         db = SessionLocal()
         try:
-            ReportWorker(db).process_one()
+            ReportWorker(db).process_job(job_id)
         finally:
             db.close()
+
+    executor = ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="report-worker")
+    while True:
+        job_id = dequeue_report_job()
+        if job_id:
+            executor.submit(process, job_id)
 
 
 if __name__ == "__main__":

@@ -1,187 +1,161 @@
 # RTK EduFlow
 
-## Security contour (demo)
+RTK EduFlow — CRM для сопровождения образовательных организаций и программ. Система поддерживает University 360, взаимодействия, workflow, учебные программы и заходы, задачи/NBA, документы, аналитику, отчёты, пользователей и интеграционные сигналы.
 
-The project includes a minimal technical security contour; it is not a claim of compliance with 152-FZ or FSTEC requirements.
+## Состав системы
 
-### Environment
+- `frontend` — React/Vite web-интерфейс;
+- `backend` — FastAPI REST API и бизнес-логика;
+- `worker` — генерация отчётов из Redis-очереди;
+- PostgreSQL — данные CRM и Keycloak;
+- MinIO — документы, вложения и отчёты;
+- Keycloak — вход и роли `KAM`, `MANAGER`, `ADMIN`;
+- `mock-lms`, ClamAV и Nginx — профильные сервисы для интеграций, проверки файлов и demo-контура.
 
-Copy `.env.example` to `.env` for a local stand. Replace every `dev-only-*` value before any non-demo deployment. Keep all secrets out of Git.
+## Требования
 
-```env
-ANTIVIRUS_ENABLED=true
-PII_ENCRYPTION_ENABLED=true
-PII_ENCRYPTION_KEY=<url-safe-base64-of-32-random-bytes>
-PII_HMAC_PEPPER=<random-secret>
-BACKUP_ENCRYPTION_ENABLED=true
-BACKUP_ENCRYPTION_KEY=<separate-random-secret>
+- Docker Desktop с Docker Compose v2;
+- для локальной frontend-разработки — Node.js 20+;
+- для backend-проверок — Python 3.11+;
+- для нагрузочного тестирования — [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/).
+
+## Быстрый запуск
+
+В PowerShell из корня репозитория:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build
+docker compose run --rm backend alembic upgrade head
+docker compose run --rm backend python scripts/seed_demo_data.py
+docker compose ps
 ```
 
-`PII_HMAC_PEPPER` is used for deterministic HMAC-SHA-256 matching of normalized email and phone values. It must be set whenever B2C/integration matching is enabled. `BACKUP_ENCRYPTION_KEY` must never equal the PII encryption key.
+| Что проверить | Адрес |
+| --- | --- |
+| Web-интерфейс | http://localhost:5173 |
+| API / Swagger | http://localhost:8000/docs |
+| Health-check | http://localhost:8000/api/health |
+| Keycloak | http://localhost:8080 |
+| MinIO Console | http://localhost:9001 |
 
-### Antivirus
+Health-check должен вернуть `{"status":"ok","service":"backend"}`.
 
-Start the optional ClamAV service with no host port published:
+## Сборка и demo-контур
 
-```bash
+Пересобрать и запустить стандартный контур:
+
+```powershell
+docker compose up -d --build
+```
+
+Demo-контур публикует Nginx на `http://localhost:8088` и позволяет масштабировать backend:
+
+```powershell
+$env:BACKEND_REPLICAS = "3"
+make demo
+```
+
+Альтернатива без Makefile:
+
+```powershell
+$env:VITE_API_URL = "http://localhost:8088"
+docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile demo up -d --build --scale backend=3
+```
+
+Frontend без Docker:
+
+```powershell
+Set-Location frontend
+npm install
+npm run dev
+```
+
+## Авторизация
+
+При первом запуске импортируется realm из `keycloak/realm/rtk-eduflow-realm.json`.
+
+| Пользователь | Пароль | Роль |
+| --- | --- | --- |
+| `kam1` | `kam1` | KAM |
+| `manager1` | `manager1` | MANAGER |
+| `admin1` | `admin1` | ADMIN |
+| `viewer1` | `viewer1` | Нет CRM-доступа |
+
+Откройте `http://localhost:5173/login`, нажмите «Войти через Keycloak» и используйте тестовую учётную запись. `/api/auth/me` без Bearer JWT возвращает `401`.
+
+## Как проверить систему
+
+1. Войдите в UI как `kam1 / kam1`: проверьте главную страницу, организации, программы, workflow, задачи и отчёты.
+2. Войдите как `admin1 / admin1`: проверьте управление, пользователей, интеграции и аудит.
+3. Откройте Swagger и выполните `GET /api/health`.
+4. Проверьте контейнеры: `docker compose ps`.
+
+Автоматические проверки:
+
+```powershell
+Set-Location backend
+pytest
+
+Set-Location ..\frontend
+npm run test
+npm run build
+
+Set-Location ..
+docker compose config --quiet
+```
+
+## Нагрузочные проверки
+
+Подробности: [docs/evidence/load-tests/README.md](docs/evidence/load-tests/README.md).
+
+### 50 параллельных пользователей
+
+Получите JWT до запуска теста:
+
+```powershell
+$form = @{ client_id = "rtk-eduflow-frontend"; grant_type = "password"; username = "admin1"; password = "admin1" }
+$env:JWT_TOKEN = (Invoke-RestMethod -Method Post -Uri "http://localhost:8080/realms/rtk-eduflow/protocol/openid-connect/token" -ContentType "application/x-www-form-urlencoded" -Body $form).access_token
+$env:BASE_URL = "http://localhost:8000"
+k6 run --summary-export docs/evidence/load-tests/results/k6_50_users_summary.json tests/load/k6_50_users.js
+```
+
+PASS: 50 виртуальных пользователей за 120 секунд, HTTP errors < 1%, p95 < 1000 мс, HTTP 5xx = 0.
+
+### 10 параллельных отчётов
+
+```powershell
+$env:REPORT_WORKER_CONCURRENCY = "10"
+docker compose up -d --force-recreate worker
+python tests/load/enqueue_10_reports.py
+```
+
+Результат сохраняется в `docs/evidence/load-tests/results/reports_10_parallel.json`. PASS: 10 заданий `DONE`, нет `FAILED`/`LOST`, одновременно выполнялись минимум 10 jobs.
+
+## Безопасность и резервное копирование
+
+Security contour демонстрационный и не является заявлением о соответствии 152-ФЗ или требованиям ФСТЭК. Перед недемо-развёртыванием замените все секреты в `.env`; не храните их в Git.
+
+```powershell
+# Антивирусная проверка файлов
 docker compose --profile antivirus up -d --build
-docker compose ps clamav
-```
 
-With `ANTIVIRUS_ENABLED=true`, workflow attachments, organization logos and import files are scanned before MinIO storage. `CLEAN` files are stored; `INFECTED` files are rejected with HTTP 422; an unavailable scanner returns HTTP 503. The scan result is persisted in `files.scan_status` and audit metadata.
-
-### Encrypted backup and restore
-
-With backup encryption enabled, PostgreSQL, MinIO and Keycloak snapshots are stored as `.enc` only. The backup container uses AES-256-CBC with PBKDF2; plaintext is removed after successful encryption.
-
-```bash
+# Backup и проверка backup
 docker compose --profile backup run --rm backup all
 docker compose --profile backup run --rm backup verify
-docker compose --profile backup run --rm backup restore-postgres /backups/postgres/daily/postgres_YYYY-MM-DD_HH-MM-SS.dump.enc
-docker compose --profile backup run --rm backup restore-minio /backups/minio/daily/minio_YYYY-MM-DD_HH-MM-SS.tar.gz.enc
 ```
 
-Use the same `BACKUP_ENCRYPTION_KEY` for backup and restore. Stop backend and worker before a real restore. MinIO server-side encryption is not enabled because its production-grade configuration requires external KMS/KES; RBAC, antivirus checks and encrypted backups remain the current protection controls.
+Для шифрования backup и персональных данных задайте `BACKUP_ENCRYPTION_KEY`, `PII_ENCRYPTION_KEY` и `PII_HMAC_PEPPER`.
 
-Короткая инструкция для запуска проекта локально.
+## Остановка и сброс demo-данных
 
-## Запуск
-
-Из корня репозитория выполните:
-
-```bash
-docker compose up --build
-```
-
-В отдельном терминале примените миграции CRM:
-
-```bash
-docker compose run --rm backend alembic upgrade head
-```
-
-После запуска откройте сайт:
-
-```text
-http://localhost:5173
-```
-
-## Где проверить
-
-Frontend:
-
-```text
-http://localhost:5173
-```
-
-Backend:
-
-```text
-http://localhost:8000
-```
-
-Swagger:
-
-```text
-http://localhost:8000/docs
-```
-
-Health endpoint:
-
-```text
-http://localhost:8000/api/health
-```
-
-Keycloak:
-
-```text
-http://localhost:8080
-```
-
-Ожидаемый ответ:
-
-```json
-{
-  "status": "ok",
-  "service": "backend"
-}
-```
-
-## Keycloak
-
-При первом запуске Docker Compose импортирует realm из:
-
-```text
-keycloak/realm/rtk-eduflow-realm.json
-```
-
-Создаются:
-
-- realm `rtk-eduflow`;
-- SPA client `rtk-eduflow-frontend` с Authorization Code Flow + PKCE;
-- backend client/audience `rtk-eduflow-backend`;
-- роли `KAM`, `MANAGER`, `ADMIN`;
-- dev-пользователи `kam1`, `manager1`, `admin1`, `viewer1`.
-
-Локальные пароли тестовых пользователей совпадают с логинами. Это только dev-настройка для локальной проверки.
-
-Админ-консоль Keycloak:
-
-```text
-http://localhost:8080
-```
-
-Значения по умолчанию:
-
-```text
-admin / admin
-```
-
-Их можно поменять через `.env`.
-
-Если `postgres_data` уже существовал до добавления Keycloak, одноразовый сервис `keycloak-db-init` создаст БД `keycloak` при следующем `docker compose up`.
-
-## Проверка авторизации
-
-1. Откройте:
-
-```text
-http://localhost:5173/login
-```
-
-2. Нажмите `Войти через Keycloak`.
-3. Войдите как `kam1 / kam1`.
-4. После возврата в приложение frontend запросит:
-
-```text
-GET http://localhost:8000/api/auth/me
-```
-
-Ожидаемый ответ содержит:
-
-```json
-{
-  "username": "kam1",
-  "roles": ["KAM"]
-}
-```
-
-Без Bearer token endpoint `/api/auth/me` должен возвращать `401`.
-
-Проверка ролей:
-
-```text
-GET http://localhost:8000/api/auth/role-check
-```
-
-С пользователями `kam1`, `manager1`, `admin1` ожидается `200`. С `viewer1` ожидается `403`.
-
-## Остановка
-
-```bash
+```powershell
 docker compose down
 ```
 
-```bash
+Полный сброс Docker volumes:
+
+```powershell
 docker compose down -v
 docker compose up -d --build
 docker compose run --rm backend alembic upgrade head
