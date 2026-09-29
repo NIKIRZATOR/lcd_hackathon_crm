@@ -10,7 +10,7 @@ import { useAdminHome } from './useAdminHome';
 const AdminHomePage = () => {
   const { summary, error, refreshing, refresh } = useAdminHome();
 
-  if (error) return <Alert type="error" showIcon message={error} />;
+  if (error) return <Alert type="error" showIcon title={error} />;
   if (!summary) return <Spin size="large" />;
 
   return (

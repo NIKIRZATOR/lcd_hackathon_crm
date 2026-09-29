@@ -1,7 +1,6 @@
 import {
   Alert,
   Button,
-  Card,
   Checkbox,
   DatePicker,
   Descriptions,
@@ -18,7 +17,8 @@ import {
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { apiRequest } from '../../api/client';
@@ -62,7 +62,6 @@ type ChecklistItem = {
   required_stakeholder_role: string | null;
   required_attachment_kind: string | null;
 };
-type Page<T> = { items: T[] };
 type DocumentationRequest = {
   id: string;
   author_name: string | null;
@@ -72,13 +71,55 @@ type DocumentationRequest = {
   created_at: string;
 };
 
+const MANAGEMENT_QUERY_KEYS = {
+  stages: ['management', 'stages'] as const,
+  playbooks: ['management', 'playbooks'] as const,
+  documentationRequests: ['management', 'documentation-requests'] as const,
+};
+
 const ManagementPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = Boolean(user?.roles.includes('ADMIN'));
-  const [catalogStages, setCatalogStages] = useState<CatalogStage[]>([]);
-  const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
+  const queryClient = useQueryClient();
+
+  const {
+    data: catalogStages = [],
+    error: catalogStagesError,
+  } = useQuery({
+      queryKey: MANAGEMENT_QUERY_KEYS.stages,
+      queryFn: ({ signal }) =>
+        apiRequest<CatalogStage[]>(
+          '/api/management/stages',
+          { signal },
+        ),
+    });
+
+    const {
+      data: playbooks = [],
+      error: playbooksError,
+    } = useQuery({
+      queryKey: MANAGEMENT_QUERY_KEYS.playbooks,
+      queryFn: ({ signal }) =>
+        apiRequest<Playbook[]>(
+          '/api/management/playbooks',
+          { signal },
+        ),
+    });
+
+    const {
+      data: documentationRequests = [],
+      error: documentationRequestsError,
+    } = useQuery({
+      queryKey: MANAGEMENT_QUERY_KEYS.documentationRequests,
+      queryFn: ({ signal }) =>
+        apiRequest<DocumentationRequest[]>(
+          '/api/documentation/requests',
+          { signal },
+        ),
+      enabled: isAdmin,
+  });
   const [selected, setSelected] = useState<Playbook>();
   const [draft, setDraft] = useState<WorkflowVersion>();
   const [stages, setStages] = useState<Stage[]>([]);
@@ -92,7 +133,6 @@ const ManagementPage = () => {
   const [factLabel, setFactLabel] = useState('');
   const [factType, setFactType] = useState<ChecklistItem['item_type']>('text');
   const [factKind, setFactKind] = useState('');
-  const [documentationRequests, setDocumentationRequests] = useState<DocumentationRequest[]>([]);
   const [requestSearch, setRequestSearch] = useState('');
   const [requestStatus, setRequestStatus] = useState<'all' | 'open' | 'closed'>('all');
   const [requestDateFrom, setRequestDateFrom] = useState<string>();
@@ -116,54 +156,14 @@ const ManagementPage = () => {
     [documentationRequests, requestDateFrom, requestDateTo, requestSearch, requestStatus],
   );
 
-  const load = useCallback(async () => {
-    try {
-      const [loadedStages, loadedPlaybooks] = await Promise.all([
-        apiRequest<CatalogStage[]>('/api/management/stages'),
-        apiRequest<Playbook[]>('/api/management/playbooks'),
-      ]);
-      setCatalogStages(loadedStages);
-      setPlaybooks(loadedPlaybooks);
-    } catch {
-      setError('Не удалось загрузить управление.');
-    }
-  }, []);
+  const queryError =
+  catalogStagesError || playbooksError
+    ? 'Не удалось загрузить управление.'
+    : documentationRequestsError
+      ? 'Не удалось загрузить обращения.'
+      : undefined;
 
-  const loadDraft = async (template: Playbook) => {
-    setError(undefined);
-    setSelected(template);
-    try {
-      const versions = await apiRequest<WorkflowVersion[]>(
-        `/api/workflows/templates/${template.id}/versions`,
-      );
-      let current = versions.find((version) => version.status === 'DRAFT');
-      if (!current)
-        current = await apiRequest<WorkflowVersion>(
-          `/api/workflows/templates/${template.id}/versions/draft`,
-          { method: 'POST' },
-        );
-      const loaded = await apiRequest<Page<Stage>>(
-        `/api/workflows/stages?workflow_template_id=${template.id}&workflow_version_id=${current.id}&limit=100`,
-      );
-      setDraft(current);
-      setStages([...loaded.items].sort((left, right) => left.order_index - right.order_index));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Не удалось открыть черновик.');
-    }
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      await load();
-    };
-    void fetchData();
-  }, [load]);
-  useEffect(() => {
-    if (isAdmin)
-      void apiRequest<DocumentationRequest[]>('/api/documentation/requests').then(
-        setDocumentationRequests,
-      );
-  }, [isAdmin]);
+  const displayedError = error ?? queryError;
 
   const addStage = async () => {
     if (!selected || !draft || !stageName.trim()) return;
@@ -214,7 +214,9 @@ const ManagementPage = () => {
       await apiRequest(`/api/workflows/versions/${draft.id}/publish`, { method: 'POST' });
       setDraft(undefined);
       setStages([]);
-      await load();
+      await queryClient.invalidateQueries({
+        queryKey: MANAGEMENT_QUERY_KEYS.playbooks,
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Не удалось опубликовать эталон.');
     }
@@ -265,7 +267,7 @@ const ManagementPage = () => {
           <p>Каталоги, доступы, интеграции и технические операции CRM.</p>
         </div>
       </header>
-      {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
+      {displayedError && <Alert type="error" title={displayedError} showIcon style={{ marginBottom: 16 }} />}
       <Tabs
         activeKey={searchParams.get('tab') ?? 'playbooks'}
         onChange={(key) => setSearchParams(key === 'playbooks' ? {} : { tab: key })}
@@ -640,10 +642,12 @@ const ManagementPage = () => {
                       body: JSON.stringify({ status }),
                     });
                     const updated = { ...requestDetail, status };
-                    setDocumentationRequests(
-                      documentationRequests.map((item) =>
-                        item.id === updated.id ? updated : item,
-                      ),
+                    queryClient.setQueryData<DocumentationRequest[]>(
+                      MANAGEMENT_QUERY_KEYS.documentationRequests,
+                      (current = []) =>
+                        current.map((item) =>
+                          item.id === updated.id ? updated : item,
+                        ),
                     );
                     setRequestDetail(updated);
                   }}

@@ -150,15 +150,35 @@ const organizationStatus = (status: string): OrganizationStatus => (
   status === 'paused' || status === 'archived' ? status : 'active'
 );
 
-const loadPage = async <T,>(path: string) => {
+const loadPage = async <T,>(
+  path: string,
+  signal?: AbortSignal,
+) => {
   const separator = path.includes('?') ? '&' : '?';
-  const first = await apiRequest<Page<T>>(`${path}${separator}limit=100&offset=0`);
+
+  const first = await apiRequest<Page<T>>(
+    `${path}${separator}limit=100&offset=0`,
+    {
+      signal,
+    },
+  );
+
   const items = [...first.items];
+
   let offset = first.items.length;
 
   while (items.length < first.total) {
-    const next = await apiRequest<Page<T>>(`${path}${separator}limit=100&offset=${offset}`);
-    if (next.items.length === 0) break;
+    const next = await apiRequest<Page<T>>(
+      `${path}${separator}limit=100&offset=${offset}`,
+      {
+        signal,
+      },
+    );
+
+    if (next.items.length === 0) {
+      break;
+    }
+
     items.push(...next.items);
     offset += next.items.length;
   }
@@ -175,43 +195,122 @@ const journalByOrganization = (rows: JournalRow[]) => {
   return grouped;
 };
 
-export const loadPortfolio = async (): Promise<PortfolioOrganization[]> => {
+const withFallback = async <T>(
+  request: Promise<T>,
+  fallback: T,
+  signal?: AbortSignal,
+): Promise<T> => {
+  try {
+    return await request;
+  } catch (error) {
+    if (signal?.aborted) {
+      throw error;
+    }
+
+    return fallback;
+  }
+};
+
+export const loadPortfolio = async (
+  signal?: AbortSignal,
+): Promise<PortfolioOrganization[]> => {
   const [organizations, journal] = await Promise.all([
-    loadPage<OrganizationListItem>('/api/organizations'),
-    apiRequest<JournalRow[]>('/api/workflow-journal?preset=all').catch(() => []),
+    loadPage<OrganizationListItem>(
+      '/api/organizations',
+      signal,
+    ),
+
+    withFallback<JournalRow[]>(
+      apiRequest<JournalRow[]>(
+        '/api/workflow-journal?preset=all',
+        {
+          signal,
+        },
+      ),
+      [],
+      signal,
+    ),
   ]);
+
   const grouped = journalByOrganization(journal);
 
-  if (organizations.length === 0) return samplePortfolio().map((item) => ({ ...item, shortName: `${item.shortName} * Демо` }));
+  if (organizations.length === 0) {
+    return samplePortfolio().map((item) => ({
+      ...item,
+      shortName: `${item.shortName} * Демо`,
+    }));
+  }
 
   return organizations.map((organization) => {
     const related = [
       ...(grouped.get(normalize(organization.name)) ?? []),
-      ...(organization.short_name ? grouped.get(normalize(organization.short_name)) ?? [] : []),
+      ...(organization.short_name
+        ? grouped.get(normalize(organization.short_name)) ?? []
+        : []),
     ];
-    const unique = new Map(related.map((row) => [row.id, row]));
+
+    const unique = new Map(
+      related.map((row) => [row.id, row]),
+    );
+
     const programs = [...unique.values()];
-    const programCount = organization.active_programs_count ?? programs.length;
-    const healthScore = organization.worst_health_score ?? null;
+
+    const programCount =
+      organization.active_programs_count ?? programs.length;
+
+    const healthScore =
+      organization.worst_health_score ?? null;
 
     return {
       id: organization.id,
       logoFileId: organization.logo_file_id ?? null,
       name: organization.name,
-      shortName: text(organization.short_name, organization.name),
+      shortName: text(
+        organization.short_name,
+        organization.name,
+      ),
       city: filledCity(organization.city),
       region: filledRegion(organization.region),
-      typeName: text(organization.type_name, 'Площадка'),
-      kam: text(organization.kam_name, 'KAM не назначен'),
+      typeName: text(
+        organization.type_name,
+        'Площадка',
+      ),
+      kam: text(
+        organization.kam_name,
+        'KAM не назначен',
+      ),
       status: organizationStatus(organization.status),
       programCount,
-      healthScore: programCount > 0 ? healthScore : null,
-      healthBand: programCount > 0 ? healthBandOf(healthScore, organization.worst_health_band) : null,
-      nearestRisk: filledRisk(organization.nearest_risk, programCount > 0),
-      noActivity: organization.no_activity ?? programCount === 0,
+      healthScore:
+        programCount > 0 ? healthScore : null,
+      healthBand:
+        programCount > 0
+          ? healthBandOf(
+              healthScore,
+              organization.worst_health_band,
+            )
+          : null,
+      nearestRisk: filledRisk(
+        organization.nearest_risk,
+        programCount > 0,
+      ),
+      noActivity:
+        organization.no_activity ?? programCount === 0,
       updatedAt: dateOnly(organization.updated_at),
-      directions: [...new Set(programs.map((row) => row.direction_name).filter(Boolean))],
-      products: [...new Set(programs.map((row) => row.product_name).filter(Boolean))],
+      directions: [
+        ...new Set(
+          programs
+            .map((row) => row.direction_name)
+            .filter(Boolean),
+        ),
+      ],
+      products: [
+        ...new Set(
+          programs
+            .map((row) => row.product_name)
+            .filter(Boolean),
+        ),
+      ],
     };
   });
 };
@@ -282,119 +381,355 @@ const gapCard = (organization: PortfolioOrganization): UniversityCard => withSam
   feed: [],
 });
 
-export const loadUniversityCard = async (id: string): Promise<UniversityCard> => {
+export const loadUniversityCard = async (
+  id: string,
+  signal?: AbortSignal,
+): Promise<UniversityCard> => {
   if (isGapRecord(id)) {
-    const organization = samplePortfolio().find((item) => item.id === id) ?? samplePortfolio()[0];
+    const organization =
+      samplePortfolio().find((item) => item.id === id) ??
+      samplePortfolio()[0];
+
     const card = gapCard(organization);
-    return organization.programCount === 0 ? { ...card, programs: [] } : card;
+
+    return organization.programCount === 0
+      ? { ...card, programs: [] }
+      : card;
   }
 
-  const [organization, summary, health, people, programsPage, documents, feed, teachers, contracts, licenses, journal] = await Promise.all([
-    apiRequest<OrganizationListItem>(`/api/organizations/${id}`),
-    apiRequest<{ type_name: string; kam_name: string | null }>(`/api/organizations/${id}/360`),
-    apiRequest<{ worst_health_score: number | null; worst_health_band: string | null; active_programs_count: number }>(`/api/organizations/${id}/health`).catch(() => null),
-    apiRequest<Stakeholder[]>(`/api/organizations/${id}/stakeholders`).catch(() => []),
-    apiRequest<Page<ProgramInstance>>(`/api/organizations/${id}/program-instances?limit=100`).catch(() => ({ items: [], total: 0 })),
-    apiRequest<DocumentRow[]>(`/api/organizations/${id}/documents`).catch(() => []),
-    apiRequest<FeedRow[]>(`/api/organizations/${id}/feed`).catch(() => []),
-    apiRequest<Teacher[]>(`/api/organizations/${id}/teachers`).catch(() => []),
-    apiRequest<Contract[]>(`/api/organizations/${id}/contracts`).catch(() => []),
-    apiRequest<License[]>(`/api/organizations/${id}/licenses`).catch(() => []),
-    apiRequest<JournalRow[]>('/api/workflow-journal?preset=all').catch(() => []),
+  const [
+    organization,
+    summary,
+    health,
+    people,
+    programsPage,
+    documents,
+    feed,
+    teachers,
+    contracts,
+    licenses,
+    journal,
+  ] = await Promise.all([
+    apiRequest<OrganizationListItem>(
+      `/api/organizations/${id}`,
+      { signal },
+    ),
+
+    apiRequest<{
+      type_name: string;
+      kam_name: string | null;
+    }>(
+      `/api/organizations/${id}/360`,
+      { signal },
+    ),
+
+    withFallback(
+      apiRequest<{
+        worst_health_score: number | null;
+        worst_health_band: string | null;
+        active_programs_count: number;
+      }>(
+        `/api/organizations/${id}/health`,
+        { signal },
+      ),
+      null,
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<Stakeholder[]>(
+        `/api/organizations/${id}/stakeholders`,
+        { signal },
+      ),
+      [],
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<Page<ProgramInstance>>(
+        `/api/organizations/${id}/program-instances?limit=100`,
+        { signal },
+      ),
+      {
+        items: [],
+        total: 0,
+      },
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<DocumentRow[]>(
+        `/api/organizations/${id}/documents`,
+        { signal },
+      ),
+      [],
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<FeedRow[]>(
+        `/api/organizations/${id}/feed`,
+        { signal },
+      ),
+      [],
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<Teacher[]>(
+        `/api/organizations/${id}/teachers`,
+        { signal },
+      ),
+      [],
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<Contract[]>(
+        `/api/organizations/${id}/contracts`,
+        { signal },
+      ),
+      [],
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<License[]>(
+        `/api/organizations/${id}/licenses`,
+        { signal },
+      ),
+      [],
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<JournalRow[]>(
+        '/api/workflow-journal?preset=all',
+        { signal },
+      ),
+      [],
+      signal,
+    ),
   ]);
-  const journalById = new Map(journal.map((row) => [row.id, row]));
-  const metrics = await Promise.all(programsPage.items.map(async (program) => {
-    const metric = await apiRequest<{ students_count: number } | null>(`/api/integrations/program-instances/${program.id}/metrics`).catch(() => null);
-    return [program.id, metric] as const;
-  }));
+
+  const journalById = new Map(
+    journal.map((row) => [row.id, row]),
+  );
+
+  const metrics = await Promise.all(
+    programsPage.items.map(async (program) => {
+      const metric = await withFallback(
+        apiRequest<{ students_count: number } | null>(
+          `/api/integrations/program-instances/${program.id}/metrics`,
+          { signal },
+        ),
+        null,
+        signal,
+      );
+
+      return [program.id, metric] as const;
+    }),
+  );
+
   const metricsById = new Map(metrics);
-  const licenseByProgram = new Map(licenses.map((license) => [license.program_instance_id, license]));
-  const programCount = health?.active_programs_count ?? programsPage.items.filter((item) => item.status === 'active' || item.status === 'paused' || item.status === 'draft').length;
-  const programs = programsPage.items.map((program) => programRow(
-    program,
-    journalById.get(program.id),
-    metricsById.get(program.id) ?? null,
-    licenseByProgram.get(program.id),
-  ));
-  const programLabels = new Map(programs.map((program) => [program.id, `${program.directionName} · ${program.productName}`]));
+
+  const licenseByProgram = new Map(
+    licenses.map((license) => [
+      license.program_instance_id,
+      license,
+    ]),
+  );
+
+  const programCount =
+    health?.active_programs_count ??
+    programsPage.items.filter(
+      (item) =>
+        item.status === 'active' ||
+        item.status === 'paused' ||
+        item.status === 'draft',
+    ).length;
+
+  const programs = programsPage.items.map((program) =>
+    programRow(
+      program,
+      journalById.get(program.id),
+      metricsById.get(program.id) ?? null,
+      licenseByProgram.get(program.id),
+    ),
+  );
+
+  const programLabels = new Map(
+    programs.map((program) => [
+      program.id,
+      `${program.directionName} · ${program.productName}`,
+    ]),
+  );
 
   return withSamples({
     id: organization.id,
     logoFileId: organization.logo_file_id ?? null,
     name: organization.name,
-    shortName: text(organization.short_name, organization.name),
+    shortName: text(
+      organization.short_name,
+      organization.name,
+    ),
     typeName: text(summary.type_name, 'Площадка'),
     city: filledCity(organization.city),
     region: filledRegion(organization.region),
     status: organizationStatus(organization.status),
     kamName: text(summary.kam_name, 'KAM не назначен'),
     comment: text(organization.comment),
-    healthScore: programCount > 0 ? health?.worst_health_score ?? null : null,
-    healthBand: programCount > 0 ? healthBandOf(health?.worst_health_score ?? null, health?.worst_health_band) : null,
+
+    healthScore:
+      programCount > 0
+        ? health?.worst_health_score ?? null
+        : null,
+
+    healthBand:
+      programCount > 0
+        ? healthBandOf(
+            health?.worst_health_score ?? null,
+            health?.worst_health_band,
+          )
+        : null,
+
     programCount,
     programs,
-    people: people.map((person): UniversityPerson => ({
-      id: person.id,
-      roleCode: person.role_code,
-      roleLabel: roleLabel(person.role_code),
-      name: person.full_name,
-      position: text(person.position, 'Должность не указана'),
-      email: text(person.email, 'Почта не указана'),
-      phone: text(person.phone, 'Телефон не указан'),
-      isPrimary: person.is_primary,
-      isActive: person.is_active,
-      programId: person.program_instance_id,
-      programLabel: person.program_instance_id ? programLabels.get(person.program_instance_id) ?? 'Программа' : 'На всю площадку',
-    })),
-    contracts: contracts.map((contract): UniversityContract => ({
-      id: contract.id,
-      number: contract.number,
-      signedOn: dateOnly(contract.signed_on) || 'Дата не указана',
-      validUntil: dateOnly(contract.valid_until) || 'Срок не указан',
-      status: text(contract.status, 'без статуса'),
-      current: Boolean(contract.signed_on) && contract.status !== 'expired',
-      fileName: filledAttachmentName('contract', contract.attachment_id),
-      attachmentId: contract.attachment_id,
-    })),
-    licenses: licenses.map((license): UniversityLicense => ({
-      id: license.id,
-      programId: license.program_instance_id,
-      productName: license.product_name,
-      number: text(license.license_number, 'Номер не указан'),
-      signedOn: dateOnly(license.signed_at) || 'Дата не указана',
-      validUntil: dateOnly(license.valid_until) || 'Срок не указан',
-      transferStatus: license.transfer_status,
-      access: text(license.product_access, 'Доступ не описан'),
-      fileName: filledAttachmentName('license', license.attachment_id),
-      attachmentId: license.attachment_id,
-    })),
-    teachers: teachers.map((teacher): UniversityTeacher => ({
-      id: teacher.id,
-      name: teacher.full_name,
-      productName: teacher.product_name,
-      status: teacher.status,
-      trainedOn: dateOnly(teacher.trained_on) || 'Дата не указана',
-      qualificationUntil: dateOnly(teacher.qualification_until) || 'Срок не указан',
-      lastLmsActivity: dateOnly(teacher.last_lms_activity_on) || 'Сигнала LMS нет',
-    })),
-    documents: documents.map((document): UniversityDocument => ({
-      id: document.file_id,
-      name: document.filename,
-      kind: text(document.kind, 'без типа'),
-      programName: text(document.program_name, 'Без программы'),
-      stageName: text(document.stage_name, 'Без этапа'),
-      uploadedBy: text(document.uploaded_by_name, 'Автор не указан'),
-      createdAt: dateOnly(document.created_at),
-      attachmentId: document.attachment_id,
-    })),
-    feed: feed.map((event): UniversityFeedEvent => ({
-      id: event.id,
-      title: event.title,
-      description: text(event.description, 'Без описания'),
-      actor: text(event.actor_name, 'Система'),
-      createdAt: event.created_at,
-      kind: event.kind,
-    })),
+
+    people: people.map(
+      (person): UniversityPerson => ({
+        id: person.id,
+        roleCode: person.role_code,
+        roleLabel: roleLabel(person.role_code),
+        name: person.full_name,
+        position: text(
+          person.position,
+          'Должность не указана',
+        ),
+        email: text(
+          person.email,
+          'Почта не указана',
+        ),
+        phone: text(
+          person.phone,
+          'Телефон не указан',
+        ),
+        isPrimary: person.is_primary,
+        isActive: person.is_active,
+        programId: person.program_instance_id,
+        programLabel: person.program_instance_id
+          ? programLabels.get(person.program_instance_id) ??
+            'Программа'
+          : 'На всю площадку',
+      }),
+    ),
+
+    contracts: contracts.map(
+      (contract): UniversityContract => ({
+        id: contract.id,
+        number: contract.number,
+        signedOn:
+          dateOnly(contract.signed_on) ||
+          'Дата не указана',
+        validUntil:
+          dateOnly(contract.valid_until) ||
+          'Срок не указан',
+        status: text(contract.status, 'без статуса'),
+        current:
+          Boolean(contract.signed_on) &&
+          contract.status !== 'expired',
+        fileName: filledAttachmentName(
+          'contract',
+          contract.attachment_id,
+        ),
+        attachmentId: contract.attachment_id,
+      }),
+    ),
+
+    licenses: licenses.map(
+      (license): UniversityLicense => ({
+        id: license.id,
+        programId: license.program_instance_id,
+        productName: license.product_name,
+        number: text(
+          license.license_number,
+          'Номер не указан',
+        ),
+        signedOn:
+          dateOnly(license.signed_at) ||
+          'Дата не указана',
+        validUntil:
+          dateOnly(license.valid_until) ||
+          'Срок не указан',
+        transferStatus: license.transfer_status,
+        access: text(
+          license.product_access,
+          'Доступ не описан',
+        ),
+        fileName: filledAttachmentName(
+          'license',
+          license.attachment_id,
+        ),
+        attachmentId: license.attachment_id,
+      }),
+    ),
+
+    teachers: teachers.map(
+      (teacher): UniversityTeacher => ({
+        id: teacher.id,
+        name: teacher.full_name,
+        productName: teacher.product_name,
+        status: teacher.status,
+        trainedOn:
+          dateOnly(teacher.trained_on) ||
+          'Дата не указана',
+        qualificationUntil:
+          dateOnly(teacher.qualification_until) ||
+          'Срок не указан',
+        lastLmsActivity:
+          dateOnly(teacher.last_lms_activity_on) ||
+          'Сигнала LMS нет',
+      }),
+    ),
+
+    documents: documents.map(
+      (document): UniversityDocument => ({
+        id: document.file_id,
+        name: document.filename,
+        kind: text(document.kind, 'без типа'),
+        programName: text(
+          document.program_name,
+          'Без программы',
+        ),
+        stageName: text(
+          document.stage_name,
+          'Без этапа',
+        ),
+        uploadedBy: text(
+          document.uploaded_by_name,
+          'Автор не указан',
+        ),
+        createdAt: dateOnly(document.created_at),
+        attachmentId: document.attachment_id,
+      }),
+    ),
+
+    feed: feed.map(
+      (event): UniversityFeedEvent => ({
+        id: event.id,
+        title: event.title,
+        description: text(
+          event.description,
+          'Без описания',
+        ),
+        actor: text(
+          event.actor_name,
+          'Система',
+        ),
+        createdAt: event.created_at,
+        kind: event.kind,
+      }),
+    ),
   });
 };
 

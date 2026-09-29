@@ -16,15 +16,45 @@ type ProtectedRouteProps = PropsWithChildren<{
 }>;
 
 export const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
-  const { authenticated, initialized, login, logout, user } = useAuth();
+  const { authenticated, initialized, login, logout, user, userError, userLoading, refreshUser } =
+    useAuth();
 
   useEffect(() => {
     if (initialized && !authenticated) {
-      login();
+      void login();
     }
   }, [authenticated, initialized, login]);
 
-  if (!initialized || !authenticated || !user) {
+  if (!initialized || !authenticated || userLoading) {
+    return (
+      <div style={centeredStyle}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (userError) {
+    return (
+      <div style={centeredStyle}>
+        <Result
+          status="error"
+          title="Не удалось загрузить профиль"
+          subTitle="Не удалось получить данные текущего пользователя."
+          extra={[
+            <Button key="retry" type="primary" onClick={() => void refreshUser()}>
+              Повторить
+            </Button>,
+
+            <Button key="logout" onClick={() => void logout()}>
+              Выйти
+            </Button>,
+          ]}
+        />
+      </div>
+    );
+  }
+
+  if (!user) {
     return (
       <div style={centeredStyle}>
         <Spin size="large" />

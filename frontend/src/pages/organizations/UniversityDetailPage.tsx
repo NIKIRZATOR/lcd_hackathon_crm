@@ -1,5 +1,6 @@
 import { Alert, Button, Empty, Grid, Modal, Progress, Select, Spin, Tag, message } from 'antd';
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../../auth';
@@ -10,7 +11,6 @@ import OrganizationLogo from './components/OrganizationLogo';
 import ProgramMasterModal from './components/ProgramMasterModal';
 import UniversityTabBar from './components/UniversityTabBar';
 import UniversityWorkspace from './components/UniversityWorkspace';
-import type { UniversityCard } from './screenModel';
 import { healthBandOf } from './screenModel';
 
 import styles from './UniversityDetailPage.module.scss';
@@ -37,13 +37,21 @@ const UniversityDetailPage = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const compactScore = !Grid.useBreakpoint().lg;
   const seesKam = user?.roles.some((role) => role === 'MANAGER' || role === 'ADMIN') ?? false;
   const [params, setParams] = useSearchParams();
   const section = sections.some((item) => item.key === params.get('section')) ? params.get('section') ?? 'programs' : 'programs';
-  const [card, setCard] = useState<UniversityCard | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const {
+    data: card,
+    isPending: loading,
+    error: cardError,
+    refetch: refetchCard,
+  } = useQuery({
+    queryKey: ['organizations', 'detail', id],
+    queryFn: ({ signal }) => loadUniversityCard(id, signal),
+    enabled: Boolean(id),
+  });
   const [masterOpen, setMasterOpen] = useState(false);
   const [kamOpen, setKamOpen] = useState(false);
   const [kams, setKams] = useState<Array<{ id: string; full_name: string }>>([]);
@@ -51,19 +59,21 @@ const UniversityDetailPage = () => {
   const [assigning, setAssigning] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  const reload = useCallback(() => {
-    if (!id) return;
-    setLoading(true);
-    loadUniversityCard(id)
-      .then((loaded) => { setCard(loaded); setError(''); })
-      .catch(() => setError('Не удалось открыть вуз'))
-      .finally(() => setLoading(false));
-  }, [id]);
+  const refreshOrganization = async () => {
+    await refetchCard();
 
-  useEffect(() => {
-    const timer = window.setTimeout(reload, 0);
-    return () => window.clearTimeout(timer);
-  }, [reload]);
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ['organizations', 'portfolio'],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['workflow', 'journal'],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['workflow', 'desk'],
+      }),
+    ]);
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -91,7 +101,7 @@ const UniversityDetailPage = () => {
     try {
       const result = await syncOrganizationPrograms(programIds);
       message.success(`Сигналы: сопоставлено ${result.mapped}, без площадки ${result.unmatched}`);
-      reload();
+      await refreshOrganization();
     } catch {
       message.error('Синхронизация не прошла');
     } finally {
@@ -103,8 +113,19 @@ const UniversityDetailPage = () => {
     return <PageLayout><div className={styles.loader}><Spin size="large" /></div></PageLayout>;
   }
 
+
   if (!card) {
-    return <PageLayout><Empty description={error || 'Организация не найдена'} /></PageLayout>;
+    return (
+      <PageLayout>
+        <Empty
+          description={
+            cardError
+              ? 'Не удалось открыть организацию'
+              : 'Организация не найдена'
+          }
+        />
+      </PageLayout>
+    );
   }
 
   const note = healthNote(card.healthScore);
@@ -126,7 +147,7 @@ const UniversityDetailPage = () => {
             </>
           )}
         </div>
-        {error && <Alert type="error" showIcon message={error} />}
+        {cardError && <Alert type="error" showIcon title={"Не удалось обновить данные организации"} />}
         <section className={styles.hero}>
           <div className={styles.identity}>
             <OrganizationLogo
@@ -169,7 +190,13 @@ const UniversityDetailPage = () => {
           </div>}
         </section>
         <UniversityTabBar items={sections} activeKey={section} onChange={(key) => setParams({ section: key }, { replace: true })} />
-        <UniversityWorkspace card={card} section={section} onChanged={reload} />
+        <UniversityWorkspace
+          card={card}
+          section={section}
+          onChanged={() => {
+            void refreshOrganization();
+          }}
+        />
         <Modal
           open={kamOpen}
           title="Ответственный KAM"
@@ -182,10 +209,10 @@ const UniversityDetailPage = () => {
             if (!kamUserId) return;
             setAssigning(true);
             assignOrganizationKam(card.id, kamUserId)
-              .then(() => {
+              .then( async () => {
                 message.success('KAM назначен. Живые программы площадки перешли к нему, этапы не сброшены.');
                 setKamOpen(false);
-                reload();
+                await refreshOrganization();
               })
               .catch(() => message.error('Не удалось назначить KAM'))
               .finally(() => setAssigning(false));
@@ -207,7 +234,24 @@ const UniversityDetailPage = () => {
           organizationId={card.id}
           programs={card.programs}
           onClose={() => setMasterOpen(false)}
-          onCreated={(programId) => navigate(`/workflows/${programId}`)}
+          onCreated={(programId) => {
+            void queryClient.invalidateQueries({
+              queryKey: ['organizations', 'detail', card.id],
+              refetchType: 'none',
+            });
+
+            void queryClient.invalidateQueries({
+              queryKey: ['organizations', 'portfolio'],
+              refetchType: 'none',
+            });
+
+            void queryClient.invalidateQueries({
+              queryKey: ['workflow', 'journal'],
+              refetchType: 'none',
+            });
+
+            navigate(`/workflows/${programId}`);
+          }}
         />
       </div>
     </PageLayout>

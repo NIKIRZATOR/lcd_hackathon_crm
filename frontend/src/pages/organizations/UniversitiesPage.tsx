@@ -1,4 +1,5 @@
 import { BankOutlined, EnvironmentOutlined, FilterOutlined, SearchOutlined, WarningOutlined } from '@ant-design/icons';
+import { useQuery } from '@tanstack/react-query';
 import { Alert, Button, Collapse, DatePicker, Empty, Input, Select, Spin, Table } from 'antd';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
@@ -79,21 +80,22 @@ const UniversitiesPage = () => {
   const isCompact = layout === 'narrow';
   const [params, setParams] = useSearchParams();
   const filters = readFilters(params);
-  const [items, setItems] = useState<PortfolioOrganization[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const {
+    data: items = [],
+    isPending: loading,
+    error: portfolioError,
+    refetch: refetchPortfolio,
+  } = useQuery({
+    queryKey: ['organizations', 'portfolio'],
+    queryFn: ({ signal }) => loadPortfolio(signal),
+  });
+
+  const error = portfolioError
+    ? 'Не удалось загрузить организации'
+    : '';
   const [importOpen, setImportOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(20);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadPortfolio()
-      .then((loaded) => { if (!cancelled) setItems(loaded); })
-      .catch(() => { if (!cancelled) setError('Не удалось загрузить вузы'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
 
   const filtered = useMemo(() => items.filter((item) => matches(item, filters)), [filters, items]);
   const summary = useMemo(() => ({
@@ -163,7 +165,7 @@ const UniversitiesPage = () => {
           </div>
           {isAdmin && <Button onClick={() => setImportOpen(true)}>Загрузить каталог</Button>}
         </div>
-        {error && <Alert type="error" showIcon message={error} />}
+        {error && <Alert type="error" showIcon title={error} />}
         <section className={styles.metrics} aria-label="Сводка портфеля">
           <div className={styles.metric}><span className={`${styles.metricIcon} ${styles.metricIconTotal}`}><BankOutlined /></span><span><span className={styles.metricLabel}>Площадок</span><strong className={styles.metricValue}>{summary.total}</strong></span></div>
           <div className={styles.metric}><span className={`${styles.metricIcon} ${styles.metricIconRegions}`}><EnvironmentOutlined /></span><span><span className={styles.metricLabel}>Программ</span><strong className={styles.metricValue}>{summary.programs}</strong></span></div>
@@ -228,7 +230,14 @@ const UniversitiesPage = () => {
             {visibleCount < filtered.length && <div ref={loadMoreRef} className={styles.loadMore}><Spin size="small" /><span>Загружаем ещё вузы...</span></div>}
           </section>
         )}
-        <CatalogImportModal open={importOpen} onClose={() => setImportOpen(false)} onApplied={() => { setImportOpen(false); setLoading(true); loadPortfolio().then(setItems).catch(() => setError('Не удалось загрузить вузы')).finally(() => setLoading(false)); }} />
+        <CatalogImportModal
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          onApplied={() => {
+            setImportOpen(false);
+            void refetchPortfolio();
+          }}
+        />
       </div>
     </PageLayout>
   );
