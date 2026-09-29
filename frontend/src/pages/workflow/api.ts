@@ -47,7 +47,11 @@ type JournalRow = {
 
 export const CLOSED_STAGE_LABEL = 'Заход закрыт';
 
-export const journalStageName = (row: { id: string; current_stage_name?: string | null; status?: string | null }) => {
+export const journalStageName = (row: {
+  id: string;
+  current_stage_name?: string | null;
+  status?: string | null;
+}) => {
   if ((row.status ?? '').toLowerCase() === 'cancelled') return CLOSED_STAGE_LABEL;
   return row.current_stage_name?.trim() || 'Этап не передан';
 };
@@ -105,14 +109,21 @@ export const workflowStatusFromApi = (
 ): WorkflowStatus => {
   const normalized = (status ?? '').toLowerCase();
   if (normalized === 'completed') return 'completed';
-  if (dueAt && dayjs(dueAt).isValid() && dayjs(dueAt).endOf('day').isBefore(dayjs())) return 'overdue';
-  if (normalized === 'paused' || normalized === 'cancelled' || healthBand === 'red' || healthBand === 'yellow') return 'attention';
+  if (dueAt && dayjs(dueAt).isValid() && dayjs(dueAt).endOf('day').isBefore(dayjs()))
+    return 'overdue';
+  if (
+    normalized === 'paused' ||
+    normalized === 'cancelled' ||
+    healthBand === 'red' ||
+    healthBand === 'yellow'
+  )
+    return 'attention';
   return 'active';
 };
 
 export const universityWorkflowRows = (universityId: number | string) => {
   const key = String(universityId);
-  return rowsByUniversity.has(key) ? rowsByUniversity.get(key) ?? [] : undefined;
+  return rowsByUniversity.has(key) ? (rowsByUniversity.get(key) ?? []) : undefined;
 };
 
 const emptyActivity = (): StageActivity => ({ files: [], comments: [] });
@@ -123,7 +134,11 @@ const rememberActivity = (workflowId: string, stageId: number, activity: StageAc
   liveActivity.set(workflowId, byStage);
 };
 
-export const getWorkflowStageActivity = (workflowId: string | number, stageId: number, currentStageId: number) => {
+export const getWorkflowStageActivity = (
+  workflowId: string | number,
+  stageId: number,
+  currentStageId: number,
+) => {
   const live = liveActivity.get(String(workflowId))?.get(stageId);
   if (live || liveActivity.has(String(workflowId))) {
     const activity = live ?? emptyActivity();
@@ -133,7 +148,8 @@ export const getWorkflowStageActivity = (workflowId: string | number, stageId: n
     };
   }
 
-  if (typeof workflowId === 'number') return getMockStageActivity(workflowId, stageId, currentStageId);
+  if (typeof workflowId === 'number')
+    return getMockStageActivity(workflowId, stageId, currentStageId);
   return emptyActivity();
 };
 
@@ -151,7 +167,8 @@ export const addWorkflowStageComment = (
     return created;
   }
 
-  if (typeof workflowId === 'number') return addMockComment(workflowId, stageId, currentStageId, comment);
+  if (typeof workflowId === 'number')
+    return addMockComment(workflowId, stageId, currentStageId, comment);
   return { ...comment, id: Date.now() };
 };
 
@@ -173,24 +190,29 @@ export const addWorkflowStageFile = (
   return { ...file, id: Date.now() };
 };
 
-export const advanceWorkflowStage = (workflowId: string | number) => (
-  typeof workflowId === 'number' ? advanceMockStage(workflowId) : undefined
-);
+export const advanceWorkflowStage = (workflowId: string | number) =>
+  typeof workflowId === 'number' ? advanceMockStage(workflowId) : undefined;
 
-export const moveWorkflowToStage = (workflowId: string | number, stageId: number) => (
-  typeof workflowId === 'number' ? moveMockStage(workflowId, stageId) : undefined
-);
+export const moveWorkflowToStage = (workflowId: string | number, stageId: number) =>
+  typeof workflowId === 'number' ? moveMockStage(workflowId, stageId) : undefined;
 
-const stageState = (stage: ApiStage, index: number, currentIndex: number): WorkflowDetailMock['stages'][number]['state'] => {
+const stageState = (
+  stage: ApiStage,
+  index: number,
+  currentIndex: number,
+): WorkflowDetailMock['stages'][number]['state'] => {
   const status = stage.status.toLowerCase();
   if (index === currentIndex) return 'current';
-  if (status === 'completed' || status === 'skipped' || (currentIndex >= 0 && index < currentIndex)) return 'completed';
+  if (status === 'completed' || status === 'skipped' || (currentIndex >= 0 && index < currentIndex))
+    return 'completed';
   return 'upcoming';
 };
 
-export const loadWorkflowDetail = async (id: string | number): Promise<WorkflowDetailMock | undefined> => {
+export const loadWorkflowDetail = async (
+  id: string | number,
+): Promise<WorkflowDetailMock | undefined> => {
   const key = String(id);
-  if (!key || Number.isNaN(Number(key)) === false && !key.includes('-')) {
+  if (!key || (Number.isNaN(Number(key)) === false && !key.includes('-'))) {
     return getWorkflowDetailMock(Number(key));
   }
 
@@ -208,41 +230,53 @@ export const loadWorkflowDetail = async (id: string | number): Promise<WorkflowD
       }>(`/api/program-instances/${key}`),
       apiRequest<ApiWorkflow>(`/api/program-instances/${key}/workflow`),
     ]);
-    const organization = await apiRequest<{ name: string; short_name: string | null }>(`/api/organizations/${program.organization_id}`);
+    const organization = await apiRequest<{ name: string; short_name: string | null }>(
+      `/api/organizations/${program.organization_id}`,
+    );
     const stages = [...workflow.stages].sort((left, right) => left.order_index - right.order_index);
-    const currentIndex = stages.findIndex((stage) => stage.id === workflow.current_stage_instance_id);
+    const currentIndex = stages.findIndex(
+      (stage) => stage.id === workflow.current_stage_instance_id,
+    );
     const current = stages[currentIndex];
     liveActivity.set(key, new Map());
 
     const checklistByStage: Record<number, WorkflowChecklistItem[]> = {};
-    await Promise.all(stages.map(async (stage, index) => {
-      const stageKey = index + 1;
-      const [checklist, comments, attachments] = await Promise.all([
-        apiRequest<ApiChecklist[]>(`/api/stage-instances/${stage.id}/checklist`).catch(() => []),
-        apiRequest<ApiComment[]>(`/api/workflows/stage-instances/${stage.id}/comments`).catch(() => []),
-        apiRequest<ApiAttachment[]>(`/api/workflows/stage-instances/${stage.id}/attachments`).catch(() => []),
-      ]);
-      checklistByStage[stageKey] = checklist.map((item, itemIndex) => ({
-        id: itemIndex + 1,
-        label: text(item.label),
-        completed: item.is_done,
-      }));
-      rememberActivity(key, stageKey, {
-        comments: comments.map((comment, commentIndex) => ({
-          id: commentIndex + 1,
-          author: dash,
-          text: text(comment.text),
-          createdAt: dayjs(comment.created_at).isValid() ? dayjs(comment.created_at).format('D MMMM YYYY, HH:mm') : dash,
-        })),
-        files: attachments.map((file, fileIndex) => ({
-          id: fileIndex + 1,
-          name: text(file.original_name),
-          type: text(file.attachment_kind),
-          size: dash,
-          uploadedAt: dash,
-        })),
-      });
-    }));
+    await Promise.all(
+      stages.map(async (stage, index) => {
+        const stageKey = index + 1;
+        const [checklist, comments, attachments] = await Promise.all([
+          apiRequest<ApiChecklist[]>(`/api/stage-instances/${stage.id}/checklist`).catch(() => []),
+          apiRequest<ApiComment[]>(`/api/workflows/stage-instances/${stage.id}/comments`).catch(
+            () => [],
+          ),
+          apiRequest<ApiAttachment[]>(
+            `/api/workflows/stage-instances/${stage.id}/attachments`,
+          ).catch(() => []),
+        ]);
+        checklistByStage[stageKey] = checklist.map((item, itemIndex) => ({
+          id: itemIndex + 1,
+          label: text(item.label),
+          completed: item.is_done,
+        }));
+        rememberActivity(key, stageKey, {
+          comments: comments.map((comment, commentIndex) => ({
+            id: commentIndex + 1,
+            author: dash,
+            text: text(comment.text),
+            createdAt: dayjs(comment.created_at).isValid()
+              ? dayjs(comment.created_at).format('D MMMM YYYY, HH:mm')
+              : dash,
+          })),
+          files: attachments.map((file, fileIndex) => ({
+            id: fileIndex + 1,
+            name: text(file.original_name),
+            type: text(file.attachment_kind),
+            size: dash,
+            uploadedAt: dash,
+          })),
+        });
+      }),
+    );
 
     const stepConfigs: WorkflowStepConfig[] = stages.map((stage, index) => ({
       id: index + 1,
@@ -268,11 +302,17 @@ export const loadWorkflowDetail = async (id: string | number): Promise<WorkflowD
       responsible: text(program.kam_name),
       deadline: isoDate(current?.due_at),
       status: workflowStatusFromApi(program.status, current?.due_at, program.health_band),
-      progress: stages.length ? Math.round((done / stages.length) * 100) : program.health_score ?? -1,
+      progress: stages.length
+        ? Math.round((done / stages.length) * 100)
+        : (program.health_score ?? -1),
     };
     const detail: WorkflowDetailMock = {
       item,
-      stages: stages.map((stage, index) => ({ id: index + 1, name: text(stage.name), state: stageState(stage, index, currentIndex) })),
+      stages: stages.map((stage, index) => ({
+        id: index + 1,
+        name: text(stage.name),
+        state: stageState(stage, index, currentIndex),
+      })),
       stepConfigs,
       currentStageId: currentIndex >= 0 ? currentIndex + 1 : 0,
       checklist: checklistByStage[currentIndex + 1] ?? [],
@@ -289,7 +329,8 @@ export const loadWorkflowDetail = async (id: string | number): Promise<WorkflowD
   }
 };
 
-export const getWorkflow = (id: string | number) => liveDetails.get(String(id)) ?? getWorkflowDetailMock(Number(id));
+export const getWorkflow = (id: string | number) =>
+  liveDetails.get(String(id)) ?? getWorkflowDetailMock(Number(id));
 
 export type JournalPreset = 'all' | 'overdue' | 'semester' | 'renewal' | 'lms_silence';
 
@@ -334,7 +375,13 @@ export type DeskChecklistItem = {
   attachmentId: string | null;
 };
 
-export type DeskFile = { id: string; fileId: string; name: string; kind: string | null; sizeLabel: string };
+export type DeskFile = {
+  id: string;
+  fileId: string;
+  name: string;
+  kind: string | null;
+  sizeLabel: string;
+};
 export type DeskComment = { id: string; text: string; createdAt: string; authorId: string };
 
 export type ProgramDesk = {
@@ -369,19 +416,50 @@ const bandOf = (score: number | null, band?: string | null): JournalProgram['hea
   return 'red';
 };
 
-const shortNameByOrganization = async () => {
-  const page = await apiRequest<{ items: Array<{ name: string; short_name: string | null }> }>('/api/organizations?limit=100&offset=0').catch(() => ({ items: [] }));
-  return new Map(page.items.map((item) => [item.name.trim().toLowerCase().replace(/ё/g, 'е'), item.short_name?.trim() || item.name]));
+const shortNameByOrganization = async (signal?: AbortSignal) => {
+  const page = await apiRequest<{
+    items: Array<{
+      name: string;
+      short_name: string | null;
+    }>;
+  }>('/api/organizations?limit=100&offset=0', {
+    signal,
+  }).catch(() => ({
+    items: [],
+  }));
+
+  return new Map(
+    page.items.map((item) => [
+      item.name.trim().toLowerCase().replace(/ё/g, 'е'),
+      item.short_name?.trim() || item.name,
+    ]),
+  );
 };
 
-export const loadJournal = async (preset: JournalPreset): Promise<JournalProgram[]> => {
+export const loadJournal = async (
+  preset: JournalPreset,
+  signal?: AbortSignal,
+): Promise<JournalProgram[]> => {
   const [rows, shortNames] = await Promise.all([
-    apiRequest<Array<JournalRow & { playbook_name?: string; students_count?: number | null; applications_count?: number | null }>>(`/api/workflow-journal?preset=${preset}`),
-    shortNameByOrganization(),
+    apiRequest<
+      Array<
+        JournalRow & {
+          playbook_name?: string;
+          students_count?: number | null;
+          applications_count?: number | null;
+        }
+      >
+    >(`/api/workflow-journal?preset=${preset}`, {
+      signal,
+    }),
+    shortNameByOrganization(signal),
   ]);
+
   return rows.map((row) => ({
     id: row.id,
-    organization: shortNames.get(row.organization_name.trim().toLowerCase().replace(/ё/g, 'е')) || text(row.organization_name),
+    organization:
+      shortNames.get(row.organization_name.trim().toLowerCase().replace(/ё/g, 'е')) ||
+      text(row.organization_name),
     direction: text(row.direction_name),
     product: text(row.product_name),
     playbook: row.playbook_name?.trim() || 'Плейбук не передан',
@@ -395,7 +473,23 @@ export const loadJournal = async (preset: JournalPreset): Promise<JournalProgram
   }));
 };
 
-export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
+const withFallback = async <T>(
+  request: Promise<T>,
+  fallback: T,
+  signal?: AbortSignal,
+): Promise<T> => {
+  try {
+    return await request;
+  } catch (error) {
+    if (signal?.aborted) {
+      throw error;
+    }
+
+    return fallback;
+  }
+};
+
+export const loadProgramDesk = async (id: string, signal?: AbortSignal): Promise<ProgramDesk> => {
   const [program, workflow, nba, metrics, license] = await Promise.all([
     apiRequest<{
       organization_id: string;
@@ -409,26 +503,89 @@ export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
       health_score: number | null;
       health_band: string | null;
       current_stage_code: string | null;
-    }>(`/api/program-instances/${id}`),
+    }>(`/api/program-instances/${id}`, {
+      signal,
+    }),
+
     apiRequest<{
       stages: Array<ApiStage & { phase_name?: string; code?: string }>;
       current_stage_instance_id: string | null;
-      available_transitions?: Array<{ id: string; name: string; to_stage_name: string }>;
-    }>(`/api/program-instances/${id}/workflow`),
-    apiRequest<Array<{ program_instance_id: string | null; reason: string; severity: string }>>('/api/nba/today').catch(() => []),
-    apiRequest<{ students_count: number } | null>(`/api/integrations/program-instances/${id}/metrics`).catch(() => null),
-    apiRequest<{ license_number: string | null; transfer_status: string } | null>(`/api/program-instances/${id}/license`).catch(() => null),
+      available_transitions?: Array<{
+        id: string;
+        name: string;
+        to_stage_name: string;
+      }>;
+    }>(`/api/program-instances/${id}/workflow`, {
+      signal,
+    }),
+
+    withFallback(
+      apiRequest<
+        Array<{
+          program_instance_id: string | null;
+          reason: string;
+          severity: string;
+        }>
+      >('/api/nba/today', {
+        signal,
+      }),
+      [],
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<{ students_count: number } | null>(
+        `/api/integrations/program-instances/${id}/metrics`,
+        {
+          signal,
+        },
+      ),
+      null,
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<{
+        license_number: string | null;
+        transfer_status: string;
+      } | null>(`/api/program-instances/${id}/license`, {
+        signal,
+      }),
+      null,
+      signal,
+    ),
   ]);
-  const organization = await apiRequest<{ name: string }>(`/api/organizations/${program.organization_id}`);
-  const people = await apiRequest<Array<{ id: string; full_name: string; role_code: string; is_active: boolean }>>(`/api/organizations/${program.organization_id}/stakeholders`).catch(() => []);
+
+  const organization = await apiRequest<{
+    name: string;
+  }>(`/api/organizations/${program.organization_id}`, {
+    signal,
+  });
+
+  const people = await withFallback(
+    apiRequest<
+      Array<{
+        id: string;
+        full_name: string;
+        role_code: string;
+        is_active: boolean;
+      }>
+    >(`/api/organizations/${program.organization_id}/stakeholders`, {
+      signal,
+    }),
+    [],
+    signal,
+  );
+
   const action = nba.find((item) => item.program_instance_id === id);
+
   const students = metrics?.students_count ?? null;
-  // Older API responses may omit the current instance pointer.  The stage row
-  // itself still carries enough runtime state to open the correct workspace.
-  const currentStageId = workflow.current_stage_instance_id
-    || workflow.stages.find((stage) => stage.status.toLowerCase() === 'in_progress')?.id
-    || workflow.stages.find((stage) => stage.code === program.current_stage_code)?.id
-    || null;
+
+  const currentStageId =
+    workflow.current_stage_instance_id ||
+    workflow.stages.find((stage) => stage.status.toLowerCase() === 'in_progress')?.id ||
+    workflow.stages.find((stage) => stage.code === program.current_stage_code)?.id ||
+    null;
 
   return {
     id,
@@ -446,16 +603,42 @@ export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
     students,
     stageCode: program.current_stage_code,
     currentStageId,
-    banner: action?.reason || (students > 0 && program.current_stage_code === 'classes_running' ? `LMS: ${students} студентов. Подтвердить ведение занятий?` : emptyActionText),
-    bannerTone: action ? (action.severity === 'critical' ? 'warning' : 'info') : students > 0 && program.current_stage_code === 'classes_running' ? 'success' : 'info',
-    people: people.filter((person) => person.is_active !== false).map((person) => ({ id: (person as { id?: string }).id || person.full_name, name: person.full_name, role: person.role_code, roleCode: person.role_code })),
-    license: license ? `${license.license_number || 'Номер не указан'} · ${license.transfer_status}` : 'Лицензия не заведена',
-    transitions: (workflow.available_transitions ?? []).map((item) => ({ id: item.id, name: item.name, toStageName: item.to_stage_name })),
+    banner:
+      action?.reason ||
+      (students > 0 && program.current_stage_code === 'classes_running'
+        ? `LMS: ${students} студентов. Подтвердить ведение занятий?`
+        : emptyActionText),
+    bannerTone: action
+      ? action.severity === 'critical'
+        ? 'warning'
+        : 'info'
+      : students > 0 && program.current_stage_code === 'classes_running'
+        ? 'success'
+        : 'info',
+    people: people
+      .filter((person) => person.is_active !== false)
+      .map((person) => ({
+        id: person.id || person.full_name,
+        name: person.full_name,
+        role: person.role_code,
+        roleCode: person.role_code,
+      })),
+    license: license
+      ? `${license.license_number || 'Номер не указан'} · ${license.transfer_status}`
+      : 'Лицензия не заведена',
+    transitions: (workflow.available_transitions ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      toStageName: item.to_stage_name,
+    })),
     stages: workflow.stages.map((stage) => ({
       id: stage.id,
       code: stage.code || stage.name,
       name: stage.name,
-      phase: stage.phase_name?.trim() && stage.phase_name.toLowerCase() !== 'other' ? stage.phase_name : '—',
+      phase:
+        stage.phase_name?.trim() && stage.phase_name.toLowerCase() !== 'other'
+          ? stage.phase_name
+          : '—',
       status: stage.status,
       dueAt: stage.due_at,
       optional: stage.is_optional,
@@ -464,12 +647,63 @@ export const loadProgramDesk = async (id: string): Promise<ProgramDesk> => {
   };
 };
 
-export const loadStageFacts = async (stageId: string) => {
+export const loadStageFacts = async (stageId: string, signal?: AbortSignal) => {
   const [checklist, comments, files] = await Promise.all([
-    apiRequest<Array<{ id: string; code?: string; label: string; required: boolean; is_done: boolean; item_type: string; required_stakeholder_role?: string | null; required_attachment_kind?: string | null; value_text?: string | null; value_date?: string | null; stakeholder_id?: string | null; attachment_id?: string | null }>>(`/api/stage-instances/${stageId}/checklist`).catch(() => []),
-    apiRequest<Array<{ id: string; text: string; created_at: string; author_user_id: string }>>(`/api/workflows/stage-instances/${stageId}/comments`).catch(() => []),
-    apiRequest<Array<{ id: string; file_id: string; original_name: string; attachment_kind?: string | null; size_bytes?: number }>>(`/api/workflows/stage-instances/${stageId}/attachments`).catch(() => []),
+    withFallback(
+      apiRequest<
+        Array<{
+          id: string;
+          code?: string;
+          label: string;
+          required: boolean;
+          is_done: boolean;
+          item_type: string;
+          required_stakeholder_role?: string | null;
+          required_attachment_kind?: string | null;
+          value_text?: string | null;
+          value_date?: string | null;
+          stakeholder_id?: string | null;
+          attachment_id?: string | null;
+        }>
+      >(`/api/stage-instances/${stageId}/checklist`, {
+        signal,
+      }),
+      [],
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<
+        Array<{
+          id: string;
+          text: string;
+          created_at: string;
+          author_user_id: string;
+        }>
+      >(`/api/workflows/stage-instances/${stageId}/comments`, {
+        signal,
+      }),
+      [],
+      signal,
+    ),
+
+    withFallback(
+      apiRequest<
+        Array<{
+          id: string;
+          file_id: string;
+          original_name: string;
+          attachment_kind?: string | null;
+          size_bytes?: number;
+        }>
+      >(`/api/workflows/stage-instances/${stageId}/attachments`, {
+        signal,
+      }),
+      [],
+      signal,
+    ),
   ]);
+
   return {
     checklist: checklist.map((item): DeskChecklistItem => ({
       id: item.id,
@@ -485,67 +719,99 @@ export const loadStageFacts = async (stageId: string) => {
       stakeholderId: item.stakeholder_id ?? null,
       attachmentId: item.attachment_id ?? null,
     })),
-    comments: comments.map((item): DeskComment => ({ id: item.id, text: item.text, createdAt: item.created_at, authorId: item.author_user_id })),
+
+    comments: comments.map((item): DeskComment => ({
+      id: item.id,
+      text: item.text,
+      createdAt: item.created_at,
+      authorId: item.author_user_id,
+    })),
+
     files: files.map((item): DeskFile => ({
       id: item.id,
       fileId: item.file_id,
       name: item.original_name,
       kind: item.attachment_kind ?? null,
-      sizeLabel: typeof item.size_bytes === 'number' ? `${Math.max(item.size_bytes / 1024 / 1024, 0.1).toFixed(1)} МБ` : '',
+      sizeLabel:
+        typeof item.size_bytes === 'number'
+          ? `${Math.max(item.size_bytes / 1024 / 1024, 0.1).toFixed(1)} МБ`
+          : '',
     })),
   };
 };
 
-export const saveChecklistItem = (valueId: string, payload: Record<string, unknown>) => apiRequest(`/api/stage-instances/checklist/${valueId}`, {
-  method: 'PATCH',
-  body: JSON.stringify(payload),
-});
+export const saveChecklistItem = (valueId: string, payload: Record<string, unknown>) =>
+  apiRequest(`/api/stage-instances/checklist/${valueId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
 
-export const addStageComment = (stageId: string, textValue: string) => apiRequest(`/api/workflows/stage-instances/${stageId}/comments`, {
-  method: 'POST',
-  body: JSON.stringify({ text: textValue }),
-});
+export const addStageComment = (stageId: string, textValue: string) =>
+  apiRequest(`/api/workflows/stage-instances/${stageId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ text: textValue }),
+  });
 
 export const uploadStageFile = (stageId: string, file: File, kind?: string | null) => {
   const body = new FormData();
   body.append('file', file);
   if (kind) body.append('attachment_kind', kind);
-  return apiRequest<{ id: string; file_id: string; original_name: string; attachment_kind?: string | null }>(`/api/workflows/stage-instances/${stageId}/attachments`, { method: 'POST', body });
+  return apiRequest<{
+    id: string;
+    file_id: string;
+    original_name: string;
+    attachment_kind?: string | null;
+  }>(`/api/workflows/stage-instances/${stageId}/attachments`, { method: 'POST', body });
 };
 
-export const deleteStageFile = (attachmentId: string) => apiRequest(`/api/workflows/attachments/${attachmentId}`, { method: 'DELETE' });
+export const deleteStageFile = (attachmentId: string) =>
+  apiRequest(`/api/workflows/attachments/${attachmentId}`, { method: 'DELETE' });
 
-export const updateStageComment = (stageId: string, commentId: string, textValue: string) => apiRequest(`/api/workflows/stage-instances/${stageId}/comments/${commentId}`, {
-  method: 'PATCH',
-  body: JSON.stringify({ text: textValue }),
-});
+export const updateStageComment = (stageId: string, commentId: string, textValue: string) =>
+  apiRequest(`/api/workflows/stage-instances/${stageId}/comments/${commentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ text: textValue }),
+  });
 
-export const deleteStageComment = (stageId: string, commentId: string) => apiRequest(`/api/workflows/stage-instances/${stageId}/comments/${commentId}`, { method: 'DELETE' });
+export const deleteStageComment = (stageId: string, commentId: string) =>
+  apiRequest(`/api/workflows/stage-instances/${stageId}/comments/${commentId}`, {
+    method: 'DELETE',
+  });
 
-export const refuseProgram = (programId: string, payload: { stageId: string; comment: string }) => apiRequest(`/api/program-instances/${programId}/refuse`, {
-  method: 'POST',
-  body: JSON.stringify({
-    comment: payload.comment,
-    expected_current_stage_instance_id: payload.stageId,
-  }),
-});
+export const refuseProgram = (programId: string, payload: { stageId: string; comment: string }) =>
+  apiRequest(`/api/program-instances/${programId}/refuse`, {
+    method: 'POST',
+    body: JSON.stringify({
+      comment: payload.comment,
+      expected_current_stage_instance_id: payload.stageId,
+    }),
+  });
 
-export const reopenProgramStage = (programId: string, stageId: string) => apiRequest(`/api/program-instances/${programId}/reopen`, {
-  method: 'POST',
-  body: JSON.stringify({ stage_instance_id: stageId }),
-});
+export const reopenProgramStage = (programId: string, stageId: string) =>
+  apiRequest(`/api/program-instances/${programId}/reopen`, {
+    method: 'POST',
+    body: JSON.stringify({ stage_instance_id: stageId }),
+  });
 
-export const moveProgram = (programId: string, payload: { transitionId?: string; comment?: string; stageId?: string; skip?: boolean }) => apiRequest(`/api/program-instances/${programId}/transition`, {
-  method: 'POST',
-  body: JSON.stringify({
-    transition_id: payload.transitionId ?? null,
-    comment: payload.comment ?? null,
-    expected_current_stage_instance_id: payload.stageId ?? null,
-    skip_current: payload.skip ?? false,
-  }),
-});
+export const moveProgram = (
+  programId: string,
+  payload: { transitionId?: string; comment?: string; stageId?: string; skip?: boolean },
+) =>
+  apiRequest(`/api/program-instances/${programId}/transition`, {
+    method: 'POST',
+    body: JSON.stringify({
+      transition_id: payload.transitionId ?? null,
+      comment: payload.comment ?? null,
+      expected_current_stage_instance_id: payload.stageId ?? null,
+      skip_current: payload.skip ?? false,
+    }),
+  });
 
-export const syncProgram = (programId: string) => apiRequest<{ mapped: number; unmatched: number }>(`/api/integrations/program-instances/${programId}/sync`, { method: 'POST' });
+export const syncProgram = (programId: string) =>
+  apiRequest<{ mapped: number; unmatched: number }>(
+    `/api/integrations/program-instances/${programId}/sync`,
+    { method: 'POST' },
+  );
 
 export type WorkflowStageData<T extends object> = {
   id: string;
@@ -578,7 +844,10 @@ export const addChecklistExtra = (stageId: string, label: string) =>
     body: JSON.stringify({ label }),
   });
 
-export const updateChecklistExtra = (id: string, patch: Partial<Pick<ChecklistExtra, 'label' | 'is_done'>>) =>
+export const updateChecklistExtra = (
+  id: string,
+  patch: Partial<Pick<ChecklistExtra, 'label' | 'is_done'>>,
+) =>
   apiRequest<ChecklistExtra>(`/api/stage-instances/checklist-extras/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(patch),

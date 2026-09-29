@@ -2,6 +2,7 @@ import { DeleteOutlined, EditOutlined, SendOutlined } from '@ant-design/icons';
 import { Alert, Avatar, Button, Card, Empty, Input, List, Popconfirm, Space, Spin, Tag, Tooltip, message } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiError, apiRequest } from '../../api/client';
@@ -77,10 +78,60 @@ const WorkflowDetailPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const seesKam = user?.roles.some((role) => role === 'MANAGER' || role === 'ADMIN') ?? false;
-  const [desk, setDesk] = useState<ProgramDesk | null>(null);
-  const [loading, setLoading] = useState(true);
+
+ const queryClient = useQueryClient();
+
   const [error, setError] = useState('');
+
+  const {
+    data: desk,
+    isPending: loading,
+    error: deskError,
+    refetch: refetchDesk,
+  } = useQuery({
+    queryKey: ['workflow', 'desk', id],
+    queryFn: ({ signal }) => loadProgramDesk(id, signal),
+    enabled: Boolean(id),
+  });
   const [selectedId, setSelectedId] = useState<string>(() => searchParams.get('stage') === 'control' ? 'control' : '');
+  const selectedStage = desk?.stages.find(
+    (stage) => stage.id === selectedId,
+  );
+
+  const selectedStageIsControl = Boolean(
+    selectedStage &&
+      (
+        stageCodeOf(selectedStage.code, selectedStage.name) === 'control' ||
+        selectedStage.name.trim().toLowerCase() === 'контроль исполнения'
+      ),
+  );
+
+  const shouldLoadStageFacts =
+    Boolean(selectedId) &&
+    selectedId !== 'control' &&
+    !selectedId.startsWith('gap-') &&
+    !selectedStageIsControl;
+
+  const {
+    data: stageFacts,
+    error: stageFactsError,
+    refetch: refetchStageFacts,
+  } = useQuery({
+    queryKey: ['workflow', 'stage-facts', selectedId],
+    queryFn: ({ signal }) => loadStageFacts(selectedId, signal),
+    enabled: shouldLoadStageFacts,
+  });
+
+  const updateDesk = useCallback(
+  (updater: (current: ProgramDesk) => ProgramDesk) => {
+    queryClient.setQueryData<ProgramDesk>(
+      ['workflow', 'desk', id],
+      (current) => current ? updater(current) : current,
+    );
+  },
+  [id, queryClient],
+);
+
   const [checklist, setChecklist] = useState<DeskChecklistItem[]>([]);
   const [factsStageId, setFactsStageId] = useState('');
   const [stageBlockers, setStageBlockers] = useState<string[] | null>(null);
@@ -104,24 +155,25 @@ const WorkflowDetailPage = () => {
   const [editingText, setEditingText] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(() => {
-    if (!id) return;
-    setLoading(true);
-    loadProgramDesk(id)
-      .then((loaded) => {
-        setDesk(loaded);
-        const isRealControl = loaded.stageCode === 'control';
-        setSelectedId((current) => current || (isRealControl ? 'control' : loaded.currentStageId || loaded.stages[0]?.id || ''));
-        setError('');
-      })
-      .catch(() => setError('Не удалось открыть программу'))
-      .finally(() => setLoading(false));
-  }, [id]);
-
   useEffect(() => {
-    const timer = window.setTimeout(load, 0);
+    if (!desk) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const isRealControl = desk.stageCode === 'control';
+
+      setSelectedId(
+        (current) =>
+          current ||
+          (isRealControl
+            ? 'control'
+            : desk.currentStageId || desk.stages[0]?.id || ''),
+      );
+    }, 0);
+
     return () => window.clearTimeout(timer);
-  }, [load]);
+  }, [desk]);
 
   useEffect(() => {
     const isControlSelected = selectedId === 'control';
@@ -145,69 +197,106 @@ const WorkflowDetailPage = () => {
   }, [navigate]);
 
   useEffect(() => {
-    const stage = desk?.stages.find((item) => item.id === selectedId);
-    if (selectedId === 'control' || (stage && (
-      stageCodeOf(stage.code, stage.name) === 'control'
-      || stage.name.trim().toLowerCase() === 'контроль исполнения'
-    ))) {
+    const stage = desk?.stages.find(
+      (item) => item.id === selectedId,
+    );
+
+    if (
+      selectedId === 'control' ||
+      (
+        stage &&
+        (
+          stageCodeOf(stage.code, stage.name) === 'control' ||
+          stage.name.trim().toLowerCase() === 'контроль исполнения'
+        )
+      )
+    ) {
       const timer = window.setTimeout(() => {
         setChecklist([]);
         setComments([]);
         setFiles([]);
         setFactsStageId(selectedId);
       }, 0);
+
       return () => window.clearTimeout(timer);
     }
+
     if (!selectedId || selectedId.startsWith('gap-')) {
       const code = stageCodeOf(stage?.code, stage?.name);
       const blueprint = stageBlueprints[code];
+
       const timer = window.setTimeout(() => {
-        setChecklist((blueprint?.facts ?? []).map((fact) => ({
-          id: `local-${selectedId}-${fact.code}`,
-          code: fact.code,
-          label: fact.label,
-          required: true,
-          done: false,
-          itemType: fact.itemType,
-          role: fact.role ?? null,
-          attachmentKind: fact.attachmentKind ?? null,
-          valueText: null,
-          valueDate: null,
-          stakeholderId: null,
-          attachmentId: null,
-        })));
+        setChecklist(
+          (blueprint?.facts ?? []).map((fact) => ({
+            id: `local-${selectedId}-${fact.code}`,
+            code: fact.code,
+            label: fact.label,
+            required: true,
+            done: false,
+            itemType: fact.itemType,
+            role: fact.role ?? null,
+            attachmentKind: fact.attachmentKind ?? null,
+            valueText: null,
+            valueDate: null,
+            stakeholderId: null,
+            attachmentId: null,
+          })),
+        );
+
         setComments([]);
         setFiles([]);
         setFactsStageId(selectedId);
       }, 0);
+
       return () => window.clearTimeout(timer);
     }
-    let cancelled = false;
-    loadStageFacts(selectedId).then((facts) => {
-      if (cancelled) return;
-      const code = stageCodeOf(stage?.code, stage?.name);
-      const blueprint = stageBlueprints[code];
-      const visible = facts.checklist.length > 0 || !blueprint ? facts.checklist : blueprint.facts.map((fact) => ({
-        id: `local-${selectedId}-${fact.code}`,
-        code: fact.code,
-        label: fact.label,
-        required: true,
-        done: false,
-        itemType: fact.itemType,
-        role: fact.role ?? null,
-        attachmentKind: fact.attachmentKind ?? null,
-        valueText: null,
-        valueDate: null,
-        stakeholderId: null,
-        attachmentId: null,
-      }));
+
+    if (!stageFacts) {
+      return;
+    }
+
+    const code = stageCodeOf(stage?.code, stage?.name);
+    const blueprint = stageBlueprints[code];
+
+    const visible =
+      stageFacts.checklist.length > 0 || !blueprint
+        ? stageFacts.checklist
+        : blueprint.facts.map((fact) => ({
+            id: `local-${selectedId}-${fact.code}`,
+            code: fact.code,
+            label: fact.label,
+            required: true,
+            done: false,
+            itemType: fact.itemType,
+            role: fact.role ?? null,
+            attachmentKind: fact.attachmentKind ?? null,
+            valueText: null,
+            valueDate: null,
+            stakeholderId: null,
+            attachmentId: null,
+          }));
+
+    const timer = window.setTimeout(() => {
       setChecklist(visible);
-      setComments(facts.comments);
-      setFiles(facts.files);
+      setComments(stageFacts.comments);
+      setFiles(stageFacts.files);
       setFactsStageId(selectedId);
-    }).catch(() => { if (!cancelled) setError('Не удалось прочитать этап'); });
-    return () => { cancelled = true; };
-  }, [desk?.stages, selectedId]);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [desk?.stages, selectedId, stageFacts]);
+
+  useEffect(() => {
+    if (!stageFactsError) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setError('Не удалось прочитать этап');
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [stageFactsError]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -306,7 +395,29 @@ const WorkflowDetailPage = () => {
   }, []);
 
   if (loading && !desk) return <PageLayout><div className={styles.loader}><Spin size="large" /></div></PageLayout>;
-  if (!desk) return <PageLayout><Empty description={error || 'Программа не найдена'} /></PageLayout>;
+  if (loading && !desk) {
+  return (
+      <PageLayout>
+        <div className={styles.loader}>
+          <Spin size="large" />
+        </div>
+      </PageLayout>
+    );
+  }
+
+  if (!desk) {
+    return (
+      <PageLayout>
+        <Empty
+          description={
+            deskError
+              ? 'Не удалось открыть программу'
+              : 'Программа не найдена'
+          }
+        />
+      </PageLayout>
+    );
+  }
 
   const controlId = 'control';
   const isControlStage = (stage: ProgramDesk['stages'][number] | undefined) => Boolean(stage && (
@@ -365,11 +476,20 @@ const WorkflowDetailPage = () => {
     && (!factBanner || showFactBanner);
 
   const refreshFacts = async () => {
-    if (!selected || selected.id.startsWith('gap-')) return;
-    const facts = await loadStageFacts(selected.id);
-    setChecklist(facts.checklist);
-    setComments(facts.comments);
-    setFiles(facts.files);
+    if (!selected || selected.id.startsWith('gap-')) {
+      return;
+    }
+
+    const result = await refetchStageFacts();
+
+    if (!result.data) {
+      return;
+    }
+
+    setChecklist(result.data.checklist);
+    setComments(result.data.comments);
+    setFiles(result.data.files);
+    setFactsStageId(selected.id);
   };
 
   const changeItem = async (item: DeskChecklistItem, patch: Record<string, unknown>) => {
@@ -390,6 +510,11 @@ const WorkflowDetailPage = () => {
     delete body.keepLocal;
     try {
       await saveChecklistItem(item.id, body);
+      await refetchStageFacts();
+
+      await queryClient.invalidateQueries({
+        queryKey: ['nba', 'context', desk.id],
+      });
     } catch (reason) {
       message.error(errorText(reason));
       if (!patch.keepLocal && item.itemType !== 'text') await refreshFacts();
@@ -419,9 +544,21 @@ const WorkflowDetailPage = () => {
     }
     setBusy(true);
     try {
-      await refuseProgram(desk.id, { stageId: desk.currentStageId || selected.id, comment: meetingPlan.note });
-      const reloaded = await loadProgramDesk(desk.id);
-      setDesk(reloaded);
+      await refuseProgram(desk.id, {
+        stageId: desk.currentStageId || selected.id,
+        comment: meetingPlan.note,
+      });
+
+      await refetchDesk();
+
+      await queryClient.invalidateQueries({
+        queryKey: ['workflow', 'journal'],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ['nba', 'context', desk.id],
+      });
+
       return true;
     } catch (reason) {
       message.error(errorText(reason));
@@ -522,11 +659,29 @@ const WorkflowDetailPage = () => {
   };
 
   const reopen = async () => {
-    if (!selected || selected.id.startsWith('gap-') || desk.id.startsWith('gap-')) return;
+    if (
+      !selected ||
+      selected.id.startsWith('gap-') ||
+      desk.id.startsWith('gap-')
+    ) {
+      return;
+    }
+
     setBusy(true);
+
     try {
       await reopenProgramStage(desk.id, selected.id);
-      await load();
+
+      await refetchDesk();
+
+      await queryClient.invalidateQueries({
+        queryKey: ['workflow', 'journal'],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ['nba', 'context', desk.id],
+      });
+
       setSelectedId(selected.id);
     } catch (reason) {
       message.error(errorText(reason));
@@ -535,26 +690,70 @@ const WorkflowDetailPage = () => {
     }
   };
 
-  const go = async (transitionId: string | undefined, skip = false) => {
-    if (desk.id.startsWith('gap-')) {
-      message.info('Это демо-программа из файла для бэкенда');
-      return;
+const go = async (
+  transitionId: string | undefined,
+  skip = false,
+) => {
+  if (desk.id.startsWith('gap-')) {
+    message.info('Это демо-программа из файла для бэкенда');
+    return;
+  }
+
+  const previousStageId = selected.id;
+
+  setBusy(true);
+
+  try {
+    await moveProgram(desk.id, {
+      transitionId,
+      comment: drafts[previousStageId],
+      stageId: desk.currentStageId ?? undefined,
+      skip,
+    });
+
+    setDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [previousStageId]: '',
+    }));
+
+    await queryClient.invalidateQueries({
+      queryKey: ['workflow', 'stage-facts', previousStageId],
+    });
+
+    const result = await refetchDesk();
+
+    if (result.data) {
+      setSelectedId(
+        result.data.currentStageId ||
+          result.data.stages[0]?.id ||
+          '',
+      );
     }
-    setBusy(true);
-    try {
-      await moveProgram(desk.id, { transitionId, comment: drafts[selected.id], stageId: desk.currentStageId ?? undefined, skip });
-      setDrafts((currentDrafts) => ({ ...currentDrafts, [selected.id]: '' }));
-      const reloaded = await loadProgramDesk(desk.id);
-      setDesk(reloaded);
-      setSelectedId(reloaded.currentStageId || reloaded.stages[0]?.id || '');
-      return true;
-    } catch (reason) {
-      message.error(errorText(reason));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  };
+
+    await queryClient.invalidateQueries({
+      queryKey: ['workflow', 'journal'],
+    });
+
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ['nba', 'context', desk.id],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['nba', 'today', 'kam'],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['nba', 'home', 'kam'],
+      }),
+    ]);
+
+    return true;
+  } catch (reason) {
+    message.error(errorText(reason));
+    return false;
+  } finally {
+    setBusy(false);
+  }
+};
 
   return (
     <PageLayout>
@@ -575,7 +774,23 @@ const WorkflowDetailPage = () => {
           <Tag>Окно: {desk.windowTitle}</Tag>
           <HealthMark score={desk.healthScore} band={desk.healthBand} empty="Нет оценки" />
           {seesKam && <Tag>KAM: {desk.kam}</Tag>}
-          <Button onClick={() => void syncProgram(desk.id).then(() => load()).catch((reason) => message.error(errorText(reason)))}>Синхронизировать</Button>
+          <Button
+            onClick={() => {
+              void syncProgram(desk.id)
+                .then(async () => {
+                  await refetchDesk();
+
+                  await queryClient.invalidateQueries({
+                    queryKey: ['workflow', 'journal'],
+                  });
+                })
+                .catch((reason) => {
+                  message.error(errorText(reason));
+                });
+            }}
+          >
+            Синхронизировать
+          </Button>
         </div>
         <div className={styles.layout}>
           <Card className={styles.stageCard} title="Путь">
@@ -634,7 +849,12 @@ const WorkflowDetailPage = () => {
                     readOnly={readOnly}
                     onCommit={(item, patch) => { void changeItem(item, patch); }}
                     onBlockers={publishBlockers}
-                    onPeopleChange={(people) => setDesk((current) => current ? { ...current, people } : current)}
+                    onPeopleChange={(people) => {
+                      updateDesk((current) => ({
+                        ...current,
+                        people,
+                      }));
+                    }}
                   />
                 ) : firstMeeting ? (
                   <FirstMeetingStage
@@ -666,7 +886,12 @@ const WorkflowDetailPage = () => {
                       await deleteStageFile(file.id);
                       await refreshFacts();
                     }}
-                    onPeopleChange={(people) => setDesk((current) => current ? { ...current, people } : current)}
+                    onPeopleChange={(people) => {
+                      updateDesk((current) => ({
+                        ...current,
+                        people,
+                      }));
+                    }}
                   />
                 ) : periodResults ? (
                   <PeriodResultsStage
@@ -968,7 +1193,12 @@ const WorkflowDetailPage = () => {
                         await deleteStageFile(file.id);
                         await refreshFacts();
                       }}
-                      onPersonAdded={(person) => setDesk((current) => current ? { ...current, people: [...current.people, person] } : current)}
+                      onPersonAdded={(person) => {
+                        updateDesk((current) => ({
+                          ...current,
+                          people: [...current.people, person],
+                        }));
+                      }}
                     />
                   </>
                 )}

@@ -10,7 +10,11 @@ export type AuthUser = {
 export type AuthContextValue = {
   initialized: boolean;
   authenticated: boolean;
+
   user: AuthUser | null;
+  userLoading: boolean;
+  userError: Error | null;
+
   login: () => Promise<void>;
   logout: () => Promise<void>;
   getToken: () => Promise<string | undefined>;

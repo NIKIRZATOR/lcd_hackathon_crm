@@ -1,6 +1,3 @@
-import { useCallback, useEffect, useState } from 'react';
-
-import { apiRequest } from '../../../api/client';
 import PageLayout from '../../../components/pageLayout/PageLayout';
 
 import KamAcademicWindow from './components/KamAcademicWindow/';
@@ -10,53 +7,12 @@ import KamPortfolioHealth from './components/KamPortfolioHealth';
 import KamSignals from './components/KamSignals/';
 import { kamSignalsMock } from './components/KamSignals/mocks';
 import KamSummaryCards from './components/SummaryCards';
-import { getNextBestAction } from './nba/getNextBestAction';
-import { loadNbaContext } from './nba/loadNbaContext';
-import type { NbaRecommendation } from './nba/nbaTypes';
-import type { HomeSummary, NbaItem } from './types';
+import { useKamHome } from './useKamHome';
 
 import styles from './KamHomePage.module.scss';
 
 const KamHomePage = () => {
-  const [items, setItems] = useState<NbaItem[]>([]);
-  const [summary, setSummary] = useState<HomeSummary>();
-  const [recommendations, setRecommendations] = useState<Record<string, NbaRecommendation>>({});
-  const [queueLoading, setQueueLoading] = useState(true);
-  const [error, setError] = useState<string>();
-
-  const loadDesk = useCallback(() => {
-    setQueueLoading(true);
-
-    void apiRequest<HomeSummary>('/api/nba/home')
-      .then(setSummary)
-      .catch(() => setError('Не удалось загрузить рабочий стол.'));
-
-    void apiRequest<NbaItem[]>('/api/nba/today')
-      .then(async (loadedItems) => {
-        const next: Record<string, NbaRecommendation> = {};
-        await Promise.all(
-          loadedItems.map(async (item) => {
-            if (!item.program_instance_id) return;
-            try {
-              next[item.id] = getNextBestAction(await loadNbaContext(item.program_instance_id));
-            } catch {
-              return;
-            }
-          }),
-        );
-        setRecommendations(next);
-        setItems(loadedItems);
-        setQueueLoading(false);
-      })
-      .catch(() => {
-        setQueueLoading(false);
-        setError('Не удалось загрузить рабочий стол.');
-      });
-  }, []);
-
-  useEffect(() => {
-    loadDesk();
-  }, [loadDesk]);
+  const { summary, items, recommendations, queueLoading, error } = useKamHome();
 
   return (
     <PageLayout
