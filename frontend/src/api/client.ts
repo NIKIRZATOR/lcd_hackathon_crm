@@ -57,10 +57,17 @@ export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promi
   return response.json() as Promise<T>;
 };
 
-export const apiDownload = async (path: string): Promise<Blob> => {
+export const apiDownload = async (path: string, init: RequestInit = {}): Promise<Blob> => {
+  const headers = new Headers(init.headers);
   const token = await tokenProvider?.();
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    ...init,
+    headers,
   });
   if (!response.ok) throw new ApiError(response.status, await readErrorPayload(response));
   return response.blob();

@@ -40,7 +40,7 @@ const ManagerBottlenecks = ({ items }: ManagerBottlenecksProps) => {
           return b.count - a.count;
         }
 
-        return a.stageId - b.stageId;
+        return a.stageName.localeCompare(b.stageName, 'ru');
       }),
     [items],
   );
@@ -48,7 +48,7 @@ const ManagerBottlenecks = ({ items }: ManagerBottlenecksProps) => {
   const maxCount = sortedItems[0]?.count ?? 0;
 
   const handleStageClick = (item: ManagerBottleneckItem) => {
-    navigate(`/workflow?stage=${item.stageId}`);
+    navigate(`/workflows?stage=${encodeURIComponent(item.stageName)}`);
   };
 
   return (

@@ -10,6 +10,9 @@ class CurrentUserRead(BaseModel):
     email: str | None = None
     full_name: str
     roles: list[str]
+    has_avatar: bool
+    supervisor_name: str | None = None
+    team_members: list[str] = []
 
     model_config = ConfigDict(from_attributes=True)
 

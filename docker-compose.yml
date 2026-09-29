@@ -48,6 +48,7 @@ services:
       S3_BUCKET_REPORTS: ${S3_BUCKET_REPORTS:-reports}
       S3_BUCKET_DOCUMENTATION: ${S3_BUCKET_DOCUMENTATION:-documentation}
       S3_BUCKET_ORGANIZATION_LOGOS: ${S3_BUCKET_ORGANIZATION_LOGOS:-organization-logos}
+      S3_BUCKET_USER_AVATARS: ${S3_BUCKET_USER_AVATARS:-user-avatars}
       ORGANIZATION_LOGO_PRELOAD_DIR: ${ORGANIZATION_LOGO_PRELOAD_DIR:-/preload_data/organization_logo}
       FILE_RETENTION_DAYS: ${FILE_RETENTION_DAYS:-30}
       FILE_MAX_UPLOAD_BYTES: ${FILE_MAX_UPLOAD_BYTES:-26214400}
@@ -161,6 +162,7 @@ services:
       S3_BUCKET_REPORTS: ${S3_BUCKET_REPORTS:-reports}
       S3_BUCKET_DOCUMENTATION: ${S3_BUCKET_DOCUMENTATION:-documentation}
       S3_BUCKET_ORGANIZATION_LOGOS: ${S3_BUCKET_ORGANIZATION_LOGOS:-organization-logos}
+      S3_BUCKET_USER_AVATARS: ${S3_BUCKET_USER_AVATARS:-user-avatars}
     entrypoint:
       - /bin/sh
       - -c
@@ -171,6 +173,7 @@ services:
         mc mb --ignore-existing "local/$$S3_BUCKET_REPORTS"
         mc mb --ignore-existing "local/$$S3_BUCKET_DOCUMENTATION"
         mc mb --ignore-existing "local/$$S3_BUCKET_ORGANIZATION_LOGOS"
+        mc mb --ignore-existing "local/$$S3_BUCKET_USER_AVATARS"
     depends_on:
       minio:
         condition: service_healthy

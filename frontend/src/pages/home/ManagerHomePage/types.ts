@@ -13,7 +13,7 @@ export type ManagerLoadItem = Pick<
 >;
 
 export type ManagerBottleneckItem = {
-  stageId: number;
+  stageId: string;
   stageName: string;
   count: number;
 };
@@ -21,13 +21,25 @@ export type ManagerBottleneckItem = {
 export type ManagerOrganizationHealthStatus = 'critical' | 'warning' | 'healthy';
 
 export type ManagerOrganizationHealthItem = {
-  organizationId: number;
+  organizationId: string;
   organizationName: string;
-  kamId: number;
+  kamId: string;
   kamName: string;
   programsCount: number;
-  healthScore: number;
+  healthScore: number | null;
   healthStatus: ManagerOrganizationHealthStatus;
+};
+
+export type ManagerKamItem = {
+  kamId: string;
+  kamName: string;
+};
+
+export type ManagerDashboardSummary = {
+  kamCount: number;
+  organizationsCount: number;
+  activeProgramsCount: number;
+  redProgramsCount: number;
 };
 
 export type ManagerProgramsRatingItem = {

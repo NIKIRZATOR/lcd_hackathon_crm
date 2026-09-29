@@ -11,17 +11,7 @@ import {
 } from '@ant-design/icons';
 
 import type { MenuProps } from 'antd';
-import {
-  Avatar,
-  Button,
-  Drawer,
-  Dropdown,
-  FloatButton,
-  Grid,
-  Layout,
-  Menu,
-  Space,
-} from 'antd';
+import { Avatar, Button, Drawer, Dropdown, FloatButton, Grid, Layout, Menu, Space } from 'antd';
 
 import type { ReactNode } from 'react';
 import { useState } from 'react';
@@ -29,7 +19,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth';
 import DocumentationDrawer from '../documentation/DocumentationDrawer';
-import { readAvatar } from '../pages/profile/avatarStorage';
+import { useProfileAvatar } from '../pages/profile/useProfileAvatar';
 
 import styles from './AppLayout.module.scss';
 
@@ -58,6 +48,7 @@ const navigation: NavigationItem[] = [
 
 const AppLayout = () => {
   const { logout, user } = useAuth();
+  const { avatar } = useProfileAvatar(user?.id);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -73,9 +64,7 @@ const AppLayout = () => {
   const selectedKey = [...items]
     .sort((left, right) => right.key.length - left.key.length)
     .find(
-      (item) =>
-        location.pathname === item.key ||
-        location.pathname.startsWith(`${item.key}/`),
+      (item) => location.pathname === item.key || location.pathname.startsWith(`${item.key}/`),
     )?.key;
 
   const go = (key: string) => {
@@ -113,9 +102,7 @@ const AppLayout = () => {
                   key={item.key}
                   type="text"
                   className={
-                    item.key === selectedKey
-                      ? styles.navigationActive
-                      : styles.navigationButton
+                    item.key === selectedKey ? styles.navigationActive : styles.navigationButton
                   }
                   onClick={() => go(item.key)}
                 >
@@ -165,15 +152,8 @@ const AppLayout = () => {
               },
             }}
           >
-            <Avatar
-              size={40}
-              src={user ? readAvatar(user.id) || undefined : undefined}
-              style={{ cursor: 'pointer' }}
-            >
-              {(user?.full_name || user?.username || 'П')
-                .trim()
-                .slice(0, 1)
-                .toUpperCase()}
+            <Avatar size={40} src={avatar || undefined} style={{ cursor: 'pointer' }}>
+              {(user?.full_name || user?.username || 'П').trim().slice(0, 1).toUpperCase()}
             </Avatar>
           </Dropdown>
         </Space>
@@ -202,10 +182,7 @@ const AppLayout = () => {
 
       <FloatButton.BackTop style={{ right: 24, bottom: 24 }} />
 
-      <DocumentationDrawer
-        open={documentationOpen}
-        onClose={() => setDocumentationOpen(false)}
-      />
+      <DocumentationDrawer open={documentationOpen} onClose={() => setDocumentationOpen(false)} />
     </Layout>
   );
 };

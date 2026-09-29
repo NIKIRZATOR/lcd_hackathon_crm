@@ -1,13 +1,14 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File as FastApiFile, HTTPException, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.common.errors import get_request_id
 from app.common.schemas.pagination import Page, PaginationParams
 from app.core.database import get_db_session
 from app.modules.audit.service import AuditService
-from app.modules.auth.access import ADMIN_ROLES
+from app.modules.auth.access import ADMIN_ROLES, CRM_ROLES
 from app.modules.auth.dependencies import require_roles
 from app.modules.users.model import User
 from app.modules.users.schemas import ManagerMembershipCreate, ManagerMembershipRead, ManagerMembershipUpdate, UserRead, UserStatusUpdate
@@ -31,9 +32,45 @@ def _user_read(user: User) -> UserRead:
         email=user.email,
         roles=sorted(role.name for role in user.roles),
         is_active=user.is_active,
+        has_avatar=user.avatar_file_id is not None,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
+
+
+@router.get("/me/avatar")
+def get_my_avatar(
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    file_record = UserService(db).avatar_file(current_user)
+    return StreamingResponse(
+        UserService(db).stream_avatar(file_record),
+        media_type=file_record.mime_type or "application/octet-stream",
+        headers={
+            "Cache-Control": "private, no-store",
+            "Vary": "Authorization",
+        },
+    )
+
+
+@router.post("/me/avatar")
+def upload_my_avatar(
+    file: UploadFile = FastApiFile(..., description="JPEG, PNG or WebP image up to 5 MB."),
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    UserService(db).upload_avatar(current_user, file)
+    return {"has_avatar": True}
+
+
+@router.delete("/me/avatar")
+def delete_my_avatar(
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_roles(*CRM_ROLES)),
+):
+    UserService(db).delete_avatar(current_user)
+    return {"has_avatar": False}
 
 
 @router.get("", response_model=Page[UserRead], responses=USERS_ADMIN_ERROR_RESPONSES)

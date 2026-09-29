@@ -95,6 +95,10 @@ class AssignmentCreate(BaseModel):
     reason: str | None = Field(default=None, max_length=1000)
 
 
+class BulkAssignmentCreate(AssignmentCreate):
+    organization_ids: list[UUID] = Field(min_length=1)
+
+
 class AssignmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
@@ -104,6 +108,11 @@ class AssignmentRead(BaseModel):
     assigned_at: datetime
     assigned_by: UUID
     ended_at: datetime | None
+
+
+class BulkAssignmentRead(BaseModel):
+    assignments: list[AssignmentRead]
+    reassigned_programs: int
 
 
 class AssignmentHistoryRead(AssignmentRead):
