@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { apiRequest } from '../../../api/client';
 import PageLayout from '../../../components/pageLayout/PageLayout';
@@ -19,16 +19,19 @@ const KamHomePage = () => {
   const [summary, setSummary] = useState<HomeSummary>();
   const [error, setError] = useState<string>();
 
-  useEffect(() => {
-    Promise.all([apiRequest<NbaItem[]>('/api/nba/today'), apiRequest<HomeSummary>('/api/nba/home')])
-      .then(([loadedItems, loadedSummary]) => {
-        setItems(loadedItems);
-        setSummary(loadedSummary);
-      })
-      .catch(() => {
-        setError('Не удалось загрузить рабочий стол.');
-      });
+  const loadDesk = useCallback(() => {
+    void apiRequest<HomeSummary>('/api/nba/home')
+      .then(setSummary)
+      .catch(() => setError('Не удалось загрузить рабочий стол.'));
+
+    void apiRequest<NbaItem[]>('/api/nba/today')
+      .then(setItems)
+      .catch(() => setError('Не удалось загрузить рабочий стол.'));
   }, []);
+
+  useEffect(() => {
+    loadDesk();
+  }, [loadDesk]);
 
   return (
     <PageLayout
