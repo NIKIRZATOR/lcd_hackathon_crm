@@ -81,11 +81,12 @@ def test_non_admin_cannot_list_audit_events(role: str) -> None:
 
 
 @pytest.mark.parametrize("role", ["KAM", "MANAGER"])
-def test_non_admin_cannot_read_system_status(role: str) -> None:
+@pytest.mark.parametrize("path", ["/api/system/status", "/api/system/backup"])
+def test_non_admin_cannot_read_system_status(role: str, path: str) -> None:
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: make_user(role)
 
-    response = TestClient(app).get("/api/system/status")
+    response = TestClient(app).get(path)
 
     assert response.status_code == 403
 

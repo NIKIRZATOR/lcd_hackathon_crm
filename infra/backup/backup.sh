@@ -6,6 +6,7 @@ stamp=$(date -u +%Y-%m-%d_%H-%M-%S)
 daily_days=${BACKUP_RETENTION_DAILY:-7}
 weekly_days=$((${BACKUP_RETENTION_WEEKLY:-4} * 7))
 monthly_days=$((${BACKUP_RETENTION_MONTHLY:-3} * 31))
+heartbeat_interval=${BACKUP_HEARTBEAT_INTERVAL_SECONDS:-60}
 
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*"; }
 fail() { log "ERROR: $*" >&2; exit 1; }
@@ -88,6 +89,33 @@ backup_keycloak() {
   log "Keycloak realm export completed: $(basename "$target")"
 }
 
+record_successful_backup() {
+  temporary="$root/last-successful.json.partial"
+  printf '{"completed_at":"%s","components":["postgres","minio","keycloak"]}\n' "$(date -u +%FT%TZ)" > "$temporary"
+  mv "$temporary" "$root/last-successful.json"
+}
+
+record_heartbeat() {
+  temporary="$root/scheduler-heartbeat.json.partial"
+  printf '{"updated_at":"%s"}\n' "$(date -u +%FT%TZ)" > "$temporary"
+  mv "$temporary" "$root/scheduler-heartbeat.json"
+}
+
+heartbeat_loop() {
+  while true; do
+    record_heartbeat
+    sleep "$heartbeat_interval"
+  done
+}
+
+backup_all() {
+  backup_postgres
+  backup_minio
+  backup_keycloak
+  record_successful_backup
+  log "Full backup completed"
+}
+
 verify() {
   log "Verifying backup checksums"
   find "$root" -name '*.sha256' -type f -print0 | xargs -0 -r -n1 sh -c 'cd "$(dirname "$1")" && sha256sum -c "$(basename "$1")"' sh
@@ -115,16 +143,19 @@ schedule() {
   interval=${BACKUP_INTERVAL_SECONDS:-86400}
   case "$interval" in *[!0-9]*|'') fail "BACKUP_INTERVAL_SECONDS must be a positive integer" ;; esac
   test "$interval" -gt 0 || fail "BACKUP_INTERVAL_SECONDS must be positive"
+  case "$heartbeat_interval" in *[!0-9]*|'') fail "BACKUP_HEARTBEAT_INTERVAL_SECONDS must be a positive integer" ;; esac
+  test "$heartbeat_interval" -gt 0 || fail "BACKUP_HEARTBEAT_INTERVAL_SECONDS must be positive"
+  heartbeat_loop &
+  heartbeat_pid=$!
+  trap 'kill "$heartbeat_pid" 2>/dev/null || true; exit 0' INT TERM EXIT
   while true; do
-    backup_postgres
-    backup_minio
-    backup_keycloak
+    backup_all
     sleep "$interval"
   done
 }
 
 case "${1:-all}" in
-  all) backup_postgres; backup_minio; backup_keycloak ;;
+  all) backup_all ;;
   postgres) backup_postgres ;;
   minio) backup_minio ;;
   keycloak) backup_keycloak ;;

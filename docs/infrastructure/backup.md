@@ -1,6 +1,6 @@
 # Резервное копирование
 
-Профиль `backup` не запускается в обычном dev-режиме. Он создаёт custom-format `pg_dump` CRM БД, зеркальную копию всех доступных MinIO buckets и Keycloak partial realm export. Keycloak также находится в отдельной БД PostgreSQL; её восстановление описано отдельно.
+Профиль `backup` предназначен для ручных запусков. В обычном dev-режиме автоматически работает `backup-scheduler`, который создаёт custom-format `pg_dump` CRM БД, зеркальную копию всех доступных MinIO buckets и Keycloak partial realm export. Keycloak также находится в отдельной БД PostgreSQL; её восстановление описано отдельно.
 
 ```bash
 make backup

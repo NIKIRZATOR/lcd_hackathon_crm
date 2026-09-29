@@ -18,18 +18,19 @@ const relatedPath: Record<string, string> = {
   Keycloak: '/management?tab=users',
   MinIO: '/management?tab=imports',
   'Report queue': '/reports',
-  'Report worker': '/reports',
 };
 const imageNames: Record<string, string> = {
   Backend: 'backend.png',
   PostgreSQL: 'postgresql.png',
   Redis: 'Simpleicons-Team-Simple-Redis.512 (1).png',
   'Report queue': 'reports.png',
-  'Report worker': 'reports.png',
+  'Backup scheduler': 'backup.png',
   MinIO: 'Minio_logo_light.png',
   Keycloak: 'keycloak-logo-png_seeklogo-505405.png',
 };
 const imageBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
+const formatStatusDetail = (detail: string) =>
+  detail.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/g, (timestamp) => new Date(timestamp).toLocaleString('ru-RU'));
 
 const SystemStatusTab = () => {
   const navigate = useNavigate();
@@ -104,7 +105,7 @@ const SystemStatusTab = () => {
                 extra={<Tag color={statusColor[item.status]}>{item.status.toUpperCase()}</Tag>}
               >
                 <Typography.Paragraph style={{ minHeight: 44, marginBottom: 8 }}>
-                  {item.detail}
+                  {formatStatusDetail(item.detail)}
                 </Typography.Paragraph>
                 <Typography.Text type="secondary">
                   Проверено: {new Date(item.checked_at).toLocaleString('ru-RU')}

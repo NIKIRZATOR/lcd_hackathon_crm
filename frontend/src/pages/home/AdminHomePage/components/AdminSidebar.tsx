@@ -9,11 +9,13 @@ const imageNames: Record<string, string> = {
   PostgreSQL: 'postgresql.png',
   Redis: 'Simpleicons-Team-Simple-Redis.512 (1).png',
   'Report queue': 'reports.png',
-  'Report worker': 'reports.png',
+  'Backup scheduler': 'backup.png',
   MinIO: 'Minio_logo_light.png',
   Keycloak: 'keycloak-logo-png_seeklogo-505405.png',
 };
 const imageBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
+const formatStatusDetail = (detail: string) =>
+  detail.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/g, (timestamp) => new Date(timestamp).toLocaleString('ru-RU'));
 
 const AdminSidebar = ({ summary }: { summary: AdminHomeSummary }) => {
   const navigate = useNavigate();
@@ -70,7 +72,7 @@ const AdminSidebar = ({ summary }: { summary: AdminHomeSummary }) => {
                 <div>
                   <strong>{item.component}</strong>
                   <br />
-                  {item.detail}
+                  {formatStatusDetail(item.detail)}
                   <br />
                   {item.status} ·{' '}
                   {new Date(item.checked_at).toLocaleTimeString('ru-RU', {

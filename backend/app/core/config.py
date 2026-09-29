@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,6 +46,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     report_queue_name: str = "reports"
     report_file_retention_days: int = 90
+    backup_status_path: Path = Path("/backups/last-successful.json")
+    backup_heartbeat_path: Path = Path("/backups/scheduler-heartbeat.json")
+    backup_heartbeat_ttl_seconds: int = 180
 
     model_config = SettingsConfigDict(
         env_file=".env",

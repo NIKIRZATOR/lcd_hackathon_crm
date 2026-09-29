@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+import json
+from pathlib import Path
 from typing import Callable
 from urllib.request import urlopen
 
@@ -24,7 +26,7 @@ class PlatformStatusService:
             self._report_queue_status(checked_at),
             self._check("MinIO", "Файловое хранилище доступно", checked_at, self._check_storage),
             self._check("Keycloak", "OpenID-конфигурация доступна", checked_at, self._check_keycloak),
-            {"component": "Report worker", "status": "Unknown", "detail": "Heartbeat worker пока не реализован", "checked_at": checked_at},
+            self._backup_scheduler_status(checked_at),
         ]
 
     def _check_database(self) -> None:
@@ -69,6 +71,30 @@ class PlatformStatusService:
         }
 
     @staticmethod
+    def _backup_scheduler_status(checked_at: str) -> dict[str, str]:
+        backup = BackupStatusService().last_successful_backup()
+        completed_at = backup["last_successful_backup_at"]
+        heartbeat_at = backup["scheduler_last_heartbeat_at"]
+        if backup["scheduler_alive"]:
+            detail = "Планировщик резервного копирования работает"
+            if completed_at:
+                detail += f". Последний полный backup: {completed_at}"
+            else:
+                detail += ". Полный backup ещё не завершён"
+            status = "OK"
+        else:
+            detail = "Нет актуального heartbeat планировщика резервного копирования"
+            if completed_at:
+                detail += f". Последний полный backup: {completed_at}"
+            status = "Error"
+        return {
+            "component": "Backup scheduler",
+            "status": status,
+            "detail": detail,
+            "checked_at": heartbeat_at or checked_at,
+        }
+
+    @staticmethod
     def _check_storage() -> None:
         get_storage_adapter().healthcheck()
 
@@ -88,3 +114,57 @@ class PlatformStatusService:
         except Exception:
             return {"component": component, "status": "Error", "detail": "Компонент недоступен", "checked_at": checked_at}
         return self._ok(component, detail, checked_at)
+
+
+class BackupStatusService:
+    """Read the marker written after a complete successful backup."""
+
+    def __init__(
+        self,
+        status_path: Path | None = None,
+        heartbeat_path: Path | None = None,
+        heartbeat_ttl_seconds: int | None = None,
+    ) -> None:
+        self.status_path = status_path or settings.backup_status_path
+        self.heartbeat_path = heartbeat_path or settings.backup_heartbeat_path
+        self.heartbeat_ttl_seconds = heartbeat_ttl_seconds or settings.backup_heartbeat_ttl_seconds
+
+    def last_successful_backup(self) -> dict[str, object | None]:
+        completed_at, components = self._read_backup_marker()
+        heartbeat_at = self._read_timestamp(self.heartbeat_path, "updated_at")
+        return {
+            "scheduler_alive": self._is_scheduler_alive(heartbeat_at),
+            "scheduler_last_heartbeat_at": heartbeat_at,
+            "last_successful_backup_at": completed_at,
+            "components": components,
+        }
+
+    def _read_backup_marker(self) -> tuple[str | None, list[object]]:
+        try:
+            payload = json.loads(self.status_path.read_text(encoding="utf-8"))
+            completed_at = payload["completed_at"]
+            components = payload["components"]
+            if not isinstance(completed_at, str) or not isinstance(components, list):
+                raise ValueError("Invalid backup status payload")
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+            return None, []
+        return completed_at, components
+
+    @staticmethod
+    def _read_timestamp(path: Path, field: str) -> str | None:
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))[field]
+            if not isinstance(value, str):
+                raise ValueError("Invalid timestamp")
+            return value
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+            return None
+
+    def _is_scheduler_alive(self, heartbeat_at: str | None) -> bool:
+        if heartbeat_at is None:
+            return False
+        try:
+            heartbeat = datetime.fromisoformat(heartbeat_at.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        return (datetime.now(timezone.utc) - heartbeat).total_seconds() <= self.heartbeat_ttl_seconds

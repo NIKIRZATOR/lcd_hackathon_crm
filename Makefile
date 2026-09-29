@@ -16,7 +16,7 @@ backup:
 	$(COMPOSE) --profile backup run --rm backup all
 
 backup-schedule:
-	$(COMPOSE) --profile backup-scheduler up backup-scheduler
+	$(COMPOSE) up backup-scheduler
 
 backup-postgres:
 	$(COMPOSE) --profile backup run --rm backup postgres

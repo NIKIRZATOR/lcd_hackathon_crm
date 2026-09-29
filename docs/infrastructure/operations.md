@@ -12,7 +12,7 @@ Copy-Item .env.example .env
 
 ## Лёгкий dev-режим
 
-Запускает frontend, один backend, PostgreSQL, MinIO, Keycloak, Redis и worker. Nginx, несколько backend-экземпляров и backup scheduler не запускаются.
+Запускает frontend, один backend, PostgreSQL, MinIO, Keycloak, Redis, worker и backup scheduler. Nginx и несколько backend-экземпляров не запускаются.
 
 ```powershell
 docker compose up --build
@@ -76,11 +76,13 @@ Remove-Item Env:VITE_API_URL -ErrorAction SilentlyContinue
 
 ## Резервное копирование
 
-Backup profile выключен по умолчанию. Архивы хранятся в `data/backups/`, исключённом из Git. Путь, сроки хранения и интервал настраиваются в `.env`:
+Backup scheduler запускается в обычном Docker Compose-режиме. Архивы хранятся в `data/backups/`, исключённом из Git. Путь, сроки хранения и интервал настраиваются в `.env`:
 
 ```env
 BACKUP_LOCAL_PATH=./data/backups
 BACKUP_INTERVAL_SECONDS=86400
+BACKUP_HEARTBEAT_INTERVAL_SECONDS=60
+BACKUP_HEARTBEAT_TTL_SECONDS=180
 BACKUP_RETENTION_DAILY=7
 BACKUP_RETENTION_WEEKLY=4
 BACKUP_RETENTION_MONTHLY=3
@@ -106,11 +108,13 @@ docker compose --profile backup run --rm backup keycloak
 docker compose --profile backup run --rm backup verify
 ```
 
-Периодический scheduler (выполняет backup раз в `BACKUP_INTERVAL_SECONDS`):
+Периодический scheduler (выполняет backup раз в `BACKUP_INTERVAL_SECONDS`) запускается автоматически. Его можно запустить отдельно:
 
 ```powershell
-docker compose --profile backup-scheduler up backup-scheduler
+docker compose up backup-scheduler
 ```
+
+После первого успешного полного backup ADMIN может проверить его состояние через `GET /api/system/backup`. Ответ содержит `scheduler_alive`, время последнего heartbeat `scheduler_last_heartbeat_at` и `last_successful_backup_at`. Scheduler обновляет heartbeat раз в минуту; `scheduler_alive` становится `false`, если он старше трёх минут. Полный backup запускается сразу после старта scheduler и далее раз в `BACKUP_INTERVAL_SECONDS` (по умолчанию раз в сутки).
 
 ## Восстановление
 
