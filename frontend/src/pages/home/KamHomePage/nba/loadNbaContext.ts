@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { apiRequest } from '../../../../api/client';
 
 import { LICENSE_FILE_KIND, parseLicenseDraft, signLicenseChecks } from '../../../workflow/stages/signLicense';
+import type { NbaItem } from '../types';
 
 import { resolveStageCode } from './getNextBestAction';
 import type { ChecklistFact, ProgramNbaContext } from './nbaTypes';
@@ -74,6 +75,23 @@ const mapFacts = (rows: ChecklistRow[]): ChecklistFact[] =>
     completed: row.is_done === true,
     order,
   }));
+
+export const contextFromNbaItem = (item: NbaItem): ProgramNbaContext => {
+  const ctx = emptyContext(item.program_instance_id ?? '', true);
+  if (!item.context) return ctx;
+
+  ctx.stageCode = resolveStageCode(item.context.stage_code);
+  ctx.overdueDays = overdueDays(item.context.stage_due_at);
+  if (ctx.stageCode === 'sign_license') {
+    ctx.facts = licenseFacts(
+      item.context.checklist,
+      item.context.attachment_kinds.map((attachment_kind) => ({ attachment_kind })),
+    );
+  } else {
+    ctx.facts = mapFacts(item.context.checklist);
+  }
+  return ctx;
+};
 
 export const resetNbaLoadCaches = () => undefined;
 

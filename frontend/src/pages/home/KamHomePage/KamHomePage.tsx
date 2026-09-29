@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { apiRequest } from '../../../api/client';
 import PageLayout from '../../../components/pageLayout/PageLayout';
@@ -11,7 +11,7 @@ import KamSignals from './components/KamSignals/';
 import { kamSignalsMock } from './components/KamSignals/mocks';
 import KamSummaryCards from './components/SummaryCards';
 import { getNextBestAction } from './nba/getNextBestAction';
-import { loadNbaContext } from './nba/loadNbaContext';
+import { contextFromNbaItem } from './nba/loadNbaContext';
 import type { NbaRecommendation } from './nba/nbaTypes';
 import type { HomeSummary, NbaItem } from './types';
 
@@ -23,27 +23,22 @@ const KamHomePage = () => {
   const [recommendations, setRecommendations] = useState<Record<string, NbaRecommendation>>({});
   const [queueLoading, setQueueLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const initialLoadStarted = useRef(false);
 
   const loadDesk = useCallback(() => {
     setQueueLoading(true);
 
     void apiRequest<HomeSummary>('/api/nba/home')
-      .then(setSummary)
-      .catch(() => setError('Не удалось загрузить рабочий стол.'));
+      .then((loadedSummary) => {
+        const loadedItems = loadedSummary.items ?? [];
+        const next = loadedItems.reduce<Record<string, NbaRecommendation>>((result, item) => {
+          if (item.program_instance_id && item.context) {
+            result[item.id] = getNextBestAction(contextFromNbaItem(item));
+          }
+          return result;
+        }, {});
 
-    void apiRequest<NbaItem[]>('/api/nba/today')
-      .then(async (loadedItems) => {
-        const next: Record<string, NbaRecommendation> = {};
-        await Promise.all(
-          loadedItems.map(async (item) => {
-            if (!item.program_instance_id) return;
-            try {
-              next[item.id] = getNextBestAction(await loadNbaContext(item.program_instance_id));
-            } catch {
-              return;
-            }
-          }),
-        );
+        setSummary(loadedSummary);
         setRecommendations(next);
         setItems(loadedItems);
         setQueueLoading(false);
@@ -55,6 +50,8 @@ const KamHomePage = () => {
   }, []);
 
   useEffect(() => {
+    if (initialLoadStarted.current) return;
+    initialLoadStarted.current = true;
     loadDesk();
   }, [loadDesk]);
 
