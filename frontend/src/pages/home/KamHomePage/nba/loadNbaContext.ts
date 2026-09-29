@@ -1,26 +1,14 @@
 import dayjs from 'dayjs';
 
-import { apiRequest } from '../../../../api/client';
-
 import {
   LICENSE_FILE_KIND,
   parseLicenseDraft,
   signLicenseChecks,
 } from '../../../workflow/stages/signLicense';
+import type { NbaItem } from '../types';
 
 import { resolveStageCode } from './getNextBestAction';
 import type { ChecklistFact, ProgramNbaContext } from './nbaTypes';
-
-type WorkflowPayload = {
-  current_stage_instance_id: string | null;
-  stages: Array<{
-    id: string;
-    code?: string;
-    name: string;
-    status: string;
-    due_at: string | null;
-  }>;
-};
 
 type ChecklistRow = {
   code?: string;
@@ -29,7 +17,6 @@ type ChecklistRow = {
   is_done: boolean;
   value_text?: string | null;
   value_date?: string | null;
-  attachment_id?: string | null;
 };
 
 const overdueDays = (dueAt: string | null) => {
@@ -79,71 +66,19 @@ const mapFacts = (rows: ChecklistRow[]): ChecklistFact[] =>
     order,
   }));
 
-const withFallback = async <T>(
-  request: Promise<T>,
-  fallback: T,
-  signal?: AbortSignal,
-): Promise<T> => {
-  try {
-    return await request;
-  } catch (error) {
-    if (signal?.aborted) {
-      throw error;
-    }
+export const contextFromNbaItem = (item: NbaItem): ProgramNbaContext => {
+  const ctx = emptyContext(item.program_instance_id ?? '', true);
+  if (!item.context) return ctx;
 
-    return fallback;
-  }
-};
-
-export const loadNbaContext = async (
-  programId: string,
-  signal?: AbortSignal,
-): Promise<ProgramNbaContext> => {
-  const workflow = await apiRequest<WorkflowPayload>(
-    `/api/program-instances/${programId}/workflow`,
-    { signal },
-  );
-
-  const current =
-    workflow.stages.find((stage) => stage.id === workflow.current_stage_instance_id) ||
-    workflow.stages.find((stage) => stage.status.toLowerCase() === 'in_progress');
-
-  const ctx = emptyContext(programId, true);
-
-  ctx.stageCode = resolveStageCode(current?.code);
-
-  if (ctx.stageCode === 'unknown' && current?.name && /подписан.*лиценз/i.test(current.name)) {
-    ctx.stageCode = 'sign_license';
-  }
-
-  ctx.overdueDays = overdueDays(current?.due_at ?? null);
-
-  if (!current?.id) {
-    return ctx;
-  }
-
-  const checklist = await withFallback(
-    apiRequest<ChecklistRow[]>(`/api/stage-instances/${current.id}/checklist`, { signal }),
-    [],
-    signal,
-  );
-
+  ctx.stageCode = resolveStageCode(item.context.stage_code);
+  ctx.overdueDays = overdueDays(item.context.stage_due_at);
   if (ctx.stageCode === 'sign_license') {
-    const files = await withFallback(
-      apiRequest<Array<{ attachment_kind?: string | null }>>(
-        `/api/workflows/stage-instances/${current.id}/attachments`,
-        { signal },
-      ),
-      [],
-      signal,
+    ctx.facts = licenseFacts(
+      item.context.checklist,
+      item.context.attachment_kinds.map((attachment_kind) => ({ attachment_kind })),
     );
-
-    ctx.facts = licenseFacts(checklist, files);
-
-    return ctx;
+  } else {
+    ctx.facts = mapFacts(item.context.checklist);
   }
-
-  ctx.facts = mapFacts(checklist);
-
   return ctx;
 };

@@ -49,7 +49,7 @@ def home_summary(db: Session = Depends(get_db_session), current_user: User = Dep
             name = owner.full_name if owner else "Без KAM"
             by_kam[name] = by_kam.get(name, 0) + 1
         return {"role": "MANAGER", "cards": {"kam_workload": len(items), "stage_bottlenecks": sum(item["rule_code"] in {"stage_overdue", "stage_overdue_8_plus"} for item in items), "organizations_without_program": sum(item["rule_code"] == "organization_without_program" for item in items), "health_attention": sum(item["severity"] in {"critical", "high"} for item in items)}, "critical_by_kam": [{"kam": name, "count": count} for name, count in sorted(by_kam.items(), key=lambda entry: entry[1], reverse=True)], **base}
-    return {"role": "KAM", "cards": {"nba_today": len(items), "health_attention": sum(item["severity"] in {"critical", "high"} for item in items)}, **base}
+    return {"role": "KAM", "cards": {"nba_today": len(items), "health_attention": sum(item["severity"] in {"critical", "high"} for item in items)}, "items": items, **base}
 
 
 @router.post("/program-instances/{program_instance_id}/recompute", response_model=list[NbaItemRead])

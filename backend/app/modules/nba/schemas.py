@@ -1,7 +1,23 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class NbaChecklistItemRead(BaseModel):
+    code: str
+    label: str
+    required: bool
+    is_done: bool
+    value_text: str | None = None
+    value_date: date | None = None
+
+
+class NbaContextRead(BaseModel):
+    stage_code: str | None = None
+    stage_due_at: datetime | None = None
+    checklist: list[NbaChecklistItemRead] = Field(default_factory=list)
+    attachment_kinds: list[str] = Field(default_factory=list)
 
 
 class NbaItemRead(BaseModel):
@@ -17,3 +33,4 @@ class NbaItemRead(BaseModel):
     priority: str
     action_target: str | None
     due_at: datetime | None
+    context: NbaContextRead | None = None

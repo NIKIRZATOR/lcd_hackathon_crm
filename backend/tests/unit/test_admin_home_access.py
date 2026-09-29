@@ -45,3 +45,5 @@ def test_kam_and_manager_do_not_receive_admin_technical_data(monkeypatch) -> Non
         assert payload["role"] == role
         assert "system_status" not in payload
         assert "attention_items" not in payload
+        if role == "KAM":
+            assert payload["items"] == []

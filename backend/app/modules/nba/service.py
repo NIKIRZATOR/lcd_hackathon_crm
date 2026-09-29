@@ -1,22 +1,23 @@
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import HTTPException
-from sqlalchemy import case, select
+from sqlalchemy import case, exists, select
 from sqlalchemy.orm import Session
 
+from app.modules.auth.access import get_subordinate_kam_ids, has_any_role, is_admin
 from app.modules.licenses.model import License
 from app.modules.integrations.model import IntegrationSignal
 from app.modules.checklists.model import PlaybookChecklistItem, ProgramChecklistValue
+from app.modules.documents.model import File
 from app.modules.nba.model import NbaItem, NbaRule
-from app.modules.organizations.model import Organization
-from app.modules.organizations.service import OrganizationService
+from app.modules.organizations.model import OrgAssignment, Organization
 from app.modules.products.model import ITProduct
 from app.modules.program_instances.model import AcademicWindow, ProgramInstance
 from app.modules.teachers.model import TeacherCarrier
 from app.modules.users.model import User
 from app.modules.workflows.model import (
     WorkflowStage,
+    WorkflowStageAttachment,
     WorkflowStageInstance,
     WorkflowTransition,
 )
@@ -197,22 +198,30 @@ class NbaService:
             (NbaItem.severity == "medium", 2),
             else_=3,
         )
-        rows = self.db.execute(
+        statement = (
             select(NbaItem, NbaRule.code, Organization.name, ITProduct.name)
             .join(NbaRule, NbaRule.id == NbaItem.rule_id)
             .join(Organization, Organization.id == NbaItem.organization_id)
             .outerjoin(ITProduct, ITProduct.id == NbaItem.product_id)
             .where(NbaItem.status == "active")
             .order_by(severity_order, NbaItem.due_at.nulls_last(), NbaItem.created_at)
-        ).all()
+        )
+        if not is_admin(user):
+            visible_user_ids = (
+                get_subordinate_kam_ids(self.db, user.id)
+                if has_any_role(user, "MANAGER")
+                else {user.id}
+            )
+            statement = statement.where(
+                exists().where(
+                    OrgAssignment.organization_id == NbaItem.organization_id,
+                    OrgAssignment.user_id.in_(visible_user_ids),
+                    OrgAssignment.status == "active",
+                )
+            )
+        rows = self.db.execute(statement).all()
         result = []
         for item, rule_code, organization_name, product_name in rows:
-            try:
-                OrganizationService(self.db).get(item.organization_id, user)
-            except HTTPException as error:
-                if error.status_code == 403:
-                    continue
-                raise
             result.append(
                 {
                     "id": item.id,
@@ -229,20 +238,133 @@ class NbaService:
                     "due_at": item.due_at,
                 }
             )
+        contexts = self._contexts_by_program(
+            {row["program_instance_id"] for row in result if row["program_instance_id"]}
+        )
+        for row in result:
+            row["context"] = contexts.get(row["program_instance_id"])
         return result
+
+    def _contexts_by_program(self, program_ids: set[UUID]) -> dict[UUID, dict]:
+        if not program_ids:
+            return {}
+
+        program_rows = self.db.execute(
+            select(
+                ProgramInstance.id,
+                ProgramInstance.current_stage_instance_id,
+                ProgramInstance.current_stage_code,
+                WorkflowStageInstance.due_at,
+            )
+            .outerjoin(
+                WorkflowStageInstance,
+                WorkflowStageInstance.id == ProgramInstance.current_stage_instance_id,
+            )
+            .where(ProgramInstance.id.in_(program_ids))
+        ).all()
+        stage_ids = {
+            stage_id for _, stage_id, _, _ in program_rows if stage_id is not None
+        }
+        checklist_by_stage: dict[UUID, list[dict]] = {stage_id: [] for stage_id in stage_ids}
+        attachment_kinds_by_stage: dict[UUID, list[str]] = {
+            stage_id: [] for stage_id in stage_ids
+        }
+
+        if stage_ids:
+            checklist_rows = self.db.execute(
+                select(
+                    ProgramChecklistValue.stage_instance_id,
+                    PlaybookChecklistItem.code,
+                    PlaybookChecklistItem.label,
+                    PlaybookChecklistItem.required,
+                    ProgramChecklistValue.is_done,
+                    ProgramChecklistValue.value_text,
+                    ProgramChecklistValue.value_date,
+                )
+                .join(
+                    PlaybookChecklistItem,
+                    PlaybookChecklistItem.id == ProgramChecklistValue.checklist_item_id,
+                )
+                .where(ProgramChecklistValue.stage_instance_id.in_(stage_ids))
+                .order_by(PlaybookChecklistItem.created_at)
+            ).all()
+            for stage_id, code, label, required, is_done, value_text, value_date in checklist_rows:
+                checklist_by_stage[stage_id].append(
+                    {
+                        "code": code,
+                        "label": label,
+                        "required": required,
+                        "is_done": is_done,
+                        "value_text": value_text,
+                        "value_date": value_date,
+                    }
+                )
+
+            attachment_rows = self.db.execute(
+                select(WorkflowStageAttachment.stage_instance_id, File.attachment_kind)
+                .join(File, File.id == WorkflowStageAttachment.file_id)
+                .where(
+                    WorkflowStageAttachment.stage_instance_id.in_(stage_ids),
+                    File.deleted_at.is_(None),
+                )
+                .order_by(WorkflowStageAttachment.created_at)
+            ).all()
+            for stage_id, attachment_kind in attachment_rows:
+                if attachment_kind:
+                    attachment_kinds_by_stage[stage_id].append(attachment_kind)
+
+        return {
+            program_id: {
+                "stage_code": stage_code,
+                "stage_due_at": stage_due_at,
+                "checklist": checklist_by_stage.get(stage_id, []),
+                "attachment_kinds": attachment_kinds_by_stage.get(stage_id, []),
+            }
+            for program_id, stage_id, stage_code, stage_due_at in program_rows
+        }
 
     def _recompute_organization_rules(self) -> None:
         rules = self._rules()
-        for organization in self.db.scalars(select(Organization)).all():
-            live = self.db.scalar(select(ProgramInstance.id).where(ProgramInstance.organization_id == organization.id, ProgramInstance.status.in_(["draft", "active", "paused"])).limit(1))
-            demand = self.db.scalar(select(IntegrationSignal.id).where(IntegrationSignal.organization_id == organization.id, IntegrationSignal.program_instance_id.is_(None), IntegrationSignal.source.in_(("WEBSITE", "website"))).limit(1))
-            for code, present, reason in (("organization_without_program", live is None, "У площадки нет активной программы."), ("demand_without_program", demand is not None and live is None, "Есть спрос с сайта без запущенной программы.")):
-                entity_key = f"organization:{organization.id}:{code}"
-                item = self.db.scalar(select(NbaItem).where(NbaItem.rule_id == rules[code].id, NbaItem.entity_key == entity_key))
+        organization_ids = set(self.db.scalars(select(Organization.id)).all())
+        live_organization_ids = set(
+            self.db.scalars(
+                select(ProgramInstance.organization_id)
+                .where(ProgramInstance.status.in_(["draft", "active", "paused"]))
+                .distinct()
+            ).all()
+        )
+        demand_organization_ids = set(
+            self.db.scalars(
+                select(IntegrationSignal.organization_id)
+                .where(
+                    IntegrationSignal.program_instance_id.is_(None),
+                    IntegrationSignal.source.in_(("WEBSITE", "website")),
+                )
+                .distinct()
+            ).all()
+        )
+        organization_rule_ids = {
+            rules["organization_without_program"].id,
+            rules["demand_without_program"].id,
+        }
+        existing_by_key = {
+            (item.rule_id, item.entity_key): item
+            for item in self.db.scalars(
+                select(NbaItem).where(NbaItem.rule_id.in_(organization_rule_ids))
+            ).all()
+        }
+
+        for organization_id in organization_ids:
+            has_live_program = organization_id in live_organization_ids
+            has_demand = organization_id in demand_organization_ids
+            for code, present, reason in (("organization_without_program", not has_live_program, "У площадки нет активной программы."), ("demand_without_program", has_demand and not has_live_program, "Есть спрос с сайта без запущенной программы.")):
+                entity_key = f"organization:{organization_id}:{code}"
+                item = existing_by_key.get((rules[code].id, entity_key))
                 if present:
                     if item is None:
-                        item = NbaItem(rule_id=rules[code].id, organization_id=organization.id, program_instance_id=None, product_id=None, entity_key=entity_key, severity="medium", reason=reason, action="Открыть площадку", priority="P3", action_target="organization", due_at=None, status="active")
+                        item = NbaItem(rule_id=rules[code].id, organization_id=organization_id, program_instance_id=None, product_id=None, entity_key=entity_key, severity="medium", reason=reason, action="Открыть площадку", priority="P3", action_target="organization", due_at=None, status="active")
                         self.db.add(item)
+                        existing_by_key[(rules[code].id, entity_key)] = item
                     else:
                         item.status, item.reason, item.resolved_at = "active", reason, None
                 elif item is not None and item.status == "active":

@@ -11,10 +11,24 @@ export type NbaItem = {
   action_target: string | null;
   due_at: string | null;
   program_instance_id: string | null;
+  context?: {
+    stage_code: string | null;
+    stage_due_at: string | null;
+    checklist: Array<{
+      code: string;
+      label: string;
+      required: boolean;
+      is_done: boolean;
+      value_text?: string | null;
+      value_date?: string | null;
+    }>;
+    attachment_kinds: string[];
+  } | null;
 };
 
 export type HomeSummary = {
   role: string;
+  items?: NbaItem[];
 
   cards: {
     nba_today: number;
