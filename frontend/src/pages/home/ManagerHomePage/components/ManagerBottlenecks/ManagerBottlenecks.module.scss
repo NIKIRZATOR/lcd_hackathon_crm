@@ -1,0 +1,178 @@
+.card {
+  min-width: 0;
+
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+
+  box-shadow: none;
+}
+
+.cardBody {
+  padding: 20px;
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+.title {
+  margin: 0 !important;
+
+  color: var(--ant-color-text);
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  line-height: 28px !important;
+}
+
+.subtitle {
+  display: block;
+
+  margin-top: 4px;
+
+  color: var(--ant-color-text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(160px, 1fr) 24px;
+  gap: 16px;
+  align-items: center;
+
+  width: 100%;
+  padding: 0;
+
+  font: inherit;
+  text-align: left;
+
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+
+  &:hover {
+    .stageName,
+    .count {
+      color: var(--ant-color-primary);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-border);
+    outline-offset: 4px;
+    border-radius: 4px;
+  }
+}
+
+.stageName {
+  min-width: 0;
+
+  color: var(--ant-color-text);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+
+  transition: color 0.15s ease;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 14px;
+  overflow: hidden;
+
+  background: var(--ant-color-fill-secondary);
+  border-radius: 5px;
+}
+
+.progressFill {
+  height: 100%;
+
+  border-radius: inherit;
+
+  transition: width 0.25s ease;
+}
+
+.critical {
+  background: rgb(239 68 68 / 60%);
+}
+
+.warning {
+  background: rgb(245 158 11 / 60%);
+}
+
+.healthy {
+  background: rgb(34 197 94 / 45%);
+}
+
+.neutral {
+  background: rgb(140 143 163 / 40%);
+}
+
+.count {
+  color: var(--ant-color-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: right;
+
+  transition: color 0.15s ease;
+}
+
+@media (max-width: 768px) {
+  .cardBody {
+    padding: 16px;
+  }
+
+  .header {
+    margin-bottom: 16px;
+  }
+
+  .title {
+    font-size: 18px !important;
+    line-height: 24px !important;
+  }
+
+  .list {
+    gap: 12px;
+  }
+
+  .row {
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+  }
+
+  .stageName {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .count {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .progressTrack {
+    grid-column: 1 / -1;
+    grid-row: 2;
+
+    height: 12px;
+  }
+}
+
+@media (max-width: 576px) {
+  .stageName {
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  .count {
+    font-size: 13px;
+    line-height: 18px;
+  }
+}

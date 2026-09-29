@@ -1,0 +1,155 @@
+.card {
+  min-width: 0;
+
+  container-type: inline-size;
+}
+
+.cardBody {
+  padding: 20px;
+}
+
+.header {
+  margin-bottom: 16px;
+}
+
+.header .title {
+  margin: 0;
+
+  color: var(--ant-color-text);
+}
+
+.subtitle {
+  display: block;
+  margin-top: 4px;
+
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.2fr)
+    minmax(0, 1fr)
+    max-content
+    max-content;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 10px 14px;
+
+  font: inherit;
+  text-align: left;
+
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover {
+    .organization,
+    .kam,
+    .programs,
+    .health {
+      color: var(--ant-color-primary);
+    }
+  }
+}
+
+.organization,
+.kam {
+  min-width: 0;
+
+  white-space: normal;
+  overflow-wrap: anywhere;
+
+  transition: color 0.15s ease;
+}
+
+.organization {
+  color: var(--ant-color-text);
+}
+
+.kam {
+  color: var(--ant-color-text);
+}
+
+.programs {
+  color: var(--ant-color-text-secondary);
+  text-align: right;
+  white-space: nowrap;
+
+  transition: color 0.15s ease;
+}
+
+.health {
+  color: var(--ant-color-text);
+  text-align: right;
+  white-space: nowrap;
+
+  transition: color 0.15s ease;
+}
+
+.critical {
+  background: rgb(239 68 68 / 8%);
+}
+
+.warning {
+  background: rgb(245 158 11 / 9%);
+}
+
+.healthy {
+  background: rgb(34 197 94 / 8%);
+}
+
+@container (max-width: 560px) {
+  .item {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 2px 12px;
+
+    padding: 10px 12px;
+  }
+
+  .organization {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .health {
+    grid-column: 2;
+    grid-row: 1;
+
+    align-self: center;
+  }
+
+  .kam {
+    grid-column: 1;
+    grid-row: 2;
+
+    color: var(--ant-color-text-secondary);
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .programs {
+    grid-column: 2;
+    grid-row: 2;
+
+    font-size: 12px;
+    line-height: 18px;
+  }
+}
+
+@media (max-width: 767px) {
+  .cardBody {
+    padding: 16px;
+  }
+}

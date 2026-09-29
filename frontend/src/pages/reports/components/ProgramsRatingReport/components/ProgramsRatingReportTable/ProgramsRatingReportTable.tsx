@@ -13,9 +13,10 @@ import {
 
 type ProgramsRatingReportTableProps = {
   items: ProgramRatingReportItem[];
+  total: number;
 };
 
-const ProgramsRatingReportTable = ({ items }: ProgramsRatingReportTableProps) => {
+const ProgramsRatingReportTable = ({ items, total }: ProgramsRatingReportTableProps) => {
   const screens = Grid.useBreakpoint();
 
   const isMobile = screens.sm === false;
@@ -25,7 +26,7 @@ const ProgramsRatingReportTable = ({ items }: ProgramsRatingReportTableProps) =>
       items={items}
       columnDefinitions={PROGRAM_RATING_REPORT_COLUMN_DEFINITIONS}
       defaultColumnKeys={PROGRAM_RATING_REPORT_DEFAULT_COLUMN_KEYS}
-      subtitle={`Найдено программ: ${items.length}`}
+      subtitle={`Найдено программ: ${total}`}
       exportConfig={{
         fileName: 'programs-rating-report',
         sheetName: 'Рейтинг программ',

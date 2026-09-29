@@ -26,6 +26,10 @@ export const appTheme: ThemeConfig = {
     colorWarning: '#F59E0B',
     colorError: '#EF4444',
 
+    colorLink: '#7700FF',
+    colorLinkHover: '#9466FF',
+    colorLinkActive: '#7700FF',
+
     borderRadius: 6,
     borderRadiusLG: 8,
 

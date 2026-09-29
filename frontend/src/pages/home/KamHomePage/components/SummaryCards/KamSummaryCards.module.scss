@@ -7,12 +7,13 @@
 .card {
   min-width: 0;
 
-  border: 1px solid var(--ant-colorBorderSecondary);
+  border: 1px solid var(--ant-color-border-secondary);
   border-radius: 8px;
 
   box-shadow: none;
 
   .cardBody {
+    height: 100%;
     padding: 14px 16px;
   }
 }
@@ -59,16 +60,17 @@
 .value {
   display: block;
 
-  color: var(--ant-colorText);
+  color: var(--ant-color-text);
   font-size: 20px;
   font-weight: 700;
   line-height: 24px;
 }
 
 .valueSuffix {
-  color: var(--ant-colorText);
+  color: var(--ant-color-text);
   font-size: 14px;
   font-weight: 600;
+  line-height: 20px;
 }
 
 .label {
@@ -78,9 +80,9 @@
 
   overflow: hidden;
 
-  color: var(--ant-colorTextSecondary);
-  font-size: 12px;
-  line-height: 16px;
+  color: var(--ant-color-text-secondary);
+  font-size: 13px;
+  line-height: 18px;
 
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -94,7 +96,45 @@
 
 @media (max-width: 576px) {
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .card {
+    .cardBody {
+      display: flex;
+      align-items: center;
+
+      padding: 12px;
+    }
+  }
+
+  .icon {
+    flex-basis: 32px;
+
+    width: 32px;
+    height: 32px;
+
+    font-size: 16px;
+  }
+
+  .value {
+    font-size: 18px;
+    line-height: 22px;
+  }
+
+  .valueSuffix {
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  .label {
+    overflow: visible;
+
+    font-size: 12px;
+    line-height: 17px;
+
+    text-overflow: initial;
+    white-space: normal;
   }
 }
-

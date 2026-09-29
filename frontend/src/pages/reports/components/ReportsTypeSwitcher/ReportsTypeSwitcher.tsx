@@ -1,6 +1,7 @@
 import { Segmented } from 'antd';
 
 import type { ReportType } from '../../types';
+import HorizontalScroll from '../../../../components/horizontalScroll/HorizontalScroll';
 
 type ReportsTypeSwitcherProps = {
   value: ReportType;
@@ -10,7 +11,7 @@ type ReportsTypeSwitcherProps = {
 
 const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   programs: 'Программы',
-  'programs-rating': 'Рейтинг программ',
+  'programs-rating': 'Рейтинг образовательных программ',
   manager: 'Менеджеры',
 };
 
@@ -20,14 +21,16 @@ const ReportsTypeSwitcher = ({
   onChange,
 }: ReportsTypeSwitcherProps) => {
   return (
-    <Segmented
-      value={value}
-      options={availableReportTypes.map((type) => ({
-        value: type,
-        label: REPORT_TYPE_LABELS[type],
-      }))}
-      onChange={(value) => onChange(value as ReportType)}
-    />
+    <HorizontalScroll>
+      <Segmented
+        value={value}
+        options={availableReportTypes.map((type) => ({
+          value: type,
+          label: REPORT_TYPE_LABELS[type],
+        }))}
+        onChange={(value) => onChange(value as ReportType)}
+      />
+    </HorizontalScroll>
   );
 };
 

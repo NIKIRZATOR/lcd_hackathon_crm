@@ -15,4 +15,3 @@ export type ExportTableOptions<T extends object> = {
   sheetName?: string;
   pdfTitle?: string;
 };
-

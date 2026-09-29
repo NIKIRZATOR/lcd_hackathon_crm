@@ -1,7 +1,16 @@
 export type ManagerProgramHealth = 'green' | 'yellow' | 'red';
 
+export type ManagerFilterOption = {
+  id: string;
+  name: string;
+};
+
+export type ManagerReportFilterOptions = {
+  managers: ManagerFilterOption[];
+};
+
 export type ManagerProgramItem = {
-  id: number;
+  id: string;
   university: string;
   name: string;
   product: string;
@@ -9,7 +18,7 @@ export type ManagerProgramItem = {
 };
 
 export type ManagerTaskItem = {
-  id: number;
+  id: string;
   university: string;
   program: string;
   reason: string;
@@ -20,8 +29,8 @@ export type ManagerOverdueTaskItem = ManagerTaskItem & {
 };
 
 export type ManagerReportItem = {
-  id: number;
-  kamId: number;
+  id: string;
+  kamId: string;
   kam: string;
 
   activePrograms: number;

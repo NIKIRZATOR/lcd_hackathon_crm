@@ -13,15 +13,33 @@ type HealthItem = {
   progress: number;
 };
 
-type KamPortfolioHealthProps = { health?: Partial<Record<HealthItem['key'], number>>; activePrograms?: number };
+type KamPortfolioHealthProps = {
+  health?: Partial<Record<HealthItem['key'], number>>;
+  activePrograms?: number;
+};
 
 const KamPortfolioHealth = ({ health = {}, activePrograms = 0 }: KamPortfolioHealthProps) => {
   const navigate = useNavigate();
   const total = Math.max(activePrograms, 1);
   const items: HealthItem[] = [
-    { key: 'green', label: 'Зелёные', count: health.green ?? 0, progress: ((health.green ?? 0) / total) * 100 },
-    { key: 'yellow', label: 'Жёлтые', count: health.yellow ?? 0, progress: ((health.yellow ?? 0) / total) * 100 },
-    { key: 'red', label: 'Красные', count: health.red ?? 0, progress: ((health.red ?? 0) / total) * 100 },
+    {
+      key: 'green',
+      label: 'Зелёные',
+      count: health.green ?? 0,
+      progress: ((health.green ?? 0) / total) * 100,
+    },
+    {
+      key: 'yellow',
+      label: 'Жёлтые',
+      count: health.yellow ?? 0,
+      progress: ((health.yellow ?? 0) / total) * 100,
+    },
+    {
+      key: 'red',
+      label: 'Красные',
+      count: health.red ?? 0,
+      progress: ((health.red ?? 0) / total) * 100,
+    },
   ];
 
   const handleOpenReports = () => {
@@ -51,7 +69,7 @@ const KamPortfolioHealth = ({ health = {}, activePrograms = 0 }: KamPortfolioHea
             </Tooltip>
           </Flex>
 
-          <Button type="text" className={styles.reportsButton} onClick={handleOpenReports}>
+          <Button type="link" className={styles.reportsButton} onClick={handleOpenReports}>
             Открыть в отчётах
             <RightOutlined />
           </Button>

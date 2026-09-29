@@ -1,7 +1,7 @@
 import type { PeriodValue } from '../../../../components/MobilePeriodPicker/MobilePeriodPicker';
 
 export type ProgramsRatingReportFilterOption = {
-  id: number;
+  id: string;
   name: string;
 };
 
@@ -14,22 +14,22 @@ export type ProgramsRatingReportFilterOptions = {
 
 export type ProgramsRatingReportFiltersValues = {
   period: PeriodValue;
-  universityIds: number[];
-  programIds: number[];
-  productIds: number[];
-  responsibleIds: number[];
+  universityIds: string[];
+  programIds: string[];
+  productIds: string[];
+  responsibleIds: string[];
 };
 
 export type ProgramImplementationStatus = 'implemented' | 'inProgress';
 
 export type ProgramsRatingReportUniversityItem = {
   university: {
-    id: number;
+    id: string;
     name: string;
   };
 
   responsible: {
-    id: number;
+    id: string | null;
     name: string;
   };
 
@@ -43,10 +43,10 @@ export type ProgramsRatingReportUniversityItem = {
 export type ProgramRatingReportItem = {
   id: string;
 
-  programId: number;
+  programId: string;
   program: string;
 
-  productId: number;
+  productId: string;
   product: string;
 
   universities: number;
@@ -62,8 +62,7 @@ export type ProgramRatingReportItem = {
   universityItems: ProgramsRatingReportUniversityItem[];
 };
 
-export type ProgramsRatingReportMock = {
-  filters: ProgramsRatingReportFilterOptions;
+export type ProgramsRatingReportResponse = {
   items: ProgramRatingReportItem[];
   total: number;
 };

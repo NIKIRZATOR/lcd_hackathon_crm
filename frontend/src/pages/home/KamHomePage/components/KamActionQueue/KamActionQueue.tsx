@@ -164,7 +164,12 @@ const KamActionQueue = ({ items }: KamActionQueueProps) => {
                 }
                 className={styles.action}
                 disabled={!item.program_instance_id}
-                onClick={() => item.program_instance_id && navigate(`/programs/${item.program_instance_id}?focus=${item.action_target ?? 'program'}`)}
+                onClick={() =>
+                  item.program_instance_id &&
+                  navigate(
+                    `/workflows/${item.program_instance_id}?focus=${item.action_target ?? 'program'}`,
+                  )
+                }
               >
                 {item.action}
               </Button>
