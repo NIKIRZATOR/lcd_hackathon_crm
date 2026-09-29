@@ -137,7 +137,7 @@ const UniversitiesPage = () => {
       <Select className={styles.filter} allowClear showSearch placeholder="Регион" value={filters.region || undefined} options={options.regions.map((value) => ({ value, label: value }))} onChange={(value) => update({ region: value ?? '' })} />
       <Select className={styles.filter} allowClear placeholder="Тип" value={filters.type || undefined} options={options.types.map((value) => ({ value, label: value }))} onChange={(value) => update({ type: value ?? '' })} />
       <Select className={styles.filter} allowClear showSearch placeholder="Направление" value={filters.direction || undefined} options={options.directions.map((value) => ({ value, label: value }))} onChange={(value) => update({ direction: value ?? '' })} />
-      <Select className={styles.filter} allowClear showSearch placeholder="Продукт" value={filters.product || undefined} options={options.products.map((value) => ({ value, label: value }))} onChange={(value) => update({ product: value ?? '' })} />
+      <Select className={styles.filter} allowClear showSearch placeholder="ИТ-программа" value={filters.product || undefined} options={options.products.map((value) => ({ value, label: value }))} onChange={(value) => update({ product: value ?? '' })} />
       {seesTeam && <Select className={styles.filter} allowClear showSearch placeholder="KAM" value={filters.unassigned ? undefined : filters.kam || undefined} options={options.kams.map((value) => ({ value, label: value }))} onChange={(value) => update({ kam: value ?? '', unassigned: false })} />}
       {isAdmin && <Button type={filters.unassigned ? 'primary' : 'default'} onClick={() => update({ unassigned: !filters.unassigned, kam: '' })}>Без KAM</Button>}
       <DatePicker.RangePicker
